@@ -1,0 +1,119 @@
+/* ── RTL layout overrides for Arabic ─────────────────────────────── */
+.shop[dir='rtl'] {
+  --font-sans: 'Segoe UI', Tahoma, 'Noto Sans Arabic', 'Arial Unicode MS', system-ui, sans-serif;
+  --font-serif: 'Segoe UI', Tahoma, 'Noto Naskh Arabic', Georgia, serif;
+}
+
+.shop[dir='rtl'] .shop-nav a::after {
+  left: auto;
+  right: 0;
+}
+
+.shop[dir='rtl'] .shop-nav-drawer {
+  transform: translateX(-100%);
+}
+
+.shop[dir='rtl'] .shop-nav-drawer.is-open {
+  transform: translateX(0);
+}
+
+.shop[dir='rtl'] .hero__logo-mark {
+  right: auto;
+  left: clamp(1rem, 8vw, 6rem);
+}
+
+.shop[dir='rtl'] .hero__title {
+  max-width: none;
+}
+
+.shop[dir='rtl'] .shop__divider {
+  background: linear-gradient(270deg, var(--color-gold), transparent);
+}
+
+.shop[dir='rtl'] .collection-card__link span[aria-hidden='true'] {
+  display: inline-block;
+  transform: scaleX(-1);
+}
+
+.shop[dir='rtl'] .ethos__pillar {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.shop[dir='rtl'] .ritual__step {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.shop[dir='rtl'] .shop__section-header--row {
+  flex-direction: row-reverse;
+}
+
+.shop[dir='rtl'] .product-card__footer {
+  flex-direction: row-reverse;
+}
+
+.shop[dir='rtl'] .hero__stats {
+  flex-direction: row-reverse;
+}
+
+.shop[dir='rtl'] .shop-footer__bottom {
+  flex-direction: row-reverse;
+}
+
+.shop[dir='rtl'] .marquee__track {
+  animation-direction: reverse;
+}
+
+@media (max-width: 768px) {
+  .shop[dir='rtl'] .hero__logo-mark {
+    left: 50%;
+    right: auto;
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* Language toggle */
+.shop-header__lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-pill);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+  background: rgb(var(--rgb-off-white) / 4%);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+  touch-action: manipulation;
+}
+
+.shop-header__lang:hover {
+  border-color: var(--color-border-gold);
+  background: var(--color-glow);
+}
+
+.shop-header__lang [data-lang-option] {
+  padding: 0.15rem 0.35rem;
+  border-radius: var(--radius-pill);
+  transition: color var(--transition-fast), background var(--transition-fast);
+  cursor: pointer;
+}
+
+.shop-header__lang [data-lang-option].is-active {
+  color: var(--color-bg-deep);
+  background: var(--color-off-white);
+}
+
+.shop-header__lang-divider {
+  opacity: 0.35;
+  user-select: none;
+  pointer-events: none;
+}
+
+.shop[dir='rtl'] .shop-header__lang {
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+}

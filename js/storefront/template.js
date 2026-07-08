@@ -3,92 +3,78 @@
  */
 import { logoImg } from '../shared/brand.js';
 
-const MARQUEE_ITEMS = [
-  'Free shipping over $75',
-  'Hand-poured in small batches',
-  'Sustainably sourced oud',
-  'Complimentary gift wrapping',
-  'Same-day Dubai delivery',
-];
-
-const COLLECTIONS = [
-  {
-    id: 'candles',
-    name: 'Signature Candles',
-    count: 12,
-    gradient: 'linear-gradient(160deg, #2a1f14 0%, #0d0b09 60%, #1a1510 100%)',
-  },
-  {
-    id: 'incense',
-    name: 'Incense & Bakhoor',
-    count: 18,
-    gradient: 'linear-gradient(200deg, #1a1814 0%, #2a2018 50%, #0d0b09 100%)',
-  },
-  {
-    id: 'oils',
-    name: 'Attars & Oils',
-    count: 9,
-    gradient: 'linear-gradient(140deg, #1e1a10 0%, #3a2a18 40%, #0d0b09 100%)',
-  },
+const COLLECTION_META = [
+  { id: 'candles', count: 12, gradient: 'linear-gradient(160deg, #2a1f14 0%, #1c1914 60%, #242019 100%)' },
+  { id: 'incense', count: 18, gradient: 'linear-gradient(200deg, #1a1814 0%, #2a2018 50%, #1c1914 100%)' },
+  { id: 'oils', count: 9, gradient: 'linear-gradient(140deg, #1e1a10 0%, #3a2a18 40%, #1c1914 100%)' },
 ];
 
 const CATEGORY_GRADIENTS = {
-  Candles: 'linear-gradient(160deg, #2a1f14, #0d0b09)',
-  Diffusers: 'linear-gradient(160deg, #1a2018, #0d0b09)',
-  Incense: 'linear-gradient(160deg, #201a14, #0d0b09)',
+  Candles: 'linear-gradient(160deg, #2a2620, #1c1914)',
+  Diffusers: 'linear-gradient(160deg, #1a2018, #1c1914)',
+  Incense: 'linear-gradient(160deg, #201a14, #1c1914)',
   Sprays: 'linear-gradient(160deg, #1a1814, #12100e)',
-  Sets: 'linear-gradient(160deg, #2a2018, #0d0b09)',
-  Bakhoor: 'linear-gradient(160deg, #241a10, #0d0b09)',
-  Accessories: 'linear-gradient(160deg, #1a1a1a, #0d0b09)',
-  Oils: 'linear-gradient(160deg, #2a2210, #0d0b09)',
-  General: 'linear-gradient(160deg, #1e1a16, #0d0b09)',
+  Sets: 'linear-gradient(160deg, #2a2018, #1c1914)',
+  Bakhoor: 'linear-gradient(160deg, #241a10, #1c1914)',
+  Accessories: 'linear-gradient(160deg, #1a1a1a, #1c1914)',
+  Oils: 'linear-gradient(160deg, #2a2210, #1c1914)',
+  General: 'linear-gradient(160deg, #1e1a16, #1c1914)',
 };
 
 /**
  * @param {object} opts
  * @param {Array} opts.products
  * @param {string[]} opts.categories
+ * @param {ReturnType<import('./i18n.js').createI18n>} opts.i18n
  */
-export function buildStorefrontHtml({ products, categories }) {
+export function buildStorefrontHtml({ products, categories, i18n }) {
+  const t = i18n.t.bind(i18n);
   const year = new Date().getFullYear();
   const categoryChips = ['All', ...categories];
+  const marqueeItems = t('marquee');
 
   return `
-    <a href="#main-content" class="shop__skip">Skip to content</a>
+    <a href="#main-content" class="shop__skip">${t('skip')}</a>
 
     <header class="shop-header" role="banner" data-header>
       <div class="shop-header__inner">
-        <a href="/" class="shop-header__logo" aria-label="Shamaadan home">
+        <a href="/" class="shop-header__logo" aria-label="${t('nav.home')}">
           ${logoImg({ className: 'shop-header__logo-img', size: 'header', loading: 'eager' })}
         </a>
 
-        <nav class="shop-nav" aria-label="Primary" data-nav>
-          <a href="#collections" data-nav-link>Collections</a>
-          <a href="#shop" data-nav-link>Shop</a>
-          <a href="#ritual" data-nav-link>Ritual</a>
-          <a href="#contact" data-nav-link>Contact</a>
+        <nav class="shop-nav" aria-label="${t('nav.primary')}" data-nav>
+          <a href="#collections" data-nav-link>${t('nav.collections')}</a>
+          <a href="#shop" data-nav-link>${t('nav.shop')}</a>
+          <a href="#ritual" data-nav-link>${t('nav.ritual')}</a>
+          <a href="#contact" data-nav-link>${t('nav.contact')}</a>
         </nav>
 
         <div class="shop-header__actions">
-          <button type="button" class="shop-header__cart" aria-label="Shopping bag" data-cart-toggle>
+          <button type="button" class="shop-header__lang" data-lang-toggle aria-label="${t('nav.switchLang')}">
+            <span data-lang-option="en">${t('lang.en')}</span>
+            <span class="shop-header__lang-divider" aria-hidden="true">|</span>
+            <span data-lang-option="ar">${t('lang.ar')}</span>
+          </button>
+
+          <button type="button" class="shop-header__cart" aria-label="${t('nav.cart')}" data-cart-toggle>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
               <path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6l-1-3H2"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/>
             </svg>
             <span class="shop-header__cart-count" data-cart-count aria-live="polite">0</span>
           </button>
 
-          <button type="button" class="shop-header__menu-btn" aria-label="Open menu" aria-expanded="false" data-menu-toggle>
+          <button type="button" class="shop-header__menu-btn" aria-label="${t('nav.openMenu')}" aria-expanded="false" data-menu-toggle>
             <span></span><span></span><span></span>
           </button>
         </div>
       </div>
     </header>
 
-    <nav class="shop-nav-drawer" aria-label="Mobile" data-nav-drawer hidden>
-      <a href="#collections" data-nav-link>Collections</a>
-      <a href="#shop" data-nav-link>Shop</a>
-      <a href="#ritual" data-nav-link>Ritual</a>
-      <a href="#contact" data-nav-link>Contact</a>
+    <nav class="shop-nav-drawer" aria-label="${t('nav.mobile')}" data-nav-drawer hidden>
+      <a href="#collections" data-nav-link>${t('nav.collections')}</a>
+      <a href="#shop" data-nav-link>${t('nav.shop')}</a>
+      <a href="#ritual" data-nav-link>${t('nav.ritual')}</a>
+      <a href="#contact" data-nav-link>${t('nav.contact')}</a>
     </nav>
 
     <main id="main-content">
@@ -102,83 +88,76 @@ export function buildStorefrontHtml({ products, categories }) {
         </div>
 
         <div class="hero__content">
-          <p class="hero__eyebrow" data-animate="fade-up">Luxury fragrance house</p>
-          <h1 class="hero__title" id="hero-heading" data-animate="fade-up" data-delay="0.1">
-            Scent as <em>ritual</em>
-          </h1>
-          <p class="hero__desc" data-animate="fade-up" data-delay="0.2">
-            Hand-crafted oud, incense, and candles — composed for those who treat every evening as a ceremony.
-          </p>
+          <p class="hero__eyebrow" data-animate="fade-up">${t('hero.eyebrow')}</p>
+          <h1 class="hero__title" id="hero-heading" data-animate="fade-up" data-delay="0.1">${t('hero.title')}</h1>
+          <p class="hero__desc" data-animate="fade-up" data-delay="0.2">${t('hero.desc')}</p>
           <div class="hero__actions" data-animate="fade-up" data-delay="0.3">
-            <a href="#shop" class="btn btn--primary">Shop Collection</a>
-            <a href="#ritual" class="btn btn--ghost">Our Ritual</a>
+            <a href="#shop" class="btn btn--primary">${t('hero.ctaShop')}</a>
+            <a href="#ritual" class="btn btn--ghost">${t('hero.ctaRitual')}</a>
           </div>
           <div class="hero__stats" data-animate="fade-up" data-delay="0.4">
             <div class="hero__stat">
               <span class="hero__stat-value">40+</span>
-              <span class="hero__stat-label">Curated scents</span>
+              <span class="hero__stat-label">${t('hero.statScents')}</span>
             </div>
             <div class="hero__stat">
               <span class="hero__stat-value">100%</span>
-              <span class="hero__stat-label">Natural oils</span>
+              <span class="hero__stat-label">${t('hero.statOils')}</span>
             </div>
             <div class="hero__stat">
               <span class="hero__stat-value">4.9</span>
-              <span class="hero__stat-label">Customer rating</span>
+              <span class="hero__stat-label">${t('hero.statRating')}</span>
             </div>
           </div>
         </div>
 
         <div class="hero__scroll-hint" aria-hidden="true" data-animate="fade" data-delay="0.8">
-          <span>Scroll</span>
+          <span>${t('hero.scroll')}</span>
           <div class="hero__scroll-line"></div>
         </div>
       </section>
 
       <div class="marquee" aria-hidden="true">
         <div class="marquee__track">
-          ${marqueeHtml()}
-          ${marqueeHtml()}
+          ${marqueeHtml(marqueeItems)}
+          ${marqueeHtml(marqueeItems)}
         </div>
       </div>
 
       <section class="shop__section ethos" id="about" aria-labelledby="ethos-heading">
         <div class="shop__container">
           <div class="ethos__grid">
-            <div class="ethos__visual" data-animate="fade-right">
+            <div class="ethos__visual" data-animate="${i18n.isRtl() ? 'fade-left' : 'fade-right'}">
               <div class="ethos__visual-bg"></div>
               <div class="ethos__visual-accent">
-                <p class="ethos__visual-text">"Every flame<br>is an invitation<br>to pause."</p>
+                <p class="ethos__visual-text">${t('ethos.quote')}</p>
               </div>
             </div>
-            <div data-animate="fade-left">
-              <p class="shop__eyebrow">Our ethos</p>
-              <h2 class="shop__title" id="ethos-heading">Crafted with intention</h2>
+            <div data-animate="${i18n.isRtl() ? 'fade-right' : 'fade-left'}">
+              <p class="shop__eyebrow">${t('ethos.eyebrow')}</p>
+              <h2 class="shop__title" id="ethos-heading">${t('ethos.title')}</h2>
               <hr class="shop__divider">
-              <p class="shop__lead">
-                Shamaadan sources rare oud, amber, and rose taif from trusted ateliers across the Gulf —
-                blended in micro-batches to preserve depth and longevity.
-              </p>
+              <p class="shop__lead">${t('ethos.lead')}</p>
               <div class="ethos__pillars">
                 <div class="ethos__pillar">
                   <span class="ethos__pillar-num">01</span>
                   <div>
-                    <h3>Small-batch atelier</h3>
-                    <p>Each product is poured, packed, and numbered by hand in our Dubai studio.</p>
+                    <h3>${t('ethos.p1Title')}</h3>
+                    <p>${t('ethos.p1Desc')}</p>
                   </div>
                 </div>
                 <div class="ethos__pillar">
                   <span class="ethos__pillar-num">02</span>
                   <div>
-                    <h3>Ethically sourced</h3>
-                    <p>We partner directly with growers — no middlemen, no compromise on purity.</p>
+                    <h3>${t('ethos.p2Title')}</h3>
+                    <p>${t('ethos.p2Desc')}</p>
                   </div>
                 </div>
                 <div class="ethos__pillar">
                   <span class="ethos__pillar-num">03</span>
                   <div>
-                    <h3>Designed to linger</h3>
-                    <p>Formulations built for throw, burn-time, and the slow unfurling of top notes.</p>
+                    <h3>${t('ethos.p3Title')}</h3>
+                    <p>${t('ethos.p3Desc')}</p>
                   </div>
                 </div>
               </div>
@@ -191,13 +170,13 @@ export function buildStorefrontHtml({ products, categories }) {
         <div class="shop__container">
           <div class="shop__section-header shop__section-header--row">
             <div>
-              <p class="shop__eyebrow">Curated for you</p>
-              <h2 class="shop__title" id="collections-heading">Collections</h2>
+              <p class="shop__eyebrow">${t('collections.eyebrow')}</p>
+              <h2 class="shop__title" id="collections-heading">${t('collections.title')}</h2>
             </div>
-            <a href="#shop" class="btn btn--ghost btn--sm">View all</a>
+            <a href="#shop" class="btn btn--ghost btn--sm">${t('collections.viewAll')}</a>
           </div>
           <div class="shop__grid-3" data-animate="stagger-grid">
-            ${COLLECTIONS.map((c) => collectionCardHtml(c)).join('')}
+            ${COLLECTION_META.map((c) => collectionCardHtml(c, i18n)).join('')}
           </div>
         </div>
       </section>
@@ -205,19 +184,19 @@ export function buildStorefrontHtml({ products, categories }) {
       <section class="shop__section shop-products" id="shop" aria-labelledby="shop-heading">
         <div class="shop__container">
           <div class="shop__section-header">
-            <p class="shop__eyebrow">The boutique</p>
-            <h2 class="shop__title" id="shop-heading">Shop the edit</h2>
-            <p class="shop__lead">Tap to add — complimentary gift wrapping on every order.</p>
+            <p class="shop__eyebrow">${t('shop.eyebrow')}</p>
+            <h2 class="shop__title" id="shop-heading">${t('shop.title')}</h2>
+            <p class="shop__lead">${t('shop.lead')}</p>
           </div>
 
-          <div class="shop-products__filters" role="group" aria-label="Filter by category" data-filters>
+          <div class="shop-products__filters" role="group" aria-label="${t('shop.filterLabel')}" data-filters>
             ${categoryChips.map((cat, i) => `
-              <button type="button" class="filter-chip${i === 0 ? ' is-active' : ''}" data-filter="${escapeAttr(cat)}">${escapeHtml(cat)}</button>
+              <button type="button" class="filter-chip${i === 0 ? ' is-active' : ''}" data-filter="${escapeAttr(cat)}">${escapeHtml(i18n.translateCategory(cat))}</button>
             `).join('')}
           </div>
 
           <div class="shop__grid-products" data-product-grid role="list">
-            ${products.map((p) => productCardHtml(p)).join('')}
+            ${products.map((p) => productCardHtml(p, i18n)).join('')}
           </div>
         </div>
       </section>
@@ -226,30 +205,30 @@ export function buildStorefrontHtml({ products, categories }) {
         <div class="shop__container">
           <div class="ritual__inner" data-animate="fade-up">
             <div>
-              <p class="shop__eyebrow">The evening ritual</p>
-              <h2 class="shop__title" id="ritual-heading">Three movements of scent</h2>
+              <p class="shop__eyebrow">${t('ritual.eyebrow')}</p>
+              <h2 class="shop__title" id="ritual-heading">${t('ritual.title')}</h2>
               <hr class="shop__divider">
-              <p class="shop__lead">A guided sequence to transform your space from day to sanctuary.</p>
+              <p class="shop__lead">${t('ritual.lead')}</p>
               <div class="ritual__steps">
                 <div class="ritual__step">
                   <span class="ritual__step-icon">I</span>
                   <div>
-                    <h4>Clear the air</h4>
-                    <p>Light a sandalwood base to neutralize and open the room.</p>
+                    <h4>${t('ritual.s1Title')}</h4>
+                    <p>${t('ritual.s1Desc')}</p>
                   </div>
                 </div>
                 <div class="ritual__step">
                   <span class="ritual__step-icon">II</span>
                   <div>
-                    <h4>Layer the heart</h4>
-                    <p>Add bakhoor or incense — let the middle notes bloom for ten minutes.</p>
+                    <h4>${t('ritual.s2Title')}</h4>
+                    <p>${t('ritual.s2Desc')}</p>
                   </div>
                 </div>
                 <div class="ritual__step">
                   <span class="ritual__step-icon">III</span>
                   <div>
-                    <h4>Seal with oud</h4>
-                    <p>Finish with a single drop of attar on pulse points. The scent will anchor for hours.</p>
+                    <h4>${t('ritual.s3Title')}</h4>
+                    <p>${t('ritual.s3Desc')}</p>
                   </div>
                 </div>
               </div>
@@ -268,14 +247,12 @@ export function buildStorefrontHtml({ products, categories }) {
       <section class="shop__section newsletter" id="contact" aria-labelledby="contact-heading">
         <div class="shop__container">
           <div class="newsletter__box" data-animate="fade-up">
-            <p class="shop__eyebrow">Stay in the circle</p>
-            <h2 class="shop__title" id="contact-heading">Private releases &amp; rituals</h2>
-            <p class="shop__lead" style="margin-inline:auto">
-              Be first to discover limited editions, seasonal blends, and invitation-only events.
-            </p>
+            <p class="shop__eyebrow">${t('newsletter.eyebrow')}</p>
+            <h2 class="shop__title" id="contact-heading">${t('newsletter.title')}</h2>
+            <p class="shop__lead" style="margin-inline:auto">${t('newsletter.lead')}</p>
             <form class="newsletter__form" data-newsletter novalidate>
-              <input type="email" class="newsletter__input" placeholder="Your email address" aria-label="Email address" required>
-              <button type="submit" class="btn btn--primary">Subscribe</button>
+              <input type="email" class="newsletter__input" placeholder="${t('newsletter.placeholder')}" aria-label="${t('newsletter.emailLabel')}" required>
+              <button type="submit" class="btn btn--primary">${t('newsletter.submit')}</button>
             </form>
           </div>
         </div>
@@ -286,114 +263,116 @@ export function buildStorefrontHtml({ products, categories }) {
       <div class="shop__container">
         <div class="shop-footer__grid">
           <div>
-            <a href="/" class="shop-footer__brand" aria-label="Shamaadan home">
+            <a href="/" class="shop-footer__brand" aria-label="${t('nav.home')}">
               ${logoImg({ className: 'shop-footer__logo-img', size: 'footer' })}
             </a>
-            <p class="shop-footer__tagline">Luxury fragrance &amp; home rituals — composed in Dubai, delivered worldwide.</p>
+            <p class="shop-footer__tagline">${t('footer.tagline')}</p>
             <div class="shop-footer__social">
-              <a href="#" aria-label="Instagram">IG</a>
-              <a href="#" aria-label="TikTok">TK</a>
-              <a href="#" aria-label="Pinterest">PI</a>
+              <a href="#" aria-label="${t('footer.instagram')}">IG</a>
+              <a href="#" aria-label="${t('footer.tiktok')}">TK</a>
+              <a href="#" aria-label="${t('footer.pinterest')}">PI</a>
             </div>
           </div>
           <div class="shop-footer__col">
-            <h4>Shop</h4>
+            <h4>${t('footer.shop')}</h4>
             <ul>
-              <li><a href="#shop">All products</a></li>
-              <li><a href="#collections">Collections</a></li>
-              <li><a href="#shop">Gift sets</a></li>
-              <li><a href="#shop">New arrivals</a></li>
+              <li><a href="#shop">${t('footer.allProducts')}</a></li>
+              <li><a href="#collections">${t('nav.collections')}</a></li>
+              <li><a href="#shop">${t('footer.giftSets')}</a></li>
+              <li><a href="#shop">${t('footer.newArrivals')}</a></li>
             </ul>
           </div>
           <div class="shop-footer__col">
-            <h4>House</h4>
+            <h4>${t('footer.house')}</h4>
             <ul>
-              <li><a href="#about">Our story</a></li>
-              <li><a href="#ritual">The ritual</a></li>
-              <li><a href="#">Sustainability</a></li>
-              <li><a href="#">Stockists</a></li>
+              <li><a href="#about">${t('footer.ourStory')}</a></li>
+              <li><a href="#ritual">${t('footer.theRitual')}</a></li>
+              <li><a href="#">${t('footer.sustainability')}</a></li>
+              <li><a href="#">${t('footer.stockists')}</a></li>
             </ul>
           </div>
           <div class="shop-footer__col">
-            <h4>Support</h4>
+            <h4>${t('footer.support')}</h4>
             <ul>
-              <li><a href="#">Shipping</a></li>
-              <li><a href="#">Returns</a></li>
-              <li><a href="#contact">Contact</a></li>
-              <li><a href="#">FAQ</a></li>
+              <li><a href="#">${t('footer.shipping')}</a></li>
+              <li><a href="#">${t('footer.returns')}</a></li>
+              <li><a href="#contact">${t('nav.contact')}</a></li>
+              <li><a href="#">${t('footer.faq')}</a></li>
             </ul>
           </div>
         </div>
         <div class="shop-footer__bottom">
-          <span>&copy; ${year} Shamaadan. All rights reserved.</span>
-          <span>Crafted with intention in Dubai</span>
+          <span>&copy; ${year} Shamaadan. ${t('footer.rights')}</span>
+          <span>${t('footer.crafted')}</span>
         </div>
       </div>
     </footer>
 
     <div class="shop-toast" role="status" aria-live="polite" data-toast>
       <span class="shop-toast__icon" aria-hidden="true">✦</span>
-      <span data-toast-message>Added to bag</span>
+      <span data-toast-message></span>
     </div>
   `;
 }
 
-export function productCardHtml(product) {
+export function productCardHtml(product, i18n) {
+  const t = i18n.t.bind(i18n);
+  const display = i18n.translateProduct(product);
   const gradient = CATEGORY_GRADIENTS[product.category] || CATEGORY_GRADIENTS.General;
-  const initial = product.name.charAt(0).toUpperCase();
+  const initial = display.displayName.charAt(0);
   const isNew = product.id === 'p1' || product.id === 'p5';
-  const badge = isNew ? '<span class="product-card__badge">New</span>' : '';
+  const badge = isNew ? `<span class="product-card__badge">${t('shop.new')}</span>` : '';
 
   return `
     <article class="product-card" role="listitem" data-product-id="${product.id}" style="--card-gradient: ${gradient}">
       <div class="product-card__media">
         <div class="product-card__visual">
-          <span class="product-card__monogram" aria-hidden="true">${initial}</span>
+          <span class="product-card__monogram" aria-hidden="true">${escapeHtml(initial)}</span>
         </div>
         <div class="product-card__shine" aria-hidden="true"></div>
         ${badge}
         <div class="product-card__quick-add">
-          <button type="button" class="btn btn--copper btn--sm" data-action="add-to-cart" data-product-id="${product.id}">Add</button>
+          <button type="button" class="btn btn--copper btn--sm" data-action="add-to-cart" data-product-id="${product.id}">${t('shop.add')}</button>
         </div>
       </div>
       <div class="product-card__body">
-        <p class="product-card__category">${escapeHtml(product.category)}</p>
-        <h3 class="product-card__name">${escapeHtml(product.name)}</h3>
+        <p class="product-card__category">${escapeHtml(display.displayCategory)}</p>
+        <h3 class="product-card__name">${escapeHtml(display.displayName)}</h3>
         <div class="product-card__footer">
-          <span class="product-card__price" data-price="${product.price}">${formatPrice(product.price)}</span>
-          <button type="button" class="btn btn--ghost btn--sm" data-action="add-to-cart" data-product-id="${product.id}">+ Bag</button>
+          <span class="product-card__price" data-price="${product.price}">${i18n.formatPrice(product.price)}</span>
+          <button type="button" class="btn btn--ghost btn--sm" data-action="add-to-cart" data-product-id="${product.id}">${t('shop.bag')}</button>
         </div>
       </div>
     </article>
   `;
 }
 
-function collectionCardHtml(collection) {
+function collectionCardHtml(collection, i18n) {
+  const t = i18n.t.bind(i18n);
+  const name = i18n.translateCollection(collection.id);
+
   return `
     <a href="#shop" class="collection-card" data-collection="${collection.id}">
       <div class="collection-card__bg" style="--collection-gradient: ${collection.gradient}"></div>
       <div class="collection-card__overlay"></div>
       <div class="collection-card__content">
-        <p class="collection-card__count">${collection.count} pieces</p>
-        <h3 class="collection-card__name">${escapeHtml(collection.name)}</h3>
-        <span class="collection-card__link">Explore <span aria-hidden="true">→</span></span>
+        <p class="collection-card__count">${collection.count} ${t('collections.pieces')}</p>
+        <h3 class="collection-card__name">${escapeHtml(name)}</h3>
+        <span class="collection-card__link">${t('collections.explore')} <span aria-hidden="true">→</span></span>
       </div>
     </a>
   `;
 }
 
-function marqueeHtml() {
+function marqueeHtml(items) {
+  const list = Array.isArray(items) ? items : [];
   return `
     <div class="marquee__content">
-      ${MARQUEE_ITEMS.map((item) => `
-        <span class="marquee__item"><span class="marquee__dot"></span>${item}</span>
+      ${list.map((item) => `
+        <span class="marquee__item"><span class="marquee__dot"></span>${escapeHtml(item)}</span>
       `).join('')}
     </div>
   `;
-}
-
-function formatPrice(amount) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 }
 
 function escapeHtml(str) {
@@ -407,4 +386,4 @@ function escapeAttr(str) {
   return escapeHtml(str).replace(/"/g, '&quot;');
 }
 
-export { COLLECTIONS, CATEGORY_GRADIENTS };
+export { COLLECTION_META, CATEGORY_GRADIENTS };

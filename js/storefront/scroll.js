@@ -9,6 +9,7 @@ let lenisInstance = null;
  */
 export async function initSmoothScroll() {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    bindSmoothScrollAnchors(null);
     return null;
   }
 
@@ -29,21 +30,12 @@ export async function initSmoothScroll() {
       requestAnimationFrame(raf);
     }
     requestAnimationFrame(raf);
-
-    document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
-      anchor.addEventListener('click', (event) => {
-        const id = anchor.getAttribute('href');
-        if (!id || id === '#') return;
-        const target = document.querySelector(id);
-        if (!target) return;
-        event.preventDefault();
-        lenis.scrollTo(target, { offset: -72, duration: 1.2 });
-      });
-    });
+    bindSmoothScrollAnchors(lenis);
 
     return lenis;
   } catch (error) {
     console.warn('[scroll] Lenis unavailable, using native scroll.', error);
+    bindSmoothScrollAnchors(null);
     return null;
   }
 }
@@ -75,6 +67,30 @@ export function syncScrollTrigger(lenis) {
 
 export function getLenis() {
   return lenisInstance;
+}
+
+/** Document-level anchor scrolling — survives DOM re-renders. */
+function bindSmoothScrollAnchors(lenis) {
+  if (bindSmoothScrollAnchors._bound) return;
+  bindSmoothScrollAnchors._bound = true;
+
+  document.addEventListener('click', (event) => {
+    const anchor = event.target.closest('#app-root a[href^="#"]');
+    if (!anchor) return;
+
+    const id = anchor.getAttribute('href');
+    if (!id || id === '#') return;
+    const target = document.querySelector(id);
+    if (!target) return;
+
+    event.preventDefault();
+    const instance = lenisInstance ?? lenis;
+    if (instance) {
+      instance.scrollTo(target, { offset: -72, duration: 1.2 });
+    } else {
+      target.scrollIntoView({ behavior: 'smooth' });
+    }
+  });
 }
 
 export function destroySmoothScroll() {

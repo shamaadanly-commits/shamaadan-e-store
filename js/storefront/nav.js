@@ -4,20 +4,18 @@
 
 /**
  * @param {HTMLElement} root
+ * @param {ReturnType<import('./i18n.js').createI18n>} i18n
  */
-export function initNav(root) {
+export function initNav(root, i18n) {
   const header = root.querySelector('[data-header]');
   const menuBtn = root.querySelector('[data-menu-toggle]');
   const drawer = root.querySelector('[data-nav-drawer]');
   const navLinks = root.querySelectorAll('[data-nav-link]');
   const sections = ['collections', 'shop', 'ritual', 'contact', 'about'];
 
-  let lastScrollY = 0;
-
   function onScroll() {
     const y = window.scrollY;
     header?.classList.toggle('is-scrolled', y > 40);
-    lastScrollY = y;
     updateActiveLink();
   }
 
@@ -42,14 +40,14 @@ export function initNav(root) {
     drawer?.removeAttribute('hidden');
     requestAnimationFrame(() => drawer?.classList.add('is-open'));
     menuBtn?.setAttribute('aria-expanded', 'true');
-    menuBtn?.setAttribute('aria-label', 'Close menu');
+    menuBtn?.setAttribute('aria-label', i18n.t('nav.closeMenu'));
     document.body.style.overflow = 'hidden';
   }
 
   function closeDrawer() {
     drawer?.classList.remove('is-open');
     menuBtn?.setAttribute('aria-expanded', 'false');
-    menuBtn?.setAttribute('aria-label', 'Open menu');
+    menuBtn?.setAttribute('aria-label', i18n.t('nav.openMenu'));
     document.body.style.overflow = '';
     setTimeout(() => drawer?.setAttribute('hidden', ''), 320);
   }
@@ -67,13 +65,18 @@ export function initNav(root) {
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
 
-  return { closeDrawer, onScroll };
+  return {
+    closeDrawer,
+    onScroll,
+    destroy: () => window.removeEventListener('scroll', onScroll),
+  };
 }
 
 /**
  * @param {HTMLElement} root
+ * @param {ReturnType<import('./i18n.js').createI18n>} i18n
  */
-export function bindNewsletter(root) {
+export function bindNewsletter(root, i18n) {
   const form = root.querySelector('[data-newsletter]');
   if (!form) return;
 
@@ -83,9 +86,9 @@ export function bindNewsletter(root) {
     if (!input?.value) return;
 
     const btn = form.querySelector('button[type="submit"]');
-    const original = btn?.textContent ?? 'Subscribe';
+    const original = btn?.textContent ?? i18n.t('newsletter.submit');
     if (btn) {
-      btn.textContent = 'Welcome ✦';
+      btn.textContent = i18n.t('newsletter.welcome');
       btn.disabled = true;
     }
     input.value = '';

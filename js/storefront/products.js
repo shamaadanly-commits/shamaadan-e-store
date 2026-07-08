@@ -54,11 +54,12 @@ export function filterProducts(products, filter) {
  * Re-render the product grid.
  * @param {HTMLElement} gridEl
  * @param {Array} products
+ * @param {ReturnType<import('./i18n.js').createI18n>} i18n
  */
-export function renderProductGrid(gridEl, products) {
+export function renderProductGrid(gridEl, products, i18n) {
   if (!products.length) {
-    gridEl.innerHTML = '<p class="shop__lead">No products in this collection yet.</p>';
+    gridEl.innerHTML = `<p class="shop__lead">${i18n.t('shop.empty')}</p>`;
     return;
   }
-  gridEl.innerHTML = products.map((p) => productCardHtml(p)).join('');
+  gridEl.innerHTML = products.map((p) => productCardHtml(p, i18n)).join('');
 }
