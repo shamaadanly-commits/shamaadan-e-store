@@ -16,7 +16,7 @@ export async function mount(root) {
   const cart = createCart();
 
   root.className = 'shop';
-  document.body.style.background = '#0a0908';
+  document.body.style.background = '#181510';
   document.documentElement.style.colorScheme = 'dark';
   root.innerHTML = buildStorefrontHtml({ products, categories });
 

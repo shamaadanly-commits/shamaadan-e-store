@@ -1,13 +1,23 @@
 /* ── Shamaadan Storefront — Design Tokens ─────────────────────────── */
 .shop {
-  --color-bg-deep: #0a0908;
-  --color-bg-elevated: #13110f;
-  --color-bg-muted: #1a1714;
-  --color-bg-card: #161310;
+  /* Off-white foundation — reduces eye strain on dark UI */
+  --color-off-white: #ebe6dc;
+  --color-cream: #f4f0e8;
+  --rgb-off-white: 235 230 220;
+  --rgb-cream: 244 240 232;
+  --rgb-bg-deep: 24 21 16;
 
-  --color-text-primary: #f5f0e8;
-  --color-text-secondary: #a89f92;
-  --color-text-muted: #6e655c;
+  /* Warm charcoal bases with cream undertone */
+  --color-bg-deep: #181510;
+  --color-bg-elevated: #211e19;
+  --color-bg-muted: #28241e;
+  --color-bg-card: #232018;
+  --color-bg-cream: #2c2822;
+
+  /* Softer text contrast — less harsh than pure white */
+  --color-text-primary: #e8e3d9;
+  --color-text-secondary: #b5aea3;
+  --color-text-muted: #8a8378;
 
   /* Warm accents — toned down 40% from original palette */
   --rgb-gold: 125 101 26;
@@ -18,9 +28,12 @@
   --color-copper: #57391d;
   --color-copper-hover: #684729;
 
-  --color-border: rgb(255 255 255 / 7%);
+  --color-border: rgb(var(--rgb-off-white) / 10%);
+  --color-border-soft: rgb(var(--rgb-off-white) / 5%);
   --color-border-gold: rgb(var(--rgb-gold) / 13%);
   --color-glow: rgb(var(--rgb-gold) / 8%);
+  --color-wash: rgb(var(--rgb-off-white) / 3%);
+  --color-wash-strong: rgb(var(--rgb-off-white) / 6%);
 
   --font-serif: Georgia, 'Times New Roman', 'Palatino Linotype', serif;
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -50,7 +63,10 @@
   --shadow-glow: 0 0 60px var(--color-glow);
 
   color: var(--color-text-primary);
-  background: var(--color-bg-deep);
+  background:
+    radial-gradient(ellipse 100% 70% at 50% -10%, var(--color-wash-strong) 0%, transparent 55%),
+    radial-gradient(ellipse 80% 50% at 100% 50%, rgb(var(--rgb-cream) / 2%) 0%, transparent 45%),
+    var(--color-bg-deep);
   font-family: var(--font-sans);
   font-size: var(--text-body);
   line-height: 1.6;

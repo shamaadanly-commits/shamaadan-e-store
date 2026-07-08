@@ -20,9 +20,10 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 80% 60% at 70% 20%, rgb(var(--rgb-copper) / 11%) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 50% at 20% 80%, rgb(var(--rgb-gold) / 6%) 0%, transparent 55%),
-    linear-gradient(180deg, #0d0b09 0%, #0a0908 40%, #13110f 100%);
+    radial-gradient(ellipse 80% 60% at 70% 20%, rgb(var(--rgb-copper) / 9%) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 20% 80%, rgb(var(--rgb-gold) / 5%) 0%, transparent 55%),
+    radial-gradient(ellipse 90% 60% at 50% 100%, var(--color-wash) 0%, transparent 50%),
+    linear-gradient(180deg, #1c1914 0%, var(--color-bg-deep) 40%, var(--color-bg-elevated) 100%);
 }
 
 .hero__grain {
@@ -130,7 +131,7 @@
   flex-wrap: wrap;
   gap: clamp(1.5rem, 4vw, 3.5rem);
   padding-top: clamp(1.5rem, 3vh, 2.5rem);
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border-soft);
 }
 
 .hero__stat {
@@ -204,8 +205,8 @@
 /* ── Marquee trust strip ─────────────────────────────────────────── */
 .marquee {
   padding-block: 1.25rem;
-  border-block: 1px solid var(--color-border);
-  background: var(--color-bg-elevated);
+  border-block: 1px solid var(--color-border-soft);
+  background: var(--color-bg-cream);
   overflow: hidden;
 }
 
@@ -261,7 +262,7 @@
 
 /* ── Ethos ─────────────────────────────────────────────────────── */
 .ethos {
-  background: var(--color-bg-elevated);
+  background: linear-gradient(180deg, var(--color-bg-elevated) 0%, var(--color-bg-muted) 100%);
 }
 
 .ethos__grid {
@@ -276,13 +277,13 @@
   aspect-ratio: 4 / 5;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-soft);
 }
 
 .ethos__visual-bg {
   position: absolute;
   inset: 0;
-  background: linear-gradient(145deg, #1e1810 0%, #0d0b09 50%, #1a1510 100%);
+  background: linear-gradient(145deg, #2a2620 0%, #1c1914 50%, #242019 100%);
 }
 
 .ethos__visual-accent {
@@ -358,7 +359,7 @@
 
 /* ── Products / Shop ───────────────────────────────────────────── */
 .shop-products {
-  background: var(--color-bg-muted);
+  background: linear-gradient(180deg, var(--color-bg-muted) 0%, var(--color-bg-deep) 100%);
 }
 
 .shop-products__filters {
@@ -375,7 +376,7 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--color-text-secondary);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-pill);
   transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
 }
@@ -399,8 +400,8 @@
   gap: clamp(2rem, 5vw, 4rem);
   align-items: center;
   padding: clamp(3rem, 6vw, 5rem);
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
+  background: var(--color-bg-cream);
+  border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-lg);
 }
 
@@ -416,7 +417,7 @@
   gap: 1rem;
   align-items: flex-start;
   padding-bottom: 1.5rem;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-soft);
 }
 
 .ritual__step:last-child {
@@ -461,7 +462,7 @@
 .ritual__visual-bg {
   position: absolute;
   inset: 0;
-  background: conic-gradient(from 210deg at 50% 50%, #1a1510, #2a2018, #1a1510, #0d0b09, #1a1510);
+  background: conic-gradient(from 210deg at 50% 50%, #242019, #322a22, #242019, #1c1914, #242019);
 }
 
 .ritual__visual-ring {
@@ -514,8 +515,8 @@
   max-width: 36rem;
   margin-inline: auto;
   padding: clamp(2.5rem, 5vw, 4rem);
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
+  background: var(--color-bg-cream);
+  border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-lg);
 }
 
@@ -529,7 +530,7 @@
   flex: 1;
   padding: 0.85rem 1.15rem;
   background: var(--color-bg-deep);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-pill);
   color: var(--color-text-primary);
   font-size: var(--text-small);
@@ -554,7 +555,7 @@
 /* ── Footer ──────────────────────────────────────────────────────── */
 .shop-footer {
   padding-block: clamp(3rem, 6vh, 5rem) 2rem;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border-soft);
   background: var(--color-bg-deep);
 }
 
@@ -650,7 +651,7 @@
   justify-content: space-between;
   gap: 1rem;
   padding-top: 2rem;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border-soft);
   font-size: var(--text-small);
   color: var(--color-text-muted);
 }

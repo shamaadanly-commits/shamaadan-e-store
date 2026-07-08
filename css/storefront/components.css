@@ -29,8 +29,8 @@
 }
 
 .shop-header.is-scrolled {
-  background: rgb(10 9 8 / 82%);
-  backdrop-filter: blur(16px) saturate(1.4);
+  background: rgb(var(--rgb-bg-deep) / 85%);
+  backdrop-filter: blur(16px) saturate(1.2);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -186,7 +186,7 @@
   position: fixed;
   inset: var(--header-height) 0 0;
   z-index: 99;
-  background: rgb(10 9 8 / 96%);
+  background: rgb(var(--rgb-bg-deep) / 94%);
   backdrop-filter: blur(20px);
   padding: 2rem var(--space-container);
   display: flex;
@@ -299,7 +299,7 @@
   display: flex;
   flex-direction: column;
   background: var(--color-bg-card);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-md);
   overflow: hidden;
   transition: border-color var(--transition-med), box-shadow var(--transition-med), transform var(--transition-med);
@@ -315,7 +315,7 @@
   position: relative;
   aspect-ratio: 4 / 5;
   overflow: hidden;
-  background: var(--card-gradient, linear-gradient(160deg, #1e1a16, #0d0b09));
+  background: var(--card-gradient, linear-gradient(160deg, #2a2620, #1c1914));
 }
 
 .product-card__visual {
@@ -329,7 +329,7 @@
 .product-card__monogram {
   font-family: var(--font-serif);
   font-size: clamp(2.5rem, 8vw, 4rem);
-  color: rgb(255 255 255 / 8%);
+  color: rgb(var(--rgb-off-white) / 10%);
   user-select: none;
   pointer-events: none;
 }
@@ -339,7 +339,7 @@
   inset: 0;
   background: linear-gradient(
     135deg,
-    rgb(255 255 255 / 6%) 0%,
+    rgb(var(--rgb-off-white) / 7%) 0%,
     transparent 45%,
     transparent 55%,
     rgb(var(--rgb-gold) / 5%) 100%
@@ -361,7 +361,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  background: rgb(10 9 8 / 75%);
+  background: rgb(var(--rgb-bg-deep) / 72%);
   backdrop-filter: blur(8px);
   border: 1px solid var(--color-border-gold);
   border-radius: var(--radius-pill);
@@ -453,7 +453,7 @@
 .collection-card__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgb(10 9 8 / 92%) 0%, rgb(10 9 8 / 20%) 55%, transparent 100%);
+  background: linear-gradient(to top, rgb(var(--rgb-bg-deep) / 88%) 0%, rgb(var(--rgb-bg-deep) / 18%) 55%, transparent 100%);
 }
 
 .collection-card__content {
