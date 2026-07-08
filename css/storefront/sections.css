@@ -20,8 +20,8 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 80% 60% at 70% 20%, rgb(139 90 43 / 18%) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 50% at 20% 80%, rgb(201 162 39 / 10%) 0%, transparent 55%),
+    radial-gradient(ellipse 80% 60% at 70% 20%, rgb(var(--rgb-copper) / 11%) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 20% 80%, rgb(var(--rgb-gold) / 6%) 0%, transparent 55%),
     linear-gradient(180deg, #0d0b09 0%, #0a0908 40%, #13110f 100%);
 }
 
@@ -48,7 +48,7 @@
   height: clamp(280px, 40vw, 520px);
   top: 10%;
   right: -5%;
-  background: rgb(139 90 43 / 22%);
+  background: rgb(var(--rgb-copper) / 13%);
 }
 
 .hero__orb--2 {
@@ -56,7 +56,7 @@
   height: clamp(200px, 30vw, 380px);
   bottom: 20%;
   left: -8%;
-  background: rgb(201 162 39 / 12%);
+  background: rgb(var(--rgb-gold) / 7%);
 }
 
 .hero__logo-mark {
@@ -467,7 +467,7 @@
 .ritual__visual-ring {
   position: absolute;
   inset: 15%;
-  border: 1px solid rgb(201 162 39 / 30%);
+  border: 1px solid rgb(var(--rgb-gold) / 18%);
   border-radius: 50%;
   animation: ring-rotate 20s linear infinite;
 }
@@ -486,7 +486,7 @@
   height: auto;
   object-fit: contain;
   opacity: 0.9;
-  filter: drop-shadow(0 0 40px rgb(201 162 39 / 15%));
+  filter: drop-shadow(0 0 40px rgb(var(--rgb-gold) / 9%));
 }
 
 @keyframes ring-rotate {

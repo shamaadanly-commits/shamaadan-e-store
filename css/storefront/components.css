@@ -342,7 +342,7 @@
     rgb(255 255 255 / 6%) 0%,
     transparent 45%,
     transparent 55%,
-    rgb(201 162 39 / 8%) 100%
+    rgb(var(--rgb-gold) / 5%) 100%
   );
   opacity: 0;
   transition: opacity var(--transition-med);

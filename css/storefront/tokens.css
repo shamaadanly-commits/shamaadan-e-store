@@ -9,14 +9,18 @@
   --color-text-secondary: #a89f92;
   --color-text-muted: #6e655c;
 
-  --color-gold: #c9a227;
-  --color-gold-light: #e8d48b;
-  --color-copper: #8b5a2b;
-  --color-copper-hover: #a6703f;
+  /* Warm accents — toned down 40% from original palette */
+  --rgb-gold: 125 101 26;
+  --rgb-copper: 87 57 29;
+
+  --color-gold: #7d651a;
+  --color-gold-light: #8f8356;
+  --color-copper: #57391d;
+  --color-copper-hover: #684729;
 
   --color-border: rgb(255 255 255 / 7%);
-  --color-border-gold: rgb(201 162 39 / 22%);
-  --color-glow: rgb(201 162 39 / 14%);
+  --color-border-gold: rgb(var(--rgb-gold) / 13%);
+  --color-glow: rgb(var(--rgb-gold) / 8%);
 
   --font-serif: Georgia, 'Times New Roman', 'Palatino Linotype', serif;
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
