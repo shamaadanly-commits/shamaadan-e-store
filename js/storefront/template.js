@@ -50,11 +50,11 @@ export function buildStorefrontHtml({ products, categories, i18n }) {
         </nav>
 
         <div class="shop-header__actions">
-          <button type="button" class="shop-header__lang" data-lang-toggle aria-label="${t('nav.switchLang')}">
-            <span data-lang-option="en">${t('lang.en')}</span>
+          <div class="shop-header__lang" data-lang-toggle role="group" aria-label="${t('nav.switchLang')}">
+            <button type="button" class="shop-header__lang-btn" data-lang-option="en" aria-pressed="false">${t('lang.en')}</button>
             <span class="shop-header__lang-divider" aria-hidden="true">|</span>
-            <span data-lang-option="ar">${t('lang.ar')}</span>
-          </button>
+            <button type="button" class="shop-header__lang-btn" data-lang-option="ar" aria-pressed="false">${t('lang.ar')}</button>
+          </div>
 
           <button type="button" class="shop-header__cart" aria-label="${t('nav.cart')}" data-cart-toggle>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">

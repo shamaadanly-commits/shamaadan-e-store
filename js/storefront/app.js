@@ -6,7 +6,7 @@ import { buildStorefrontHtml } from './template.js';
 import { loadProducts, filterProducts, renderProductGrid } from './products.js';
 import { createCart, bindCartUI, showToast } from './cart.js';
 import { initNav, bindNewsletter, bindFilters } from './nav.js';
-import { bindLangToggle } from './lang.js';
+import { syncLangToggle, handleLangClick } from './lang.js';
 import { initSmoothScroll, syncScrollTrigger, getLenis } from './scroll.js';
 import { initAnimations, animateProductGrid } from './animations.js';
 
@@ -32,6 +32,7 @@ export async function mount(root) {
     bindCartUI(root, cart);
     navApi = initNav(root, i18n);
     bindNewsletter(root, i18n);
+    syncLangToggle(root, i18n);
 
     const gridEl = root.querySelector('[data-product-grid]');
 
@@ -41,12 +42,16 @@ export async function mount(root) {
       renderProductGrid(gridEl, filtered, i18n);
       animateProductGrid(gridEl);
     });
-
-    root.addEventListener('click', onAddToCart);
-    bindLangToggle(root, i18n, rerender);
   }
 
-  function onAddToCart(event) {
+  function onRootClick(event) {
+    if (handleLangClick(event.target, i18n)) {
+      event.preventDefault();
+      event.stopPropagation();
+      rerender();
+      return;
+    }
+
     const btn = event.target.closest('[data-action="add-to-cart"]');
     if (!btn) return;
 
@@ -70,9 +75,8 @@ export async function mount(root) {
     }, 1400);
   }
 
-  async function rerender() {
+  function rerender() {
     const scrollY = window.scrollY;
-    root.removeEventListener('click', onAddToCart);
 
     root.innerHTML = buildStorefrontHtml({ products, categories, i18n });
     i18n.applyToDocument(root);
@@ -99,6 +103,8 @@ export async function mount(root) {
       initAnimations(root, getLenis());
     });
   }
+
+  root.addEventListener('click', onRootClick);
 
   root.innerHTML = buildStorefrontHtml({ products, categories, i18n });
   i18n.applyToDocument(root);

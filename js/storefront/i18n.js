@@ -290,7 +290,6 @@ function lookup(locale, path) {
 }
 
 export function createI18n(initialLocale) {
-  let locale = initialLocale || getStoredLocale() || detectLocale();
   const listeners = new Set();
 
   function getStoredLocale() {
@@ -305,6 +304,8 @@ export function createI18n(initialLocale) {
     const lang = navigator.language?.toLowerCase() ?? 'en';
     return lang.startsWith('ar') ? 'ar' : 'en';
   }
+
+  let locale = initialLocale || getStoredLocale() || detectLocale();
 
   function t(path, vars = {}) {
     let value = lookup(locale, path) ?? lookup('en', path) ?? path;
