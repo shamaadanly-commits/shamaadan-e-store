@@ -3,7 +3,7 @@
  */
 export const BRAND = {
   name: 'Shamaadan',
-  logo: '/assets/images/logo.jpg',
+  logo: '/assets/images/logo.png',
   logoWidth: 1080,
   logoHeight: 1080,
 };
