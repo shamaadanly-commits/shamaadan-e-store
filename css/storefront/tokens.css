@@ -1,0 +1,80 @@
+/* ── Shamaadan Storefront — Design Tokens ─────────────────────────── */
+.shop {
+  --color-bg-deep: #0a0908;
+  --color-bg-elevated: #13110f;
+  --color-bg-muted: #1a1714;
+  --color-bg-card: #161310;
+
+  --color-text-primary: #f5f0e8;
+  --color-text-secondary: #a89f92;
+  --color-text-muted: #6e655c;
+
+  --color-gold: #c9a227;
+  --color-gold-light: #e8d48b;
+  --color-copper: #8b5a2b;
+  --color-copper-hover: #a6703f;
+
+  --color-border: rgb(255 255 255 / 7%);
+  --color-border-gold: rgb(201 162 39 / 22%);
+  --color-glow: rgb(201 162 39 / 14%);
+
+  --font-serif: Georgia, 'Times New Roman', 'Palatino Linotype', serif;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --text-display: clamp(2.75rem, 7vw, 5.5rem);
+  --text-h2: clamp(1.85rem, 3.8vw, 3rem);
+  --text-h3: clamp(1.15rem, 2vw, 1.5rem);
+  --text-body: clamp(0.95rem, 1.1vw, 1.125rem);
+  --text-small: clamp(0.75rem, 0.9vw, 0.875rem);
+  --text-eyebrow: clamp(0.65rem, 0.8vw, 0.75rem);
+
+  --space-section: clamp(4.5rem, 11vh, 9rem);
+  --space-container: clamp(1.25rem, 4vw, 3rem);
+  --container-max: 90rem;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+
+  --header-height: 4.5rem;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-fast: 180ms var(--ease-out-expo);
+  --transition-med: 320ms var(--ease-out-expo);
+
+  --shadow-card: 0 8px 32px rgb(0 0 0 / 35%);
+  --shadow-glow: 0 0 60px var(--color-glow);
+
+  color: var(--color-text-primary);
+  background: var(--color-bg-deep);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.shop ::selection {
+  background: var(--color-gold);
+  color: var(--color-bg-deep);
+}
+
+.shop a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.shop img,
+.shop video {
+  max-width: 100%;
+  display: block;
+}
+
+.shop [data-animate] {
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop [data-animate] {
+    will-change: auto;
+  }
+}

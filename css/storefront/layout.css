@@ -1,0 +1,111 @@
+/* ── Layout shells & section rhythm ───────────────────────────────── */
+.shop {
+  min-height: 100dvh;
+  overflow-x: clip;
+}
+
+.shop__container {
+  width: 100%;
+  max-width: var(--container-max);
+  margin-inline: auto;
+  padding-inline: var(--space-container);
+}
+
+.shop__section {
+  padding-block: var(--space-section);
+  position: relative;
+}
+
+.shop__section--tight {
+  padding-block: clamp(2.5rem, 6vh, 4rem);
+}
+
+.shop__section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: clamp(2rem, 4vw, 3.5rem);
+}
+
+.shop__section-header--row {
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.shop__eyebrow {
+  font-size: var(--text-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+  margin: 0;
+}
+
+.shop__title {
+  font-family: var(--font-serif);
+  font-size: var(--text-h2);
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.shop__lead {
+  font-size: var(--text-body);
+  color: var(--color-text-secondary);
+  max-width: 38rem;
+  margin: 0;
+  line-height: 1.7;
+}
+
+.shop__divider {
+  width: 3rem;
+  height: 1px;
+  background: linear-gradient(90deg, var(--color-gold), transparent);
+  border: none;
+  margin: 0;
+}
+
+.shop__grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: clamp(1rem, 2vw, 1.5rem);
+}
+
+.shop__grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(1rem, 2vw, 1.5rem);
+}
+
+.shop__grid-products {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: clamp(1.25rem, 2.5vw, 2rem);
+}
+
+@media (max-width: 900px) {
+  .shop__grid-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .shop__grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .shop__grid-products {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.85rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .shop__grid-products {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Shamaadan — unified e-commerce storefront and in-store POS">
+  <meta name="theme-color" content="#0a0908">
+  <title>Shamaadan</title>
+
+  <link rel="icon" href="/assets/images/logo.jpg" type="image/jpeg">
+  <link rel="apple-touch-icon" href="/assets/images/logo.jpg">
+  <link rel="preload" href="/assets/images/logo.jpg" as="image" type="image/jpeg">
+
+  <!-- Preconnect for Supabase when credentials are configured -->
+  <link rel="preconnect" href="https://esm.sh" crossorigin>
+  <link rel="dns-prefetch" href="https://esm.sh">
+
+  <link rel="stylesheet" href="/css/base.css">
+</head>
+<body>
+  <div id="app-root" aria-busy="true"></div>
+
+  <!-- Defaults for local dev; overwritten on Vercel by /api/env.js -->
+  <script>window.__ENV__ = window.__ENV__ || {};</script>
+  <script src="/api/env.js" defer></script>
+  <script type="module" src="/js/router.js"></script>
+</body>
+</html>
