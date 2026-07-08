@@ -1,6 +1,9 @@
 /**
- * Lightweight shopping bag state for the storefront.
+ * Shopping bag state with quantity controls.
  */
+
+const FREE_SHIPPING_THRESHOLD = 75;
+const SHIPPING_FLAT = 12;
 
 export function createCart() {
   /** @type {Map<string, { product: object, qty: number }>} */
@@ -15,14 +18,13 @@ export function createCart() {
   function getSnapshot() {
     const list = Array.from(items.values());
     const count = list.reduce((sum, { qty }) => sum + qty, 0);
-    const total = list.reduce((sum, { product, qty }) => sum + product.price * qty, 0);
-    return { items: list, count, total };
+    const subtotal = list.reduce((sum, { product, qty }) => sum + product.price * qty, 0);
+    const shipping = subtotal >= FREE_SHIPPING_THRESHOLD || subtotal === 0 ? 0 : SHIPPING_FLAT;
+    const total = subtotal + shipping;
+
+    return { items: list, count, subtotal, shipping, total };
   }
 
-  /**
-   * @param {object} product
-   * @returns {{ added: boolean, snapshot: ReturnType<typeof getSnapshot> }}
-   */
   function add(product) {
     const existing = items.get(product.id);
     if (existing) {
@@ -32,6 +34,22 @@ export function createCart() {
     }
     notify();
     return { added: true, snapshot: getSnapshot() };
+  }
+
+  function updateQty(productId, qty) {
+    const line = items.get(productId);
+    if (!line) return;
+    if (qty <= 0) {
+      items.delete(productId);
+    } else {
+      line.qty = qty;
+    }
+    notify();
+  }
+
+  function remove(productId) {
+    items.delete(productId);
+    notify();
   }
 
   function clear() {
@@ -45,7 +63,7 @@ export function createCart() {
     return () => listeners.delete(fn);
   }
 
-  return { add, clear, subscribe, getSnapshot };
+  return { add, updateQty, remove, clear, subscribe, getSnapshot };
 }
 
 /**

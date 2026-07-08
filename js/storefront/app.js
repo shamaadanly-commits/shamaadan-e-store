@@ -5,6 +5,7 @@ import { createI18n } from './i18n.js';
 import { buildStorefrontHtml } from './template.js';
 import { loadProducts, filterProducts, renderProductGrid } from './products.js';
 import { createCart, bindCartUI, showToast } from './cart.js';
+import { initCheckout } from './checkout.js';
 import { initNav, bindNewsletter, bindFilters } from './nav.js';
 import { syncLangToggle, handleLangClick } from './lang.js';
 import { initSmoothScroll, syncScrollTrigger, getLenis } from './scroll.js';
@@ -17,6 +18,7 @@ export async function mount(root) {
   const i18n = createI18n();
   const { products, categories } = await loadProducts();
   const cart = createCart();
+  const checkout = initCheckout(root, cart, i18n);
 
   let activeFilter = 'All';
   let lenis = null;
@@ -33,6 +35,7 @@ export async function mount(root) {
     navApi = initNav(root, i18n);
     bindNewsletter(root, i18n);
     syncLangToggle(root, i18n);
+    checkout.refresh();
 
     const gridEl = root.querySelector('[data-product-grid]');
 
@@ -45,6 +48,12 @@ export async function mount(root) {
   }
 
   function onRootClick(event) {
+    if (event.target.closest('[data-cart-toggle]')) {
+      event.preventDefault();
+      checkout.open();
+      return;
+    }
+
     if (handleLangClick(event.target, i18n)) {
       event.preventDefault();
       event.stopPropagation();
