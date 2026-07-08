@@ -11,7 +11,7 @@ export function initNav(root, i18n) {
   const menuBtn = root.querySelector('[data-menu-toggle]');
   const drawer = root.querySelector('[data-nav-drawer]');
   const navLinks = root.querySelectorAll('[data-nav-link]');
-  const sections = ['collections', 'shop', 'ritual', 'contact', 'about'];
+  const sections = ['shop', 'about', 'collections', 'ritual', 'contact'];
 
   function onScroll() {
     const y = window.scrollY;

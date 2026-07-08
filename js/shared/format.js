@@ -1,11 +1,31 @@
 /** Currency and number formatting helpers shared across apps. */
 
-export function formatCurrency(amount, currency = 'USD', locale = 'en-US') {
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-  }).format(amount);
+/**
+ * @param {number} amount
+ * @param {string} [currency='LYD']
+ * @param {string} [locale='en-LY']
+ */
+export function formatCurrency(amount, currency = 'LYD', locale = 'en-LY') {
+  const value = Number(amount) || 0;
+
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    const formatted = new Intl.NumberFormat(locale, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+    return `${formatted} ${currency}`;
+  }
+}
+
+export function formatLyd(amount) {
+  return formatCurrency(amount, 'LYD');
 }
 
 export function formatCount(value) {

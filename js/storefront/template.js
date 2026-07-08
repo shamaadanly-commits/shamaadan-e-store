@@ -117,6 +117,26 @@ export function buildStorefrontHtml({ products, categories, i18n }) {
         </div>
       </section>
 
+      <section class="shop__section shop-products shop__section--tight" id="shop" aria-labelledby="shop-heading">
+        <div class="shop__container">
+          <div class="shop__section-header">
+            <p class="shop__eyebrow">${t('shop.eyebrow')}</p>
+            <h2 class="shop__title" id="shop-heading">${t('shop.title')}</h2>
+            <p class="shop__lead">${t('shop.lead')}</p>
+          </div>
+
+          <div class="shop-products__filters" role="group" aria-label="${t('shop.filterLabel')}" data-filters>
+            ${categoryChips.map((cat, i) => `
+              <button type="button" class="filter-chip${i === 0 ? ' is-active' : ''}" data-filter="${escapeAttr(cat)}">${escapeHtml(i18n.translateCategory(cat))}</button>
+            `).join('')}
+          </div>
+
+          <div class="shop__grid-products" data-product-grid role="list">
+            ${products.map((p) => productCardHtml(p, i18n)).join('')}
+          </div>
+        </div>
+      </section>
+
       <div class="marquee" aria-hidden="true">
         <div class="marquee__track">
           ${marqueeHtml(marqueeItems)}
@@ -177,26 +197,6 @@ export function buildStorefrontHtml({ products, categories, i18n }) {
           </div>
           <div class="shop__grid-3" data-animate="stagger-grid">
             ${COLLECTION_META.map((c) => collectionCardHtml(c, i18n)).join('')}
-          </div>
-        </div>
-      </section>
-
-      <section class="shop__section shop-products" id="shop" aria-labelledby="shop-heading">
-        <div class="shop__container">
-          <div class="shop__section-header">
-            <p class="shop__eyebrow">${t('shop.eyebrow')}</p>
-            <h2 class="shop__title" id="shop-heading">${t('shop.title')}</h2>
-            <p class="shop__lead">${t('shop.lead')}</p>
-          </div>
-
-          <div class="shop-products__filters" role="group" aria-label="${t('shop.filterLabel')}" data-filters>
-            ${categoryChips.map((cat, i) => `
-              <button type="button" class="filter-chip${i === 0 ? ' is-active' : ''}" data-filter="${escapeAttr(cat)}">${escapeHtml(i18n.translateCategory(cat))}</button>
-            `).join('')}
-          </div>
-
-          <div class="shop__grid-products" data-product-grid role="list">
-            ${products.map((p) => productCardHtml(p, i18n)).join('')}
           </div>
         </div>
       </section>

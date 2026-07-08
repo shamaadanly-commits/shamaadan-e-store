@@ -116,11 +116,18 @@ export function createCartState(initialCatalog) {
 
   /**
    * Complete checkout — clears ticket and returns sale summary for dashboard.
-   * @returns {{ revenue: number, cost: number, profit: number, units: number }}
+   * @returns {{ revenue: number, cost: number, profit: number, units: number, lines: Array<{ productId: string, title: string, quantity: number, unitPrice: number, unit_cost_at_sale: number }> }}
    */
   function checkout() {
-    const { subtotal, totalCost, grossProfit, itemCount } = getSnapshot();
-    const sale = { revenue: subtotal, cost: totalCost, profit: grossProfit, units: itemCount };
+    const { subtotal, totalCost, grossProfit, itemCount, items } = getSnapshot();
+    const saleLines = items.map((line) => ({
+      productId: line.productId,
+      title: line.name,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
+      unit_cost_at_sale: line.unitCost,
+    }));
+    const sale = { revenue: subtotal, cost: totalCost, profit: grossProfit, units: itemCount, lines: saleLines };
     lines.clear();
     notify();
     return sale;

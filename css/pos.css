@@ -32,9 +32,17 @@
   color: #a8b0be;
 }
 
-.pos__clock {
-  font-variant-numeric: tabular-nums;
+.pos__admin-link {
+  color: #c9a84c;
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
+
+.pos__admin-link:hover {
+  text-decoration: underline;
+}
+
 
 /* ── Main two-column layout ──────────────────────────────────────── */
 .pos__workspace {

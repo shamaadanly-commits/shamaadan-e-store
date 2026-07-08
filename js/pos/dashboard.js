@@ -1,56 +1,67 @@
 /**
- * Financial dashboard — tracks Online vs In-Store metrics.
+ * POS mini-dashboard — reads from Central Dashboard shared state.
  */
-import { formatCurrency, formatCount } from '../shared/format.js';
+import { formatLyd, formatCount } from '../shared/format.js';
 
-const METRIC_KEYS = ['sellCount', 'grossRevenue', 'productCost', 'netProfit'];
+const METRIC_KEYS = ['sellNumber', 'grossRevenue', 'assetCost', 'netProfit'];
 
 /**
  * @typedef {object} ChannelMetrics
- * @property {number} sellCount
+ * @property {number} sellNumber
  * @property {number} grossRevenue
- * @property {number} productCost
+ * @property {number} assetCost
  * @property {number} netProfit
  */
 
-export function createDashboard() {
-  /** @type {{ online: ChannelMetrics, inStore: ChannelMetrics }} */
-  const state = {
-    online: emptyMetrics(),
-    inStore: emptyMetrics(),
-  };
-
+/**
+ * @param {ReturnType<import('../dashboard.js').getSharedDashboardState>} [centralState]
+ */
+export function createDashboard(centralState) {
+  const state = centralState ?? null;
   const listeners = new Set();
+
+  function getMetrics() {
+    if (state) {
+      const { ledgers } = state.getSnapshot();
+      return {
+        online: mapLedger(ledgers.online),
+        inStore: mapLedger(ledgers.pos),
+      };
+    }
+    return { online: emptyMetrics(), inStore: emptyMetrics() };
+  }
+
+  function mapLedger(ledger) {
+    return {
+      sellNumber: ledger.sellNumber,
+      grossRevenue: ledger.grossRevenue,
+      productCost: ledger.assetCost,
+      netProfit: ledger.netProfit,
+    };
+  }
 
   function emptyMetrics() {
     return { sellCount: 0, grossRevenue: 0, productCost: 0, netProfit: 0 };
   }
 
   function notify() {
-    listeners.forEach((fn) => fn({ ...state }));
-  }
-
-  /**
-   * Record a completed sale for a channel.
-   * @param {'online' | 'inStore'} channel
-   * @param {{ revenue: number, cost: number, profit: number, units: number }} sale
-   */
-  function recordSale(channel, sale) {
-    const metrics = state[channel];
-    metrics.sellCount += sale.units;
-    metrics.grossRevenue += sale.revenue;
-    metrics.productCost += sale.cost;
-    metrics.netProfit += sale.profit;
-    notify();
+    listeners.forEach((fn) => fn(getMetrics()));
   }
 
   function subscribe(fn) {
     listeners.add(fn);
-    fn({ ...state });
+    fn(getMetrics());
+    if (state) {
+      state.subscribe(() => fn(getMetrics()));
+    }
     return () => listeners.delete(fn);
   }
 
-  return { recordSale, subscribe, getState: () => ({ ...state }) };
+  function refresh() {
+    notify();
+  }
+
+  return { subscribe, refresh, getState: getMetrics };
 }
 
 /**
@@ -73,10 +84,10 @@ export function renderDashboard(container, data) {
 
 function metricsGrid(metrics) {
   const rows = [
-    { key: 'sellCount', label: 'Sell Count', format: formatCount },
-    { key: 'grossRevenue', label: 'Gross Revenue', format: formatCurrency },
-    { key: 'productCost', label: 'Product Cost', format: formatCurrency, className: 'pos__metric-value--cost' },
-    { key: 'netProfit', label: 'Net Profit', format: formatCurrency, className: 'pos__metric-value--profit' },
+    { key: 'sellNumber', label: 'Sell Number', format: formatCount },
+    { key: 'grossRevenue', label: 'Gross Revenue', format: formatLyd },
+    { key: 'productCost', label: 'Asset Cost', format: formatLyd, className: 'pos__metric-value--cost' },
+    { key: 'netProfit', label: 'Net Profit', format: formatLyd, className: 'pos__metric-value--profit' },
   ];
 
   return `
@@ -84,7 +95,7 @@ function metricsGrid(metrics) {
       ${rows.map((row) => `
         <div class="pos__metric">
           <p class="pos__metric-label">${row.label}</p>
-          <p class="pos__metric-value ${row.className ?? ''}">${row.format(metrics[row.key])}</p>
+          <p class="pos__metric-value ${row.className ?? ''}">${row.format(metrics[row.key] ?? 0)}</p>
         </div>
       `).join('')}
     </div>

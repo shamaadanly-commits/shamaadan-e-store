@@ -6,6 +6,7 @@ export default function handler(_req, res) {
   const payload = {
     VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || '',
     VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || '',
+    ADMIN_PIN: process.env.ADMIN_PIN || '',
   };
 
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');

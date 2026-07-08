@@ -362,6 +362,10 @@
   background: linear-gradient(180deg, var(--color-bg-muted) 0%, var(--color-bg-deep) 100%);
 }
 
+.hero + .shop-products {
+  padding-top: clamp(2rem, 4vh, 3rem);
+}
+
 .shop-products__filters {
   display: flex;
   flex-wrap: wrap;

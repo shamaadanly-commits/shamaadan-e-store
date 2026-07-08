@@ -12,8 +12,10 @@ export default function handler(req, res) {
 
   let layer = 'storefront';
 
-  if (adminHosts.includes(host) || posHosts.includes(host) || host.startsWith('admin.') || host.startsWith('pos.')) {
+  if (adminHosts.includes(host) || host.startsWith('admin.')) {
     layer = 'admin';
+  } else if (posHosts.includes(host) || host.startsWith('pos.')) {
+    layer = 'pos';
   } else if (storefrontHosts.includes(host)) {
     layer = 'storefront';
   }
