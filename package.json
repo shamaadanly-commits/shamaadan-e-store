@@ -9,6 +9,7 @@
     "preview": "npx serve . -p 3000"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1083.0",
     "@supabase/supabase-js": "^2.49.1"
   }
 }

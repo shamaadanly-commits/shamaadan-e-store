@@ -16,7 +16,7 @@ import { initAnimations, animateProductGrid } from './animations.js';
  */
 export async function mount(root) {
   const i18n = createI18n();
-  const { products, categories } = await loadProducts();
+  const { products, categories, collections } = await loadProducts();
   const cart = createCart();
   const checkout = initCheckout(root, cart, i18n);
 
@@ -28,6 +28,18 @@ export async function mount(root) {
   document.body.style.background = '#181510';
   document.documentElement.style.colorScheme = 'dark';
 
+  function applyFilter(filter) {
+    activeFilter = filter || 'All';
+    const gridEl = root.querySelector('[data-product-grid]');
+    const filtered = filterProducts(products, activeFilter);
+    renderProductGrid(gridEl, filtered, i18n);
+    animateProductGrid(gridEl);
+
+    root.querySelectorAll('.filter-chip').forEach((chip) => {
+      chip.classList.toggle('is-active', chip.dataset.filter === activeFilter);
+    });
+  }
+
   function bindInteractions() {
     if (navApi?.destroy) navApi.destroy();
 
@@ -37,14 +49,7 @@ export async function mount(root) {
     syncLangToggle(root, i18n);
     checkout.refresh();
 
-    const gridEl = root.querySelector('[data-product-grid]');
-
-    bindFilters(root, products, (filter) => {
-      activeFilter = filter;
-      const filtered = filterProducts(products, filter);
-      renderProductGrid(gridEl, filtered, i18n);
-      animateProductGrid(gridEl);
-    });
+    bindFilters(root, products, (filter) => applyFilter(filter));
   }
 
   function onRootClick(event) {
@@ -58,6 +63,16 @@ export async function mount(root) {
       event.preventDefault();
       event.stopPropagation();
       rerender();
+      return;
+    }
+
+    const collectionLink = event.target.closest('[data-collection]');
+    if (collectionLink) {
+      const name = collectionLink.dataset.collection;
+      if (name) {
+        // Let hash navigation happen, then filter shop
+        setTimeout(() => applyFilter(name), 0);
+      }
       return;
     }
 
@@ -87,19 +102,11 @@ export async function mount(root) {
   function rerender() {
     const scrollY = window.scrollY;
 
-    root.innerHTML = buildStorefrontHtml({ products, categories, i18n });
+    root.innerHTML = buildStorefrontHtml({ products, categories, collections, i18n });
     i18n.applyToDocument(root);
     bindInteractions();
 
-    const gridEl = root.querySelector('[data-product-grid]');
-    const filtered = filterProducts(products, activeFilter);
-    renderProductGrid(gridEl, filtered, i18n);
-
-    const activeChip = root.querySelector(`[data-filter="${CSS.escape(activeFilter)}"]`);
-    if (activeChip) {
-      root.querySelectorAll('.filter-chip').forEach((c) => c.classList.remove('is-active'));
-      activeChip.classList.add('is-active');
-    }
+    applyFilter(activeFilter);
 
     const currentLenis = getLenis();
     if (currentLenis) {
@@ -115,7 +122,7 @@ export async function mount(root) {
 
   root.addEventListener('click', onRootClick);
 
-  root.innerHTML = buildStorefrontHtml({ products, categories, i18n });
+  root.innerHTML = buildStorefrontHtml({ products, categories, collections, i18n });
   i18n.applyToDocument(root);
   bindInteractions();
 

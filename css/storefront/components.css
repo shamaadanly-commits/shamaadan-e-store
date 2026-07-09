@@ -326,6 +326,16 @@
   justify-content: center;
 }
 
+.product-card__visual--photo {
+  background: #1a1713;
+}
+
+.product-card__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .product-card__monogram {
   font-family: var(--font-serif);
   font-size: clamp(2.5rem, 8vw, 4rem);

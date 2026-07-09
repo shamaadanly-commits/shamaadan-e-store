@@ -1,6 +1,6 @@
 /**
- * Inventory API — product CRUD scaffold for Central Dashboard.
- * Persists to Supabase when service role is configured; otherwise returns mock payload.
+ * Inventory API — product CRUD for Main Dashboard / store catalog.
+ * Persists to Supabase when service role is configured; otherwise echoes payload.
  */
 import { createClient } from '@supabase/supabase-js';
 import { MOCK_PRODUCTS } from '../js/shared/mock-products.js';
@@ -65,6 +65,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'title and barcode are required' });
     }
 
+    if (!product.id) {
+      product.id = `p-${Date.now().toString(36)}`;
+    }
+
     if (supabase) {
       const { data, error } = await supabase
         .from('products')
@@ -75,9 +79,29 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, product: normalizeRow(data) });
     }
 
-    return res.status(200).json({ ok: true, product, source: 'mock' });
+    return res.status(200).json({ ok: true, product, source: 'local' });
   }
 
-  res.setHeader('Allow', 'GET, POST');
+  if (req.method === 'DELETE') {
+    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+    const id = body.id || new URL(req.url, 'http://localhost').searchParams.get('id');
+
+    if (!id) {
+      return res.status(400).json({ ok: false, error: 'id is required' });
+    }
+
+    if (supabase) {
+      const { error } = await supabase
+        .from('products')
+        .update({ active: false })
+        .eq('id', id);
+      if (error) return res.status(500).json({ ok: false, error: error.message });
+      return res.status(200).json({ ok: true, id, deleted: true });
+    }
+
+    return res.status(200).json({ ok: true, id, deleted: true, source: 'local' });
+  }
+
+  res.setHeader('Allow', 'GET, POST, DELETE');
   return res.status(405).json({ ok: false, error: 'Method not allowed' });
 }

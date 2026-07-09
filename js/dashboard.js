@@ -5,6 +5,16 @@
 import { createMockTransactions } from './shared/mock-transactions.js';
 import { cloneCatalog, MOCK_PRODUCTS } from './shared/mock-products.js';
 import { formatCurrency, formatCount } from './shared/format.js';
+import {
+  loadStoreCatalog,
+  saveStoreCatalog,
+  normalizeStoreProduct,
+  normalizeTaxonomyItem,
+  buildCollectionsFromProducts,
+  buildCategoriesFromProducts,
+  DEFAULT_COLLECTIONS,
+  DEFAULT_CATEGORIES,
+} from './shared/catalog-store.js';
 
 const STORAGE_KEY = 'shamaadan_dashboard_v1';
 
@@ -15,6 +25,7 @@ const STORAGE_KEY = 'shamaadan_dashboard_v1';
  * @property {string} id
  * @property {string} title
  * @property {string} collectionName
+ * @property {string} [category]
  * @property {number} costPrice
  * @property {number} retailPrice
  * @property {number} stockQuantity
@@ -58,22 +69,7 @@ const STORAGE_KEY = 'shamaadan_dashboard_v1';
  * @returns {ProductRecord}
  */
 export function normalizeProduct(raw) {
-  const imageUrls = Array.isArray(raw.imageUrls)
-    ? raw.imageUrls
-    : raw.image
-      ? [raw.image]
-      : [];
-
-  return {
-    id: String(raw.id),
-    title: raw.title ?? raw.name ?? 'Untitled',
-    collectionName: raw.collectionName ?? raw.category ?? 'General',
-    costPrice: Number(raw.costPrice ?? raw.cost ?? 0),
-    retailPrice: Number(raw.retailPrice ?? raw.price ?? 0),
-    stockQuantity: Number(raw.stockQuantity ?? raw.stock ?? 0),
-    barcode: raw.barcode ?? raw.sku ?? '',
-    imageUrls,
-  };
+  return normalizeStoreProduct(raw);
 }
 
 /**
@@ -84,12 +80,13 @@ export function toPosCatalogRow(product) {
   return {
     id: product.id,
     sku: product.barcode,
+    barcode: product.barcode ?? product.sku ?? '',
     name: product.title,
-    category: product.collectionName,
+    category: product.category || product.collectionName,
     price: product.retailPrice,
     cost: product.costPrice,
     stock: product.stockQuantity,
-    image: product.imageUrls[0] ?? null,
+    image: product.imageUrls?.[0] ?? null,
   };
 }
 
@@ -163,22 +160,44 @@ export function createDashboardState(options = {}) {
   /** @type {ProductRecord[]} */
   let products = cloneCatalog(MOCK_PRODUCTS).map(normalizeProduct);
 
+  /** @type {import('./shared/catalog-store.js').TaxonomyItem[]} */
+  let collections = DEFAULT_COLLECTIONS.map((name, i) => normalizeTaxonomyItem({ name }, i));
+
+  /** @type {import('./shared/catalog-store.js').TaxonomyItem[]} */
+  let categories = DEFAULT_CATEGORIES.map((name, i) => normalizeTaxonomyItem({ name }, i));
+
   /** @type {Transaction[]} */
   let transactions = [];
 
   const listeners = new Set();
   let streamTimer = null;
 
+  function syncStoreCatalog() {
+    saveStoreCatalog({ products, collections, categories });
+  }
+
   function loadPersisted() {
     if (!persist || typeof localStorage === 'undefined') return false;
 
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return false;
+      if (!raw) {
+        const storeCatalog = loadStoreCatalog();
+        if (storeCatalog) {
+          if (storeCatalog.products?.length) products = storeCatalog.products.map(normalizeProduct);
+          if (storeCatalog.collections?.length) collections = storeCatalog.collections.map(normalizeTaxonomyItem);
+          if (storeCatalog.categories?.length) categories = storeCatalog.categories.map(normalizeTaxonomyItem);
+          return Boolean(storeCatalog.products?.length || storeCatalog.collections?.length);
+        }
+        return false;
+      }
       const data = JSON.parse(raw);
       if (data.products?.length) products = data.products.map(normalizeProduct);
+      if (data.collections?.length) collections = data.collections.map(normalizeTaxonomyItem);
+      if (data.categories?.length) categories = data.categories.map(normalizeTaxonomyItem);
       if (data.transactions?.length) transactions = data.transactions;
-      return true;
+      syncStoreCatalog();
+      return Boolean(data.products?.length || data.collections?.length || data.categories?.length);
     } catch {
       return false;
     }
@@ -186,7 +205,13 @@ export function createDashboardState(options = {}) {
 
   function save() {
     if (!persist || typeof localStorage === 'undefined') return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ products, transactions }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      products,
+      collections,
+      categories,
+      transactions,
+    }));
+    syncStoreCatalog();
   }
 
   function notify() {
@@ -196,7 +221,11 @@ export function createDashboardState(options = {}) {
 
   function getSnapshot() {
     return {
-      products: products.map((p) => ({ ...p, imageUrls: [...p.imageUrls] })),
+      products: products.map((p) => ({ ...p, imageUrls: [...(p.imageUrls || [])] })),
+      collections: buildCollectionsFromProducts(products, collections),
+      categories: buildCategoriesFromProducts(products, categories),
+      managedCollections: collections.map((c) => ({ ...c })),
+      managedCategories: categories.map((c) => ({ ...c })),
       transactions: [...transactions],
       ledgers: {
         online: computeChannelLedger(transactions, 'online'),
@@ -303,9 +332,126 @@ export function createDashboardState(options = {}) {
   }
 
   function seedFromMock() {
+    products = cloneCatalog(MOCK_PRODUCTS).map(normalizeProduct);
+    collections = DEFAULT_COLLECTIONS.map((name, i) => normalizeTaxonomyItem({ name }, i));
+    categories = DEFAULT_CATEGORIES.map((name, i) => normalizeTaxonomyItem({ name }, i));
     transactions = createMockTransactions().map((tx) => buildTransaction(tx));
     save();
     notify();
+  }
+
+  function getCollections() {
+    return buildCollectionsFromProducts(products, collections);
+  }
+
+  function getCategories() {
+    return buildCategoriesFromProducts(products, categories);
+  }
+
+  /**
+   * @param {Array} nextProducts
+   */
+  function replaceProducts(nextProducts) {
+    products = nextProducts.map(normalizeProduct);
+    save();
+    notify();
+    return products;
+  }
+
+  /**
+   * @param {{ id?: string, name: string, description?: string, gradient?: string }} input
+   * @param {string} [renameFrom]
+   */
+  function upsertCollection(input, renameFrom = '') {
+    const item = normalizeTaxonomyItem(input);
+    const oldName = renameFrom || collections.find((c) => c.id === item.id)?.name || '';
+    const idx = collections.findIndex((c) => c.id === item.id || c.name.toLowerCase() === item.name.toLowerCase() || (oldName && c.name === oldName));
+
+    if (idx >= 0) {
+      const previous = collections[idx].name;
+      collections[idx] = item;
+      if (previous && previous !== item.name) {
+        products = products.map((p) => (
+          p.collectionName === previous
+            ? { ...p, collectionName: item.name }
+            : p
+        ));
+      }
+    } else {
+      collections.push(item);
+    }
+
+    save();
+    notify();
+    return item;
+  }
+
+  /**
+   * @param {string} idOrName
+   * @param {{ reassignTo?: string }} [options]
+   */
+  function deleteCollection(idOrName, options = {}) {
+    const target = collections.find((c) => c.id === idOrName || c.name === idOrName);
+    if (!target) return false;
+
+    const reassignTo = options.reassignTo || 'General';
+    products = products.map((p) => (
+      p.collectionName === target.name
+        ? { ...p, collectionName: reassignTo }
+        : p
+    ));
+    collections = collections.filter((c) => c.id !== target.id);
+    save();
+    notify();
+    return true;
+  }
+
+  /**
+   * @param {{ id?: string, name: string, description?: string }} input
+   * @param {string} [renameFrom]
+   */
+  function upsertCategory(input, renameFrom = '') {
+    const item = normalizeTaxonomyItem(input);
+    const oldName = renameFrom || categories.find((c) => c.id === item.id)?.name || '';
+    const idx = categories.findIndex((c) => c.id === item.id || c.name.toLowerCase() === item.name.toLowerCase() || (oldName && c.name === oldName));
+
+    if (idx >= 0) {
+      const previous = categories[idx].name;
+      categories[idx] = item;
+      if (previous && previous !== item.name) {
+        products = products.map((p) => (
+          p.category === previous
+            ? { ...p, category: item.name }
+            : p
+        ));
+      }
+    } else {
+      categories.push(item);
+    }
+
+    save();
+    notify();
+    return item;
+  }
+
+  /**
+   * @param {string} idOrName
+   * @param {{ reassignTo?: string }} [options]
+   */
+  function deleteCategory(idOrName, options = {}) {
+    const target = categories.find((c) => c.id === idOrName || c.name === idOrName);
+    if (!target) return false;
+
+    const reassignTo = options.reassignTo || 'General';
+    products = products.map((p) => (
+      p.category === target.name
+        ? { ...p, category: reassignTo }
+        : p
+    ));
+    categories = categories.filter((c) => c.id !== target.id);
+    save();
+    notify();
+    return true;
   }
 
   /**
@@ -347,6 +493,8 @@ export function createDashboardState(options = {}) {
   const hadPersisted = loadPersisted();
   if (!hadPersisted && seedMock) {
     seedFromMock();
+  } else if (hadPersisted) {
+    syncStoreCatalog();
   }
 
   return {
@@ -356,6 +504,13 @@ export function createDashboardState(options = {}) {
     recordPosSale,
     upsertProduct,
     deleteProduct,
+    replaceProducts,
+    getCollections,
+    getCategories,
+    upsertCollection,
+    deleteCollection,
+    upsertCategory,
+    deleteCategory,
     findByBarcode,
     seedFromMock,
     startTransactionStream,

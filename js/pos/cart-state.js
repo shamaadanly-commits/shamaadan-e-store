@@ -7,6 +7,7 @@
  * @typedef {object} CatalogProduct
  * @property {string} id
  * @property {string} sku
+ * @property {string} [barcode]
  * @property {string} name
  * @property {string} category
  * @property {number} price
@@ -133,11 +134,53 @@ export function createCartState(initialCatalog) {
     return sale;
   }
 
+  /**
+   * Find a catalog product by barcode or SKU.
+   * @param {string} code
+   * @returns {CatalogProduct | undefined}
+   */
+  function findByBarcode(code) {
+    const needle = String(code || '').trim().toLowerCase();
+    if (!needle) return undefined;
+
+    for (const product of inventory.values()) {
+      const barcode = String(product.barcode || '').toLowerCase();
+      const sku = String(product.sku || '').toLowerCase();
+      if (barcode === needle || sku === needle) return product;
+    }
+    return undefined;
+  }
+
+  /**
+   * Add one unit by barcode / SKU.
+   * @param {string} code
+   * @returns {{ ok: boolean, product?: CatalogProduct, reason?: string }}
+   */
+  function addByBarcode(code) {
+    const product = findByBarcode(code);
+    if (!product) return { ok: false, reason: 'not_found' };
+    if (product.stock <= 0) return { ok: false, product, reason: 'out_of_stock' };
+
+    const added = addItem(product.id);
+    return added
+      ? { ok: true, product }
+      : { ok: false, product, reason: 'out_of_stock' };
+  }
+
   function subscribe(fn) {
     listeners.add(fn);
     fn(getSnapshot());
     return () => listeners.delete(fn);
   }
 
-  return { addItem, adjustQuantity, clear, checkout, subscribe, getSnapshot };
+  return {
+    addItem,
+    addByBarcode,
+    findByBarcode,
+    adjustQuantity,
+    clear,
+    checkout,
+    subscribe,
+    getSnapshot,
+  };
 }

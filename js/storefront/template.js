@@ -3,10 +3,13 @@
  */
 import { logoImg } from '../shared/brand.js';
 
-const COLLECTION_META = [
-  { id: 'candles', count: 12, gradient: 'linear-gradient(160deg, #2a1f14 0%, #1c1914 60%, #242019 100%)' },
-  { id: 'incense', count: 18, gradient: 'linear-gradient(200deg, #1a1814 0%, #2a2018 50%, #1c1914 100%)' },
-  { id: 'oils', count: 9, gradient: 'linear-gradient(140deg, #1e1a10 0%, #3a2a18 40%, #1c1914 100%)' },
+const COLLECTION_GRADIENTS = [
+  'linear-gradient(160deg, #2a1f14 0%, #1c1914 60%, #242019 100%)',
+  'linear-gradient(200deg, #1a1814 0%, #2a2018 50%, #1c1914 100%)',
+  'linear-gradient(140deg, #1e1a10 0%, #3a2a18 40%, #1c1914 100%)',
+  'linear-gradient(180deg, #241a10 0%, #1c1914 100%)',
+  'linear-gradient(160deg, #1a2018 0%, #1c1914 100%)',
+  'linear-gradient(200deg, #201a14 0%, #1c1914 100%)',
 ];
 
 const CATEGORY_GRADIENTS = {
@@ -15,6 +18,7 @@ const CATEGORY_GRADIENTS = {
   Incense: 'linear-gradient(160deg, #201a14, #1c1914)',
   Sprays: 'linear-gradient(160deg, #1a1814, #12100e)',
   Sets: 'linear-gradient(160deg, #2a2018, #1c1914)',
+  'Gift Sets': 'linear-gradient(160deg, #2a2018, #1c1914)',
   Bakhoor: 'linear-gradient(160deg, #241a10, #1c1914)',
   Accessories: 'linear-gradient(160deg, #1a1a1a, #1c1914)',
   Oils: 'linear-gradient(160deg, #2a2210, #1c1914)',
@@ -25,13 +29,25 @@ const CATEGORY_GRADIENTS = {
  * @param {object} opts
  * @param {Array} opts.products
  * @param {string[]} opts.categories
+ * @param {Array} [opts.collections]
  * @param {ReturnType<import('./i18n.js').createI18n>} opts.i18n
  */
-export function buildStorefrontHtml({ products, categories, i18n }) {
+export function buildStorefrontHtml({ products, categories, collections = [], i18n }) {
   const t = i18n.t.bind(i18n);
   const year = new Date().getFullYear();
   const categoryChips = ['All', ...categories];
   const marqueeItems = t('marquee');
+  const collectionCards = collections.length
+    ? collections.map((c, i) => ({
+      ...c,
+      gradient: c.gradient || COLLECTION_GRADIENTS[i % COLLECTION_GRADIENTS.length],
+    }))
+    : categories.slice(0, 6).map((name, i) => ({
+      id: name.toLowerCase().replace(/\s+/g, '-'),
+      name,
+      count: products.filter((p) => p.category === name).length,
+      gradient: COLLECTION_GRADIENTS[i % COLLECTION_GRADIENTS.length],
+    }));
 
   return `
     <a href="#main-content" class="shop__skip">${t('skip')}</a>
@@ -196,7 +212,7 @@ export function buildStorefrontHtml({ products, categories, i18n }) {
             <a href="#shop" class="btn btn--ghost btn--sm">${t('collections.viewAll')}</a>
           </div>
           <div class="shop__grid-3" data-animate="stagger-grid">
-            ${COLLECTION_META.map((c) => collectionCardHtml(c, i18n)).join('')}
+            ${collectionCards.map((c) => collectionCardHtml(c, i18n)).join('')}
           </div>
         </div>
       </section>
@@ -320,14 +336,19 @@ export function productCardHtml(product, i18n) {
   const display = i18n.translateProduct(product);
   const gradient = CATEGORY_GRADIENTS[product.category] || CATEGORY_GRADIENTS.General;
   const initial = display.displayName.charAt(0);
+  const imageUrl = product.imageUrls?.[0] || product.image || null;
   const isNew = product.id === 'p1' || product.id === 'p5';
   const badge = isNew ? `<span class="product-card__badge">${t('shop.new')}</span>` : '';
+
+  const media = imageUrl
+    ? `<img class="product-card__image" src="${escapeAttr(imageUrl)}" alt="${escapeAttr(display.displayName)}" loading="lazy" decoding="async">`
+    : `<span class="product-card__monogram" aria-hidden="true">${escapeHtml(initial)}</span>`;
 
   return `
     <article class="product-card" role="listitem" data-product-id="${product.id}" style="--card-gradient: ${gradient}">
       <div class="product-card__media">
-        <div class="product-card__visual">
-          <span class="product-card__monogram" aria-hidden="true">${escapeHtml(initial)}</span>
+        <div class="product-card__visual${imageUrl ? ' product-card__visual--photo' : ''}">
+          ${media}
         </div>
         <div class="product-card__shine" aria-hidden="true"></div>
         ${badge}
@@ -349,10 +370,11 @@ export function productCardHtml(product, i18n) {
 
 function collectionCardHtml(collection, i18n) {
   const t = i18n.t.bind(i18n);
-  const name = i18n.translateCollection(collection.id);
+  const name = collection.name || i18n.translateCollection(collection.id);
+  const filterName = collection.name || collection.id;
 
   return `
-    <a href="#shop" class="collection-card" data-collection="${collection.id}">
+    <a href="#shop" class="collection-card" data-collection="${escapeAttr(filterName)}">
       <div class="collection-card__bg" style="--collection-gradient: ${collection.gradient}"></div>
       <div class="collection-card__overlay"></div>
       <div class="collection-card__content">
@@ -386,4 +408,4 @@ function escapeAttr(str) {
   return escapeHtml(str).replace(/"/g, '&quot;');
 }
 
-export { COLLECTION_META, CATEGORY_GRADIENTS };
+export { CATEGORY_GRADIENTS, COLLECTION_GRADIENTS };

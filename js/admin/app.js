@@ -1,12 +1,20 @@
 /**
- * Shamaadan Central Dashboard & Accounting Suite — admin application layer.
+ * Shamaadan Main Dashboard — accounting + store catalog CRUD.
+ * Store Catalog publishes products to the website and POS.
  */
 import { getSharedDashboardState, LEDGER_METRICS } from '../dashboard.js';
 import { formatLyd } from '../shared/format.js';
+import { bindImageUploader } from './image-upload.js';
 import {
   buildAdminShell,
   ledgerMatrixHtml,
   inventoryTableHtml,
+  catalogTableHtml,
+  catalogFormHtml,
+  collectionsPanelHtml,
+  categoriesPanelHtml,
+  collectionFormHtml,
+  categoryFormHtml,
   transactionFeedHtml,
   productFormHtml,
 } from './template.js';
@@ -20,6 +28,10 @@ const DEFAULT_PIN = 'shamaadan';
 export async function mount(root) {
   const state = getSharedDashboardState();
   let editingProductId = null;
+  let editingCatalogId = null;
+  let editingCollectionId = null;
+  let editingCategoryId = null;
+  let catalogFilter = 'All';
 
   root.className = 'dashboard-app';
   root.innerHTML = buildAdminShell();
@@ -36,6 +48,17 @@ export async function mount(root) {
     formHost: root.querySelector('[data-form-host]'),
     formTitle: root.querySelector('[data-form-title]'),
     productCount: root.querySelector('[data-product-count]'),
+    catalogHost: root.querySelector('[data-catalog-host]'),
+    catalogFormHost: root.querySelector('[data-catalog-form-host]'),
+    catalogFormTitle: root.querySelector('[data-catalog-form-title]'),
+    catalogCount: root.querySelector('[data-catalog-count]'),
+    collectionsHost: root.querySelector('[data-collections-host]'),
+    collectionCount: root.querySelector('[data-collection-count]'),
+    collectionFormHost: root.querySelector('[data-collection-form-host]'),
+    categoriesHost: root.querySelector('[data-categories-host]'),
+    categoryCount: root.querySelector('[data-category-count]'),
+    categoryFormHost: root.querySelector('[data-category-form-host]'),
+    catalogFilter: root.querySelector('[data-catalog-filter]'),
     lastUpdated: root.querySelector('[data-last-updated]'),
     pageTitle: root.querySelector('[data-page-title]'),
     views: root.querySelectorAll('[data-panel]'),
@@ -48,8 +71,9 @@ export async function mount(root) {
 
   els.authForm?.addEventListener('submit', (event) => {
     event.preventDefault();
-    const pin = new FormData(event.target).get('pin');
-    const expected = window.__ENV__?.ADMIN_PIN || DEFAULT_PIN;
+    const pin = String(new FormData(event.target).get('pin') ?? '').trim();
+    const configured = String(window.__ENV__?.ADMIN_PIN ?? '').trim();
+    const expected = configured || DEFAULT_PIN;
 
     if (pin === expected) {
       sessionStorage.setItem(AUTH_KEY, '1');
@@ -57,6 +81,11 @@ export async function mount(root) {
     } else {
       showAuthError('Invalid PIN. Please try again.');
     }
+  });
+
+  els.catalogFilter?.addEventListener('change', (event) => {
+    catalogFilter = event.target.value || 'All';
+    renderCatalog(state.getSnapshot());
   });
 
   root.addEventListener('click', (event) => {
@@ -76,13 +105,123 @@ export async function mount(root) {
     if (target.matches('[data-seed-mock]')) {
       state.seedFromMock();
       editingProductId = null;
+      editingCatalogId = null;
+      editingCollectionId = null;
+      editingCategoryId = null;
+      catalogFilter = 'All';
       renderForm();
+      renderCatalogForm();
+      renderTaxonomyForms();
       return;
     }
 
     const navBtn = target.closest('[data-view]');
     if (navBtn?.matches('button[data-view]')) {
       switchView(navBtn.dataset.view);
+      return;
+    }
+
+    const filterCollection = target.closest('[data-filter-collection]');
+    if (filterCollection) {
+      catalogFilter = filterCollection.dataset.filterCollection || 'All';
+      if (els.catalogFilter) els.catalogFilter.value = catalogFilter;
+      switchView('catalog');
+      renderCatalog(state.getSnapshot());
+      return;
+    }
+
+    const editCollection = target.closest('[data-edit-collection]');
+    if (editCollection) {
+      editingCollectionId = editCollection.dataset.editCollection;
+      renderCollectionForm();
+      switchView('taxonomy');
+      return;
+    }
+
+    const deleteCollection = target.closest('[data-delete-collection]');
+    if (deleteCollection) {
+      const id = deleteCollection.dataset.deleteCollection;
+      const item = state.getSnapshot().collections.find((c) => c.id === id);
+      if (!item) return;
+      const reassignTo = window.prompt(
+        `Delete collection "${item.name}"?\nProducts will move to this collection:`,
+        'General',
+      );
+      if (reassignTo === null) return;
+      state.deleteCollection(id, { reassignTo: reassignTo.trim() || 'General' });
+      if (editingCollectionId === id) {
+        editingCollectionId = null;
+        renderCollectionForm();
+      }
+      return;
+    }
+
+    if (target.matches('[data-cancel-collection-edit]')) {
+      editingCollectionId = null;
+      renderCollectionForm();
+      return;
+    }
+
+    const editCategory = target.closest('[data-edit-category]');
+    if (editCategory) {
+      editingCategoryId = editCategory.dataset.editCategory;
+      renderCategoryForm();
+      switchView('taxonomy');
+      return;
+    }
+
+    const deleteCategory = target.closest('[data-delete-category]');
+    if (deleteCategory) {
+      const id = deleteCategory.dataset.deleteCategory;
+      const item = state.getSnapshot().categories.find((c) => c.id === id);
+      if (!item) return;
+      const reassignTo = window.prompt(
+        `Delete category "${item.name}"?\nProducts will move to this category:`,
+        'General',
+      );
+      if (reassignTo === null) return;
+      state.deleteCategory(id, { reassignTo: reassignTo.trim() || 'General' });
+      if (editingCategoryId === id) {
+        editingCategoryId = null;
+        renderCategoryForm();
+      }
+      return;
+    }
+
+    if (target.matches('[data-cancel-category-edit]')) {
+      editingCategoryId = null;
+      renderCategoryForm();
+      return;
+    }
+
+    const editCatalog = target.closest('[data-edit-catalog]');
+    if (editCatalog) {
+      editingCatalogId = editCatalog.dataset.editCatalog;
+      renderCatalogForm(state.getSnapshot().products.find((p) => p.id === editingCatalogId));
+      switchView('catalog');
+      return;
+    }
+
+    const deleteCatalog = target.closest('[data-delete-catalog]');
+    if (deleteCatalog) {
+      const id = deleteCatalog.dataset.deleteCatalog;
+      if (confirm('Remove this product from the website store?')) {
+        state.deleteProduct(id);
+        if (editingCatalogId === id) {
+          editingCatalogId = null;
+          renderCatalogForm();
+        }
+        if (editingProductId === id) {
+          editingProductId = null;
+          renderForm();
+        }
+      }
+      return;
+    }
+
+    if (target.matches('[data-cancel-catalog-edit]')) {
+      editingCatalogId = null;
+      renderCatalogForm();
       return;
     }
 
@@ -103,6 +242,10 @@ export async function mount(root) {
           editingProductId = null;
           renderForm();
         }
+        if (editingCatalogId === id) {
+          editingCatalogId = null;
+          renderCatalogForm();
+        }
       }
       return;
     }
@@ -114,20 +257,69 @@ export async function mount(root) {
   });
 
   root.addEventListener('submit', (event) => {
+    const collectionForm = event.target.closest('[data-collection-form]');
+    if (collectionForm) {
+      event.preventDefault();
+      const data = new FormData(collectionForm);
+      state.upsertCollection({
+        id: String(data.get('id') || ''),
+        name: String(data.get('name') || '').trim(),
+        description: String(data.get('description') || '').trim(),
+      }, String(data.get('renameFrom') || ''));
+      editingCollectionId = null;
+      renderCollectionForm();
+      return;
+    }
+
+    const categoryForm = event.target.closest('[data-category-form]');
+    if (categoryForm) {
+      event.preventDefault();
+      const data = new FormData(categoryForm);
+      state.upsertCategory({
+        id: String(data.get('id') || ''),
+        name: String(data.get('name') || '').trim(),
+        description: String(data.get('description') || '').trim(),
+      }, String(data.get('renameFrom') || ''));
+      editingCategoryId = null;
+      renderCategoryForm();
+      return;
+    }
+
+    const catalogForm = event.target.closest('[data-catalog-form]');
+    if (catalogForm) {
+      event.preventDefault();
+      saveProductFromForm(catalogForm);
+      editingCatalogId = null;
+      renderCatalogForm();
+      return;
+    }
+
     const form = event.target.closest('[data-product-form]');
     if (!form) return;
     event.preventDefault();
+    saveProductFromForm(form);
+    editingProductId = null;
+    renderForm();
+  });
 
+  state.subscribe((snapshot) => renderAll(snapshot));
+  state.startTransactionStream(60_000);
+
+  function saveProductFromForm(form) {
     const data = new FormData(form);
     const imageUrls = String(data.get('imageUrls') ?? '')
       .split('\n')
       .map((s) => s.trim())
       .filter(Boolean);
 
+    const collectionName = String(data.get('collectionName'));
+    const category = String(data.get('category') || collectionName);
+
     state.upsertProduct({
       id: data.get('id') || `p-${Date.now().toString(36)}`,
       title: String(data.get('title')),
-      collectionName: String(data.get('collectionName')),
+      collectionName,
+      category,
       costPrice: Number(data.get('costPrice')),
       retailPrice: Number(data.get('retailPrice')),
       stockQuantity: Number(data.get('stockQuantity')),
@@ -135,18 +327,18 @@ export async function mount(root) {
       imageUrls,
     });
 
-    editingProductId = null;
-    renderForm();
-    form.reset();
-  });
-
-  state.subscribe((snapshot) => renderAll(snapshot));
-  state.startTransactionStream(60_000);
+    // Ensure taxonomy lists include newly typed names
+    if (collectionName) state.upsertCollection({ name: collectionName });
+    if (category) state.upsertCategory({ name: category });
+  }
 
   function unlock() {
     els.authGate?.setAttribute('hidden', '');
     els.dashApp?.removeAttribute('hidden');
     renderForm();
+    renderCatalogForm();
+    renderTaxonomyForms();
+    switchView('catalog');
   }
 
   function lock() {
@@ -183,9 +375,11 @@ export async function mount(root) {
 
     const titles = {
       dashboard: 'Accounting Dashboard',
-      inventory: 'Master Inventory Control',
+      catalog: 'Store Catalog — Website Products',
+      taxonomy: 'Collections & Categories',
+      inventory: 'Inventory Costs',
     };
-    if (els.pageTitle) els.pageTitle.textContent = titles[view] ?? 'Dashboard';
+    if (els.pageTitle) els.pageTitle.textContent = titles[view] ?? 'Main Dashboard';
   }
 
   function renderForm(product = null) {
@@ -198,6 +392,89 @@ export async function mount(root) {
       els.formTitle.textContent = editing ? 'Edit Product' : 'Add Product';
     }
     els.formHost.innerHTML = productFormHtml(editing);
+    const form = els.formHost.querySelector('[data-product-form]');
+    if (form) bindImageUploader(form);
+  }
+
+  function renderCatalogForm(product = null) {
+    if (!els.catalogFormHost) return;
+    const snapshot = state.getSnapshot();
+    const editing = product ?? (editingCatalogId
+      ? snapshot.products.find((p) => p.id === editingCatalogId)
+      : null);
+    const collectionOptions = snapshot.collections.map((c) => c.name);
+    const categoryOptions = snapshot.categories.map((c) => c.name);
+
+    if (els.catalogFormTitle) {
+      els.catalogFormTitle.textContent = editing ? 'Edit Store Product' : 'Add Store Product';
+    }
+    els.catalogFormHost.innerHTML = catalogFormHtml(editing, collectionOptions, categoryOptions);
+    const form = els.catalogFormHost.querySelector('[data-catalog-form]');
+    if (form) bindImageUploader(form);
+  }
+
+  function renderCollectionForm() {
+    if (!els.collectionFormHost) return;
+    const item = editingCollectionId
+      ? state.getSnapshot().collections.find((c) => c.id === editingCollectionId)
+      : null;
+    els.collectionFormHost.innerHTML = collectionFormHtml(item);
+  }
+
+  function renderCategoryForm() {
+    if (!els.categoryFormHost) return;
+    const item = editingCategoryId
+      ? state.getSnapshot().categories.find((c) => c.id === editingCategoryId)
+      : null;
+    els.categoryFormHost.innerHTML = categoryFormHtml(item);
+  }
+
+  function renderTaxonomyForms() {
+    renderCollectionForm();
+    renderCategoryForm();
+  }
+
+  function renderCatalog(snapshot) {
+    const { products, collections, categories } = snapshot;
+
+    if (els.collectionsHost) {
+      els.collectionsHost.innerHTML = collectionsPanelHtml(collections);
+    }
+
+    if (els.categoriesHost) {
+      els.categoriesHost.innerHTML = categoriesPanelHtml(categories);
+    }
+
+    if (els.collectionCount) {
+      els.collectionCount.textContent = `${collections.length} collection${collections.length === 1 ? '' : 's'}`;
+    }
+
+    if (els.categoryCount) {
+      els.categoryCount.textContent = `${categories.length} categor${categories.length === 1 ? 'y' : 'ies'}`;
+    }
+
+    if (els.catalogFilter) {
+      const current = catalogFilter;
+      els.catalogFilter.innerHTML = `
+        <option value="All">All collections</option>
+        ${collections.map((c) => `
+          <option value="${escapeAttr(c.name)}"${c.name === current ? ' selected' : ''}>${escapeHtml(c.name)}</option>
+        `).join('')}
+      `;
+    }
+
+    if (els.catalogHost) {
+      els.catalogHost.innerHTML = catalogTableHtml(products, catalogFilter);
+    }
+
+    if (els.catalogCount) {
+      const count = catalogFilter === 'All'
+        ? products.length
+        : products.filter((p) => p.collectionName === catalogFilter).length;
+      els.catalogCount.textContent = `${count} product${count === 1 ? '' : 's'}`;
+    }
+
+    renderTaxonomyForms();
   }
 
   function renderAll(snapshot) {
@@ -222,6 +499,9 @@ export async function mount(root) {
     if (els.productCount) {
       els.productCount.textContent = `${products.length} product${products.length === 1 ? '' : 's'}`;
     }
+
+    renderCatalog(snapshot);
+    renderCatalogForm();
 
     if (els.lastUpdated) {
       els.lastUpdated.textContent = `Last updated ${new Date(updatedAt).toLocaleString('en-LY')}`;
@@ -282,4 +562,15 @@ function channelShare(part, total) {
 
 function isAuthenticated() {
   return sessionStorage.getItem(AUTH_KEY) === '1';
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function escapeAttr(str) {
+  return escapeHtml(str).replace(/"/g, '&quot;');
 }

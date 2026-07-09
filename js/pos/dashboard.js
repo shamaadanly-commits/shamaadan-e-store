@@ -41,7 +41,7 @@ export function createDashboard(centralState) {
   }
 
   function emptyMetrics() {
-    return { sellCount: 0, grossRevenue: 0, productCost: 0, netProfit: 0 };
+    return { sellNumber: 0, grossRevenue: 0, productCost: 0, netProfit: 0 };
   }
 
   function notify() {
