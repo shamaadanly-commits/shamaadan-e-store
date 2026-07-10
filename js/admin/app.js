@@ -8,6 +8,16 @@ import { formatLyd } from '../shared/format.js';
 import { fetchSession, loginAdmin, logout } from '../shared/auth-client.js';
 import { bindImageUploader } from './image-upload.js';
 import {
+  fetchAdminCatalog,
+  persistDeleteCollection,
+  persistDeleteCategory,
+  persistUpsertCollection,
+  persistUpsertCategory,
+  persistUpsertProduct,
+  persistDeleteProduct,
+  isSupabaseReady,
+} from './catalog-api.js';
+import {
   buildAdminShell,
   ledgerMatrixHtml,
   inventoryTableHtml,
@@ -73,11 +83,36 @@ export async function mount(root) {
   if (session.authenticated && session.user) {
     currentUser = session.user;
     unlock();
+    await refreshFromSupabase();
   } else {
     lock();
   }
 
   startSessionWatch();
+
+  /**
+   * Await live Supabase catalog, hydrate local state, re-render.
+   */
+  async function refreshFromSupabase() {
+    if (!isSupabaseReady()) {
+      console.warn('[admin] Supabase not configured — using local catalog only');
+      renderAll(state.getSnapshot());
+      return;
+    }
+
+    try {
+      const catalog = await fetchAdminCatalog();
+      state.hydrateCatalog(catalog);
+      renderAll(state.getSnapshot());
+      renderTaxonomyForms();
+      renderCatalogForm();
+      renderForm();
+    } catch (err) {
+      console.error('[admin] refreshFromSupabase failed:', err);
+      window.alert(err?.message || 'Failed to sync catalog from Supabase.');
+      renderAll(state.getSnapshot());
+    }
+  }
 
   els.authForm?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -116,7 +151,7 @@ export async function mount(root) {
     }
 
     if (target.matches('[data-refresh]')) {
-      renderAll(state.getSnapshot());
+      await refreshFromSupabase();
       return;
     }
 
@@ -168,16 +203,14 @@ export async function mount(root) {
       if (reassignTo === null) return;
 
       try {
-        const result = state.deleteCollection(id, {
-          mode: 'reassign',
-          reassignTo: reassignTo.trim() || 'General',
-        });
-        if (!result?.ok) {
-          window.alert(result?.error || 'Cannot delete this collection because products are still assigned to it. Please reassign the products first.');
-          return;
-        }
+        const catalog = await persistDeleteCollection(id, reassignTo.trim() || 'General');
+        state.hydrateCatalog(catalog);
+        renderAll(state.getSnapshot());
+        renderTaxonomyForms();
       } catch (err) {
-        window.alert(err?.message || 'Failed to delete collection.');
+        console.error('[admin] deleteCollection failed:', err);
+        window.alert(err?.message || 'Cannot delete this collection because products are still assigned to it. Please reassign the products first.');
+        await refreshFromSupabase();
         return;
       }
 
@@ -214,16 +247,14 @@ export async function mount(root) {
       if (reassignTo === null) return;
 
       try {
-        const result = state.deleteCategory(id, {
-          mode: 'reassign',
-          reassignTo: reassignTo.trim() || 'General',
-        });
-        if (!result?.ok) {
-          window.alert(result?.error || 'Cannot delete this category because products are still assigned to it. Please reassign the products first.');
-          return;
-        }
+        const catalog = await persistDeleteCategory(id, reassignTo.trim() || 'General');
+        state.hydrateCatalog(catalog);
+        renderAll(state.getSnapshot());
+        renderTaxonomyForms();
       } catch (err) {
-        window.alert(err?.message || 'Failed to delete category.');
+        console.error('[admin] deleteCategory failed:', err);
+        window.alert(err?.message || 'Cannot delete this category because products are still assigned to it. Please reassign the products first.');
+        await refreshFromSupabase();
         return;
       }
 
@@ -252,7 +283,15 @@ export async function mount(root) {
     if (deleteCatalog) {
       const id = deleteCatalog.dataset.deleteCatalog;
       if (confirm('Remove this product from the website store?')) {
-        state.deleteProduct(id);
+        try {
+          const catalog = await persistDeleteProduct(id);
+          state.hydrateCatalog(catalog);
+          renderAll(state.getSnapshot());
+        } catch (err) {
+          console.error('[admin] deleteProduct failed:', err);
+          window.alert(err?.message || 'Failed to delete product in Supabase.');
+          await refreshFromSupabase();
+        }
         if (editingCatalogId === id) {
           editingCatalogId = null;
           renderCatalogForm();
@@ -283,7 +322,15 @@ export async function mount(root) {
     if (deleteBtn) {
       const id = deleteBtn.dataset.deleteProduct;
       if (confirm('Delete this product from the master inventory?')) {
-        state.deleteProduct(id);
+        try {
+          const catalog = await persistDeleteProduct(id);
+          state.hydrateCatalog(catalog);
+          renderAll(state.getSnapshot());
+        } catch (err) {
+          console.error('[admin] deleteProduct failed:', err);
+          window.alert(err?.message || 'Failed to delete product in Supabase.');
+          await refreshFromSupabase();
+        }
         if (editingProductId === id) {
           editingProductId = null;
           renderForm();
@@ -302,16 +349,23 @@ export async function mount(root) {
     }
   });
 
-  root.addEventListener('submit', (event) => {
+  root.addEventListener('submit', async (event) => {
     const collectionForm = event.target.closest('[data-collection-form]');
     if (collectionForm) {
       event.preventDefault();
       const data = new FormData(collectionForm);
-      state.upsertCollection({
-        id: String(data.get('id') || ''),
-        name: String(data.get('name') || '').trim(),
-        description: String(data.get('description') || '').trim(),
-      }, String(data.get('renameFrom') || ''));
+      try {
+        const catalog = await persistUpsertCollection({
+          id: String(data.get('id') || ''),
+          name: String(data.get('name') || '').trim(),
+          description: String(data.get('description') || '').trim(),
+        }, String(data.get('renameFrom') || ''));
+        state.hydrateCatalog(catalog);
+        renderAll(state.getSnapshot());
+      } catch (err) {
+        console.error('[admin] upsertCollection failed:', err);
+        window.alert(err?.message || 'Failed to save collection.');
+      }
       editingCollectionId = null;
       renderCollectionForm();
       return;
@@ -321,11 +375,18 @@ export async function mount(root) {
     if (categoryForm) {
       event.preventDefault();
       const data = new FormData(categoryForm);
-      state.upsertCategory({
-        id: String(data.get('id') || ''),
-        name: String(data.get('name') || '').trim(),
-        description: String(data.get('description') || '').trim(),
-      }, String(data.get('renameFrom') || ''));
+      try {
+        const catalog = await persistUpsertCategory({
+          id: String(data.get('id') || ''),
+          name: String(data.get('name') || '').trim(),
+          description: String(data.get('description') || '').trim(),
+        }, String(data.get('renameFrom') || ''));
+        state.hydrateCatalog(catalog);
+        renderAll(state.getSnapshot());
+      } catch (err) {
+        console.error('[admin] upsertCategory failed:', err);
+        window.alert(err?.message || 'Failed to save category.');
+      }
       editingCategoryId = null;
       renderCategoryForm();
       return;
@@ -334,7 +395,7 @@ export async function mount(root) {
     const catalogForm = event.target.closest('[data-catalog-form]');
     if (catalogForm) {
       event.preventDefault();
-      saveProductFromForm(catalogForm);
+      await saveProductFromForm(catalogForm);
       editingCatalogId = null;
       renderCatalogForm();
       return;
@@ -343,7 +404,7 @@ export async function mount(root) {
     const form = event.target.closest('[data-product-form]');
     if (!form) return;
     event.preventDefault();
-    saveProductFromForm(form);
+    await saveProductFromForm(form);
     editingProductId = null;
     renderForm();
   });
@@ -351,7 +412,7 @@ export async function mount(root) {
   state.subscribe((snapshot) => renderAll(snapshot));
   state.startTransactionStream(60_000);
 
-  function saveProductFromForm(form) {
+  async function saveProductFromForm(form) {
     const data = new FormData(form);
     const imageUrls = String(data.get('imageUrls') ?? '')
       .split('\n')
@@ -361,8 +422,8 @@ export async function mount(root) {
     const collectionName = String(data.get('collectionName'));
     const category = String(data.get('category') || collectionName);
 
-    state.upsertProduct({
-      id: data.get('id') || `p-${Date.now().toString(36)}`,
+    const product = {
+      id: data.get('id') || undefined,
       title: String(data.get('title')),
       collectionName,
       category,
@@ -371,11 +432,23 @@ export async function mount(root) {
       stockQuantity: Number(data.get('stockQuantity')),
       barcode: String(data.get('barcode')),
       imageUrls,
-    });
+    };
 
-    // Ensure taxonomy lists include newly typed names
-    if (collectionName) state.upsertCollection({ name: collectionName });
-    if (category) state.upsertCategory({ name: category });
+    try {
+      const catalog = await persistUpsertProduct(product);
+      state.hydrateCatalog(catalog);
+      renderAll(state.getSnapshot());
+    } catch (err) {
+      console.error('[admin] upsertProduct failed:', err);
+      window.alert(err?.message || 'Failed to save product to Supabase.');
+      // Keep a local draft so the user doesn't lose form work offline
+      state.upsertProduct({
+        ...product,
+        id: product.id || `p-${Date.now().toString(36)}`,
+      });
+      if (collectionName) state.upsertCollection({ name: collectionName });
+      if (category) state.upsertCategory({ name: category });
+    }
   }
 
   function unlock() {

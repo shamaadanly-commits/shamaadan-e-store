@@ -59,8 +59,321 @@ export async function getProducts() {
     .select('*')
     .order('name', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error('[shared/supabase] getProducts failed:', error);
+    throw new Error(error.message);
+  }
   return data ?? [];
+}
+
+/**
+ * Map a DB product row into the dashboard / storefront shape.
+ * @param {object} row
+ */
+export function mapProductFromDb(row) {
+  const imageUrl = row.image_url || null;
+  const imageUrls = Array.isArray(row.image_urls)
+    ? row.image_urls.filter(Boolean)
+    : imageUrl
+      ? [imageUrl]
+      : [];
+
+  return {
+    id: String(row.id),
+    barcode: String(row.barcode ?? row.sku ?? ''),
+    sku: String(row.sku ?? row.barcode ?? ''),
+    name: String(row.name ?? row.title ?? 'Untitled'),
+    title: String(row.name ?? row.title ?? 'Untitled'),
+    description: row.description ? String(row.description) : '',
+    category: String(row.category ?? 'General'),
+    collectionName: String(row.collection ?? row.collection_name ?? row.category ?? 'General'),
+    price: Number(row.retail_price ?? row.price ?? 0),
+    retailPrice: Number(row.retail_price ?? row.price ?? 0),
+    cost: Number(row.wholesale_cost ?? row.cost ?? 0),
+    costPrice: Number(row.wholesale_cost ?? row.cost ?? 0),
+    stock: Number(row.stock_quantity ?? row.stock ?? 0),
+    stockQuantity: Number(row.stock_quantity ?? row.stock ?? 0),
+    minStockAlert: Number(row.min_stock_alert ?? 5),
+    min_stock_alert: Number(row.min_stock_alert ?? 5),
+    image: imageUrls[0] ?? null,
+    imageUrls,
+    active: row.is_active !== false,
+    is_active: row.is_active !== false,
+    category_id: row.category_id ?? null,
+    collection_id: row.collection_id ?? null,
+  };
+}
+
+/**
+ * Find or create a category by name.
+ * @param {string} name
+ */
+export async function ensureNamedCategory(name) {
+  const trimmed = String(name || 'General').trim() || 'General';
+  const { data: existing, error: findError } = await supabase
+    .from('categories')
+    .select('*')
+    .ilike('name', trimmed)
+    .maybeSingle();
+
+  if (findError) {
+    console.error('[shared/supabase] ensureNamedCategory find failed:', findError);
+    throw new Error(findError.message);
+  }
+  if (existing) return existing;
+
+  const { data, error } = await supabase
+    .from('categories')
+    .insert({ name: trimmed })
+    .select('*')
+    .single();
+
+  if (error) {
+    console.error('[shared/supabase] ensureNamedCategory insert failed:', error);
+    throw new Error(error.message);
+  }
+  return data;
+}
+
+/**
+ * Find or create a collection by name.
+ * @param {string} name
+ */
+export async function ensureNamedCollection(name) {
+  const trimmed = String(name || 'General').trim() || 'General';
+  const { data: existing, error: findError } = await supabase
+    .from('collections')
+    .select('*')
+    .ilike('name', trimmed)
+    .maybeSingle();
+
+  if (findError) {
+    console.error('[shared/supabase] ensureNamedCollection find failed:', findError);
+    throw new Error(findError.message);
+  }
+  if (existing) return existing;
+
+  const { data, error } = await supabase
+    .from('collections')
+    .insert({ name: trimmed })
+    .select('*')
+    .single();
+
+  if (error) {
+    console.error('[shared/supabase] ensureNamedCollection insert failed:', error);
+    throw new Error(error.message);
+  }
+  return data;
+}
+
+/**
+ * @param {{ id?: string, name: string, description?: string }} input
+ * @param {string} [renameFrom]
+ */
+export async function upsertCategoryRow(input, renameFrom = '') {
+  const name = String(input?.name || '').trim();
+  if (!name) throw new Error('Category name is required');
+
+  const payload = {
+    name,
+    description: input.description ? String(input.description) : null,
+  };
+
+  if (input.id) {
+    const { data: previous } = await supabase
+      .from('categories')
+      .select('name')
+      .eq('id', input.id)
+      .maybeSingle();
+
+    const { data, error } = await supabase
+      .from('categories')
+      .update(payload)
+      .eq('id', input.id)
+      .select('*')
+      .single();
+    if (error) throw new Error(error.message);
+
+    const oldName = renameFrom || previous?.name;
+    if (oldName && oldName !== name) {
+      await supabase.from('products').update({ category: name }).eq('category', oldName);
+    }
+    return data;
+  }
+
+  const { data, error } = await supabase
+    .from('categories')
+    .insert(payload)
+    .select('*')
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+/**
+ * @param {{ id?: string, name: string, description?: string }} input
+ * @param {string} [renameFrom]
+ */
+export async function upsertCollectionRow(input, renameFrom = '') {
+  const name = String(input?.name || '').trim();
+  if (!name) throw new Error('Collection name is required');
+
+  const payload = {
+    name,
+    description: input.description ? String(input.description) : null,
+  };
+
+  if (input.id) {
+    const { data: previous } = await supabase
+      .from('collections')
+      .select('name')
+      .eq('id', input.id)
+      .maybeSingle();
+
+    const { data, error } = await supabase
+      .from('collections')
+      .update(payload)
+      .eq('id', input.id)
+      .select('*')
+      .single();
+    if (error) throw new Error(error.message);
+
+    const oldName = renameFrom || previous?.name;
+    if (oldName && oldName !== name) {
+      // Text-column fallbacks used by some product schemas
+      await supabase.from('products').update({ collection: name }).eq('collection', oldName);
+      await supabase.from('products').update({ collection_name: name }).eq('collection_name', oldName);
+      await supabase.from('products').update({ category: name }).eq('category', oldName);
+    }
+    return data;
+  }
+
+  const { data, error } = await supabase
+    .from('collections')
+    .insert(payload)
+    .select('*')
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+/**
+ * Persist a product to Supabase (insert or update).
+ * @param {object} product — dashboard product shape
+ */
+export async function upsertProductRow(product) {
+  const name = String(product.title || product.name || '').trim();
+  if (!name) throw new Error('Product title is required');
+
+  const collectionName = String(product.collectionName || product.category || 'General').trim() || 'General';
+  const categoryName = String(product.category || collectionName).trim() || 'General';
+
+  let categoryId = product.category_id || null;
+  let collectionId = product.collection_id || null;
+
+  try {
+    const [cat, col] = await Promise.all([
+      ensureNamedCategory(categoryName),
+      ensureNamedCollection(collectionName),
+    ]);
+    categoryId = cat.id;
+    collectionId = col.id;
+  } catch (err) {
+    console.warn('[shared/supabase] taxonomy ensure skipped:', err.message);
+  }
+
+  const row = {
+    barcode: String(product.barcode || product.sku || ''),
+    name,
+    description: product.description ? String(product.description) : null,
+    image_url: product.imageUrls?.[0] || product.image || null,
+    wholesale_cost: Number(product.costPrice ?? product.cost ?? 0),
+    retail_price: Number(product.retailPrice ?? product.price ?? 0),
+    stock_quantity: Number(product.stockQuantity ?? product.stock ?? 0),
+    min_stock_alert: Number(product.minStockAlert ?? product.min_stock_alert ?? 5),
+    is_active: product.active !== false && product.is_active !== false,
+    updated_at: new Date().toISOString(),
+  };
+
+  // Optional FK / text columns — ignore failures if columns are absent
+  const optional = {
+    category_id: categoryId,
+    collection_id: collectionId,
+    category: categoryName,
+    collection: collectionName,
+    collection_name: collectionName,
+  };
+
+  const id = product.id && !String(product.id).startsWith('p-')
+    ? product.id
+    : product.id;
+
+  if (id && !String(id).startsWith('p-')) {
+    const { data, error } = await supabase
+      .from('products')
+      .update({ ...row, ...optional })
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) {
+      // Retry without optional columns if schema differs
+      console.warn('[shared/supabase] product update with taxonomy failed, retrying core fields:', error.message);
+      const { data: retry, error: retryError } = await supabase
+        .from('products')
+        .update(row)
+        .eq('id', id)
+        .select('*')
+        .single();
+      if (retryError) {
+        console.error('[shared/supabase] upsertProductRow update failed:', retryError);
+        throw new Error(retryError.message);
+      }
+      return retry;
+    }
+    return data;
+  }
+
+  const { data, error } = await supabase
+    .from('products')
+    .insert({ ...row, ...optional })
+    .select('*')
+    .single();
+
+  if (error) {
+    console.warn('[shared/supabase] product insert with taxonomy failed, retrying core fields:', error.message);
+    const { data: retry, error: retryError } = await supabase
+      .from('products')
+      .insert(row)
+      .select('*')
+      .single();
+    if (retryError) {
+      console.error('[shared/supabase] upsertProductRow insert failed:', retryError);
+      throw new Error(retryError.message);
+    }
+    return retry;
+  }
+  return data;
+}
+
+/**
+ * Permanently delete a product from Supabase.
+ * @param {string} productId
+ */
+export async function deleteProductRow(productId) {
+  const id = String(productId || '').trim();
+  if (!id) throw new Error('Product id is required');
+
+  const { error } = await supabase
+    .from('products')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('[shared/supabase] deleteProductRow failed:', error);
+    throw new Error(error.message);
+  }
+  return { ok: true, id };
 }
 
 /**
@@ -302,26 +615,40 @@ async function countProductsForCollection(collectionId) {
 }
 
 /**
- * Delete a category after clearing (or blocking on) product references.
+ * Delete a category after migrating product references in Supabase.
  *
  * @param {string} id
  * @param {{
  *   mode?: 'null' | 'block' | 'reassign',
  *   reassignTo?: string | null,
+ *   reassignToName?: string,
  * }} [options]
- *   - `null` (default): set products.category_id = null, then delete
- *   - `block`: refuse if any products still reference this category
- *   - `reassign`: move products to options.reassignTo, then delete
  * @returns {Promise<{ ok: true, id: string, reassigned: number }>}
  */
 export async function deleteCategory(id, options = {}) {
   const categoryId = String(id || '').trim();
   if (!categoryId) throw new Error('Category id is required');
 
-  const mode = options.mode || 'null';
+  const mode = options.mode || 'reassign';
 
   try {
-    const linked = await countProductsForCategory(categoryId);
+    const { data: existing, error: loadError } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('id', categoryId)
+      .maybeSingle();
+
+    if (loadError) throw new Error(loadError.message);
+    if (!existing) throw new Error('Category not found.');
+
+    let linked = 0;
+    try {
+      linked = await countProductsForCategory(categoryId);
+    } catch (countErr) {
+      console.warn('[shared/supabase] category product count skipped:', countErr.message);
+    }
+
+    const oldName = existing.name;
 
     if (linked > 0 && mode === 'block') {
       throw new Error(
@@ -329,23 +656,44 @@ export async function deleteCategory(id, options = {}) {
       );
     }
 
-    if (linked > 0 && mode === 'reassign') {
-      const target = options.reassignTo == null ? null : String(options.reassignTo).trim();
-      if (!target) {
-        throw new Error('reassignTo category id is required when mode is "reassign".');
+    if (mode !== 'block') {
+      let targetId = options.reassignTo ? String(options.reassignTo).trim() : '';
+      const targetName = String(options.reassignToName || options.reassignTo || 'General').trim() || 'General';
+
+      if (mode === 'reassign' || !targetId) {
+        const general = await ensureNamedCategory(
+          targetId && targetId.toLowerCase() !== 'general' && targetId.includes('-')
+            ? targetName
+            : targetName,
+        );
+        // If reassignTo was already a UUID, prefer it; otherwise use ensured row
+        if (!(targetId && targetId.includes('-') && targetId.length > 20)) {
+          targetId = general.id;
+        }
       }
-      const { error: moveError } = await supabase
-        .from('products')
-        .update({ category_id: target, updated_at: new Date().toISOString() })
-        .eq('category_id', categoryId);
-      if (moveError) throw new Error(moveError.message);
-    } else if (linked > 0) {
-      // Default: detach products so the FK cannot block deletion
-      const { error: clearError } = await supabase
-        .from('products')
-        .update({ category_id: null, updated_at: new Date().toISOString() })
-        .eq('category_id', categoryId);
-      if (clearError) throw new Error(clearError.message);
+
+      if (mode === 'null') {
+        const { error: clearError } = await supabase
+          .from('products')
+          .update({ category_id: null, updated_at: new Date().toISOString() })
+          .eq('category_id', categoryId);
+        if (clearError) console.warn('[shared/supabase] category_id clear:', clearError.message);
+      } else {
+        const { error: moveError } = await supabase
+          .from('products')
+          .update({ category_id: targetId, updated_at: new Date().toISOString() })
+          .eq('category_id', categoryId);
+        if (moveError) console.warn('[shared/supabase] category_id migrate:', moveError.message);
+      }
+
+      if (oldName) {
+        const destName = mode === 'null' ? 'General' : targetName;
+        const { error: textError } = await supabase
+          .from('products')
+          .update({ category: destName, updated_at: new Date().toISOString() })
+          .eq('category', oldName);
+        if (textError) console.warn('[shared/supabase] category text migrate:', textError.message);
+      }
     }
 
     const { error: deleteError } = await supabase
@@ -354,6 +702,7 @@ export async function deleteCategory(id, options = {}) {
       .eq('id', categoryId);
 
     if (deleteError) {
+      console.error('[shared/supabase] deleteCategory query failed:', deleteError);
       if (FK_BLOCKED_RE.test(deleteError.message)) {
         throw new Error(
           'Cannot delete this category because products are still assigned to it. Please reassign the products first.',
@@ -370,12 +719,13 @@ export async function deleteCategory(id, options = {}) {
 }
 
 /**
- * Delete a collection after clearing (or blocking on) product references.
+ * Delete a collection after migrating product references in Supabase.
  *
  * @param {string} id
  * @param {{
  *   mode?: 'null' | 'block' | 'reassign',
  *   reassignTo?: string | null,
+ *   reassignToName?: string,
  * }} [options]
  * @returns {Promise<{ ok: true, id: string, reassigned: number }>}
  */
@@ -383,10 +733,26 @@ export async function deleteCollection(id, options = {}) {
   const collectionId = String(id || '').trim();
   if (!collectionId) throw new Error('Collection id is required');
 
-  const mode = options.mode || 'null';
+  const mode = options.mode || 'reassign';
 
   try {
-    const linked = await countProductsForCollection(collectionId);
+    const { data: existing, error: loadError } = await supabase
+      .from('collections')
+      .select('*')
+      .eq('id', collectionId)
+      .maybeSingle();
+
+    if (loadError) throw new Error(loadError.message);
+    if (!existing) throw new Error('Collection not found.');
+
+    let linked = 0;
+    try {
+      linked = await countProductsForCollection(collectionId);
+    } catch (countErr) {
+      console.warn('[shared/supabase] collection product count skipped:', countErr.message);
+    }
+
+    const oldName = existing.name;
 
     if (linked > 0 && mode === 'block') {
       throw new Error(
@@ -394,22 +760,39 @@ export async function deleteCollection(id, options = {}) {
       );
     }
 
-    if (linked > 0 && mode === 'reassign') {
-      const target = options.reassignTo == null ? null : String(options.reassignTo).trim();
-      if (!target) {
-        throw new Error('reassignTo collection id is required when mode is "reassign".');
+    if (mode !== 'block') {
+      let targetId = options.reassignTo ? String(options.reassignTo).trim() : '';
+      const targetName = String(options.reassignToName || options.reassignTo || 'General').trim() || 'General';
+
+      const general = await ensureNamedCollection(targetName);
+      if (!(targetId && targetId.includes('-') && targetId.length > 20)) {
+        targetId = general.id;
       }
-      const { error: moveError } = await supabase
-        .from('products')
-        .update({ collection_id: target, updated_at: new Date().toISOString() })
-        .eq('collection_id', collectionId);
-      if (moveError) throw new Error(moveError.message);
-    } else if (linked > 0) {
-      const { error: clearError } = await supabase
-        .from('products')
-        .update({ collection_id: null, updated_at: new Date().toISOString() })
-        .eq('collection_id', collectionId);
-      if (clearError) throw new Error(clearError.message);
+
+      if (mode === 'null') {
+        const { error: clearError } = await supabase
+          .from('products')
+          .update({ collection_id: null, updated_at: new Date().toISOString() })
+          .eq('collection_id', collectionId);
+        if (clearError) console.warn('[shared/supabase] collection_id clear:', clearError.message);
+      } else {
+        const { error: moveError } = await supabase
+          .from('products')
+          .update({ collection_id: targetId, updated_at: new Date().toISOString() })
+          .eq('collection_id', collectionId);
+        if (moveError) console.warn('[shared/supabase] collection_id migrate:', moveError.message);
+      }
+
+      if (oldName) {
+        const destName = mode === 'null' ? 'General' : targetName;
+        for (const col of ['collection', 'collection_name', 'category']) {
+          const { error: textError } = await supabase
+            .from('products')
+            .update({ [col]: destName, updated_at: new Date().toISOString() })
+            .eq(col, oldName);
+          if (textError) console.warn(`[shared/supabase] ${col} migrate:`, textError.message);
+        }
+      }
     }
 
     const { error: deleteError } = await supabase
@@ -418,6 +801,7 @@ export async function deleteCollection(id, options = {}) {
       .eq('id', collectionId);
 
     if (deleteError) {
+      console.error('[shared/supabase] deleteCollection query failed:', deleteError);
       if (FK_BLOCKED_RE.test(deleteError.message)) {
         throw new Error(
           'Cannot delete this collection because products are still assigned to it. Please reassign the products first.',
@@ -432,4 +816,5 @@ export async function deleteCollection(id, options = {}) {
     throw err instanceof Error ? err : new Error(String(err));
   }
 }
+
 

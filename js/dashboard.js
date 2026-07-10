@@ -374,6 +374,25 @@ export function createDashboardState(options = {}) {
   }
 
   /**
+   * Replace local catalog from a live Supabase fetch.
+   * @param {{ products?: Array, collections?: Array, categories?: Array }} catalog
+   */
+  function hydrateCatalog(catalog = {}) {
+    if (Array.isArray(catalog.products)) {
+      products = catalog.products.map(normalizeProduct);
+    }
+    if (Array.isArray(catalog.collections)) {
+      collections = catalog.collections.map(normalizeTaxonomyItem);
+    }
+    if (Array.isArray(catalog.categories)) {
+      categories = catalog.categories.map(normalizeTaxonomyItem);
+    }
+    save();
+    notify();
+    return getSnapshot();
+  }
+
+  /**
    * @param {{ id?: string, name: string, description?: string, gradient?: string }} input
    * @param {string} [renameFrom]
    */
@@ -582,6 +601,7 @@ export function createDashboardState(options = {}) {
     upsertProduct,
     deleteProduct,
     replaceProducts,
+    hydrateCatalog,
     getCollections,
     getCategories,
     upsertCollection,
