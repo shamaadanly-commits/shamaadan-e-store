@@ -162,11 +162,25 @@ export async function mount(root) {
       const item = state.getSnapshot().collections.find((c) => c.id === id);
       if (!item) return;
       const reassignTo = window.prompt(
-        `Delete collection "${item.name}"?\nProducts will move to this collection:`,
+        `Delete collection "${item.name}"?\nProducts will move to this collection (leave blank to use General):`,
         'General',
       );
       if (reassignTo === null) return;
-      state.deleteCollection(id, { reassignTo: reassignTo.trim() || 'General' });
+
+      try {
+        const result = state.deleteCollection(id, {
+          mode: 'reassign',
+          reassignTo: reassignTo.trim() || 'General',
+        });
+        if (!result?.ok) {
+          window.alert(result?.error || 'Cannot delete this collection because products are still assigned to it. Please reassign the products first.');
+          return;
+        }
+      } catch (err) {
+        window.alert(err?.message || 'Failed to delete collection.');
+        return;
+      }
+
       if (editingCollectionId === id) {
         editingCollectionId = null;
         renderCollectionForm();
@@ -194,11 +208,25 @@ export async function mount(root) {
       const item = state.getSnapshot().categories.find((c) => c.id === id);
       if (!item) return;
       const reassignTo = window.prompt(
-        `Delete category "${item.name}"?\nProducts will move to this category:`,
+        `Delete category "${item.name}"?\nProducts will move to this category (leave blank to use General):`,
         'General',
       );
       if (reassignTo === null) return;
-      state.deleteCategory(id, { reassignTo: reassignTo.trim() || 'General' });
+
+      try {
+        const result = state.deleteCategory(id, {
+          mode: 'reassign',
+          reassignTo: reassignTo.trim() || 'General',
+        });
+        if (!result?.ok) {
+          window.alert(result?.error || 'Cannot delete this category because products are still assigned to it. Please reassign the products first.');
+          return;
+        }
+      } catch (err) {
+        window.alert(err?.message || 'Failed to delete category.');
+        return;
+      }
+
       if (editingCategoryId === id) {
         editingCategoryId = null;
         renderCategoryForm();

@@ -402,23 +402,54 @@ export function createDashboardState(options = {}) {
   }
 
   /**
+   * Delete a collection after reassigning (or clearing) linked products.
    * @param {string} idOrName
-   * @param {{ reassignTo?: string }} [options]
+   * @param {{ reassignTo?: string | null, mode?: 'reassign' | 'null' | 'block' }} [options]
+   * @returns {{ ok: boolean, error?: string, reassigned?: number }}
    */
   function deleteCollection(idOrName, options = {}) {
-    const target = collections.find((c) => c.id === idOrName || c.name === idOrName);
-    if (!target) return false;
+    try {
+      const target = collections.find((c) => c.id === idOrName || c.name === idOrName);
+      if (!target) {
+        return { ok: false, error: 'Collection not found.' };
+      }
 
-    const reassignTo = options.reassignTo || 'General';
-    products = products.map((p) => (
-      p.collectionName === target.name
-        ? { ...p, collectionName: reassignTo }
-        : p
-    ));
-    collections = collections.filter((c) => c.id !== target.id);
-    save();
-    notify();
-    return true;
+      const linked = products.filter((p) => p.collectionName === target.name);
+      const mode = options.mode || (options.reassignTo === null ? 'null' : 'reassign');
+
+      if (linked.length && mode === 'block') {
+        return {
+          ok: false,
+          error: 'Cannot delete this collection because products are still assigned to it. Please reassign the products first.',
+        };
+      }
+
+      if (mode === 'null') {
+        products = products.map((p) => (
+          p.collectionName === target.name
+            ? { ...p, collectionName: 'General' }
+            : p
+        ));
+      } else {
+        const reassignTo = String(options.reassignTo || 'General').trim() || 'General';
+        products = products.map((p) => (
+          p.collectionName === target.name
+            ? { ...p, collectionName: reassignTo }
+            : p
+        ));
+      }
+
+      collections = collections.filter((c) => c.id !== target.id);
+      save();
+      notify();
+      return { ok: true, reassigned: linked.length };
+    } catch (err) {
+      console.error('[dashboard] deleteCollection failed:', err);
+      return {
+        ok: false,
+        error: err?.message || 'Failed to delete collection.',
+      };
+    }
   }
 
   /**
@@ -450,23 +481,54 @@ export function createDashboardState(options = {}) {
   }
 
   /**
+   * Delete a category after reassigning (or clearing) linked products.
    * @param {string} idOrName
-   * @param {{ reassignTo?: string }} [options]
+   * @param {{ reassignTo?: string | null, mode?: 'reassign' | 'null' | 'block' }} [options]
+   * @returns {{ ok: boolean, error?: string, reassigned?: number }}
    */
   function deleteCategory(idOrName, options = {}) {
-    const target = categories.find((c) => c.id === idOrName || c.name === idOrName);
-    if (!target) return false;
+    try {
+      const target = categories.find((c) => c.id === idOrName || c.name === idOrName);
+      if (!target) {
+        return { ok: false, error: 'Category not found.' };
+      }
 
-    const reassignTo = options.reassignTo || 'General';
-    products = products.map((p) => (
-      p.category === target.name
-        ? { ...p, category: reassignTo }
-        : p
-    ));
-    categories = categories.filter((c) => c.id !== target.id);
-    save();
-    notify();
-    return true;
+      const linked = products.filter((p) => p.category === target.name);
+      const mode = options.mode || (options.reassignTo === null ? 'null' : 'reassign');
+
+      if (linked.length && mode === 'block') {
+        return {
+          ok: false,
+          error: 'Cannot delete this category because products are still assigned to it. Please reassign the products first.',
+        };
+      }
+
+      if (mode === 'null') {
+        products = products.map((p) => (
+          p.category === target.name
+            ? { ...p, category: 'General' }
+            : p
+        ));
+      } else {
+        const reassignTo = String(options.reassignTo || 'General').trim() || 'General';
+        products = products.map((p) => (
+          p.category === target.name
+            ? { ...p, category: reassignTo }
+            : p
+        ));
+      }
+
+      categories = categories.filter((c) => c.id !== target.id);
+      save();
+      notify();
+      return { ok: true, reassigned: linked.length };
+    } catch (err) {
+      console.error('[dashboard] deleteCategory failed:', err);
+      return {
+        ok: false,
+        error: err?.message || 'Failed to delete category.',
+      };
+    }
   }
 
   /**

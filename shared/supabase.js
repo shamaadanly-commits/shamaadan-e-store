@@ -241,3 +241,195 @@ export async function createOrder(orderData, itemsArray) {
     inventory: inventory ?? [],
   };
 }
+
+// ── Categories & collections (taxonomy) ─────────────────────────────
+
+const FK_BLOCKED_RE = /foreign key|violates foreign key|23503/i;
+
+/**
+ * @param {string} table
+ * @returns {Promise<object[]>}
+ */
+export async function getCategories() {
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .order('name', { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+/**
+ * @returns {Promise<object[]>}
+ */
+export async function getCollections() {
+  const { data, error } = await supabase
+    .from('collections')
+    .select('*')
+    .order('name', { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+/**
+ * Count products still linked to a category.
+ * @param {string} categoryId
+ */
+async function countProductsForCategory(categoryId) {
+  const { count, error } = await supabase
+    .from('products')
+    .select('id', { count: 'exact', head: true })
+    .eq('category_id', categoryId);
+
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+/**
+ * Count products still linked to a collection.
+ * @param {string} collectionId
+ */
+async function countProductsForCollection(collectionId) {
+  const { count, error } = await supabase
+    .from('products')
+    .select('id', { count: 'exact', head: true })
+    .eq('collection_id', collectionId);
+
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+/**
+ * Delete a category after clearing (or blocking on) product references.
+ *
+ * @param {string} id
+ * @param {{
+ *   mode?: 'null' | 'block' | 'reassign',
+ *   reassignTo?: string | null,
+ * }} [options]
+ *   - `null` (default): set products.category_id = null, then delete
+ *   - `block`: refuse if any products still reference this category
+ *   - `reassign`: move products to options.reassignTo, then delete
+ * @returns {Promise<{ ok: true, id: string, reassigned: number }>}
+ */
+export async function deleteCategory(id, options = {}) {
+  const categoryId = String(id || '').trim();
+  if (!categoryId) throw new Error('Category id is required');
+
+  const mode = options.mode || 'null';
+
+  try {
+    const linked = await countProductsForCategory(categoryId);
+
+    if (linked > 0 && mode === 'block') {
+      throw new Error(
+        'Cannot delete this category because products are still assigned to it. Please reassign the products first.',
+      );
+    }
+
+    if (linked > 0 && mode === 'reassign') {
+      const target = options.reassignTo == null ? null : String(options.reassignTo).trim();
+      if (!target) {
+        throw new Error('reassignTo category id is required when mode is "reassign".');
+      }
+      const { error: moveError } = await supabase
+        .from('products')
+        .update({ category_id: target, updated_at: new Date().toISOString() })
+        .eq('category_id', categoryId);
+      if (moveError) throw new Error(moveError.message);
+    } else if (linked > 0) {
+      // Default: detach products so the FK cannot block deletion
+      const { error: clearError } = await supabase
+        .from('products')
+        .update({ category_id: null, updated_at: new Date().toISOString() })
+        .eq('category_id', categoryId);
+      if (clearError) throw new Error(clearError.message);
+    }
+
+    const { error: deleteError } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', categoryId);
+
+    if (deleteError) {
+      if (FK_BLOCKED_RE.test(deleteError.message)) {
+        throw new Error(
+          'Cannot delete this category because products are still assigned to it. Please reassign the products first.',
+        );
+      }
+      throw new Error(deleteError.message);
+    }
+
+    return { ok: true, id: categoryId, reassigned: linked };
+  } catch (err) {
+    console.error('[shared/supabase] deleteCategory failed:', err);
+    throw err instanceof Error ? err : new Error(String(err));
+  }
+}
+
+/**
+ * Delete a collection after clearing (or blocking on) product references.
+ *
+ * @param {string} id
+ * @param {{
+ *   mode?: 'null' | 'block' | 'reassign',
+ *   reassignTo?: string | null,
+ * }} [options]
+ * @returns {Promise<{ ok: true, id: string, reassigned: number }>}
+ */
+export async function deleteCollection(id, options = {}) {
+  const collectionId = String(id || '').trim();
+  if (!collectionId) throw new Error('Collection id is required');
+
+  const mode = options.mode || 'null';
+
+  try {
+    const linked = await countProductsForCollection(collectionId);
+
+    if (linked > 0 && mode === 'block') {
+      throw new Error(
+        'Cannot delete this collection because products are still assigned to it. Please reassign the products first.',
+      );
+    }
+
+    if (linked > 0 && mode === 'reassign') {
+      const target = options.reassignTo == null ? null : String(options.reassignTo).trim();
+      if (!target) {
+        throw new Error('reassignTo collection id is required when mode is "reassign".');
+      }
+      const { error: moveError } = await supabase
+        .from('products')
+        .update({ collection_id: target, updated_at: new Date().toISOString() })
+        .eq('collection_id', collectionId);
+      if (moveError) throw new Error(moveError.message);
+    } else if (linked > 0) {
+      const { error: clearError } = await supabase
+        .from('products')
+        .update({ collection_id: null, updated_at: new Date().toISOString() })
+        .eq('collection_id', collectionId);
+      if (clearError) throw new Error(clearError.message);
+    }
+
+    const { error: deleteError } = await supabase
+      .from('collections')
+      .delete()
+      .eq('id', collectionId);
+
+    if (deleteError) {
+      if (FK_BLOCKED_RE.test(deleteError.message)) {
+        throw new Error(
+          'Cannot delete this collection because products are still assigned to it. Please reassign the products first.',
+        );
+      }
+      throw new Error(deleteError.message);
+    }
+
+    return { ok: true, id: collectionId, reassigned: linked };
+  } catch (err) {
+    console.error('[shared/supabase] deleteCollection failed:', err);
+    throw err instanceof Error ? err : new Error(String(err));
+  }
+}
+
