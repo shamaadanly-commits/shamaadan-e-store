@@ -15,6 +15,10 @@ import {
   DEFAULT_COLLECTIONS,
   DEFAULT_CATEGORIES,
 } from './shared/catalog-store.js';
+import {
+  persistDeleteCategory,
+  persistDeleteCollection,
+} from './admin/catalog-api.js';
 
 const STORAGE_KEY = 'shamaadan_dashboard_v1';
 
@@ -421,12 +425,12 @@ export function createDashboardState(options = {}) {
   }
 
   /**
-   * Delete a collection after reassigning (or clearing) linked products.
+   * Delete a collection in Supabase (migrate products → General), then re-fetch catalog.
    * @param {string} idOrName
    * @param {{ reassignTo?: string | null, mode?: 'reassign' | 'null' | 'block' }} [options]
-   * @returns {{ ok: boolean, error?: string, reassigned?: number }}
+   * @returns {Promise<{ ok: boolean, error?: string, reassigned?: number }>}
    */
-  function deleteCollection(idOrName, options = {}) {
+  async function deleteCollection(idOrName, options = {}) {
     try {
       const target = collections.find((c) => c.id === idOrName || c.name === idOrName);
       if (!target) {
@@ -443,24 +447,9 @@ export function createDashboardState(options = {}) {
         };
       }
 
-      if (mode === 'null') {
-        products = products.map((p) => (
-          p.collectionName === target.name
-            ? { ...p, collectionName: 'General' }
-            : p
-        ));
-      } else {
-        const reassignTo = String(options.reassignTo || 'General').trim() || 'General';
-        products = products.map((p) => (
-          p.collectionName === target.name
-            ? { ...p, collectionName: reassignTo }
-            : p
-        ));
-      }
-
-      collections = collections.filter((c) => c.id !== target.id);
-      save();
-      notify();
+      const reassignTo = String(options.reassignTo || 'General').trim() || 'General';
+      const catalog = await persistDeleteCollection(target.id, mode === 'null' ? 'General' : reassignTo);
+      hydrateCatalog(catalog);
       return { ok: true, reassigned: linked.length };
     } catch (err) {
       console.error('[dashboard] deleteCollection failed:', err);
@@ -500,12 +489,12 @@ export function createDashboardState(options = {}) {
   }
 
   /**
-   * Delete a category after reassigning (or clearing) linked products.
+   * Delete a category in Supabase (migrate products → General), then re-fetch catalog.
    * @param {string} idOrName
    * @param {{ reassignTo?: string | null, mode?: 'reassign' | 'null' | 'block' }} [options]
-   * @returns {{ ok: boolean, error?: string, reassigned?: number }}
+   * @returns {Promise<{ ok: boolean, error?: string, reassigned?: number }>}
    */
-  function deleteCategory(idOrName, options = {}) {
+  async function deleteCategory(idOrName, options = {}) {
     try {
       const target = categories.find((c) => c.id === idOrName || c.name === idOrName);
       if (!target) {
@@ -522,24 +511,9 @@ export function createDashboardState(options = {}) {
         };
       }
 
-      if (mode === 'null') {
-        products = products.map((p) => (
-          p.category === target.name
-            ? { ...p, category: 'General' }
-            : p
-        ));
-      } else {
-        const reassignTo = String(options.reassignTo || 'General').trim() || 'General';
-        products = products.map((p) => (
-          p.category === target.name
-            ? { ...p, category: reassignTo }
-            : p
-        ));
-      }
-
-      categories = categories.filter((c) => c.id !== target.id);
-      save();
-      notify();
+      const reassignTo = String(options.reassignTo || 'General').trim() || 'General';
+      const catalog = await persistDeleteCategory(target.id, mode === 'null' ? 'General' : reassignTo);
+      hydrateCatalog(catalog);
       return { ok: true, reassigned: linked.length };
     } catch (err) {
       console.error('[dashboard] deleteCategory failed:', err);

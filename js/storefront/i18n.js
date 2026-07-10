@@ -251,7 +251,7 @@ const MESSAGES = {
       added: 'تمت الإضافة ✦',
       addedToast: 'تمت إضافة {name} إلى السلة',
       outOfStock: 'نفدت الكمية',
-      onlyOneLeft: 'تبقى قطعة واحدة
+      onlyOneLeft: 'تبقى قطعة واحدة',
       lowStock: 'تبقى {count} فقط',
       maxStock: 'المتوفر {count} فقط',
     },
