@@ -1,5 +1,6 @@
 /**
- * Product data layer — shared catalog (admin) → Supabase → mock fallback.
+ * Product data layer — Supabase `public.products` (live stock) → local catalog → mock.
+ * Reads stock_quantity / min_stock_alert / retail_price from the unified schema.
  */
 import { getSupabase } from '../config/supabase.js';
 import { MOCK_PRODUCTS } from '../shared/mock-products.js';
@@ -12,48 +13,82 @@ import {
 import { productCardHtml } from './template.js';
 
 /**
+ * Map a Supabase products row into the storefront product shape.
+ * @param {object} row
+ */
+function mapSupabaseProduct(row) {
+  const imageUrl = row.image_url || null;
+  const imageUrls = Array.isArray(row.image_urls)
+    ? row.image_urls.filter(Boolean)
+    : imageUrl
+      ? [imageUrl]
+      : row.image
+        ? [row.image]
+        : [];
+
+  return normalizeStoreProduct({
+    id: row.id,
+    barcode: row.barcode ?? row.sku ?? '',
+    sku: row.sku ?? row.barcode ?? '',
+    name: row.name,
+    title: row.name,
+    description: row.description ?? '',
+    category: row.category ?? 'General',
+    collectionName: row.category ?? 'General',
+    retailPrice: Number(row.retail_price ?? row.price ?? 0),
+    price: Number(row.retail_price ?? row.price ?? 0),
+    wholesale_cost: Number(row.wholesale_cost ?? row.cost ?? 0),
+    cost: Number(row.wholesale_cost ?? row.cost ?? 0),
+    stock_quantity: Number(row.stock_quantity ?? row.stock ?? 0),
+    stock: Number(row.stock_quantity ?? row.stock ?? 0),
+    min_stock_alert: Number(row.min_stock_alert ?? 5),
+    imageUrls,
+    image: imageUrls[0] ?? null,
+    active: row.is_active !== false && row.active !== false,
+    is_active: row.is_active !== false && row.active !== false,
+  });
+}
+
+/**
  * @returns {Promise<{ products: Array, categories: string[], collections: Array, connected: boolean }>}
  */
 export async function loadProducts() {
   const shared = loadStoreCatalog();
-  let products = shared?.products?.length
-    ? shared.products.map(normalizeStoreProduct)
-    : MOCK_PRODUCTS.map(normalizeStoreProduct);
-
   let managedCollections = shared?.collections || [];
   let managedCategories = shared?.categories || [];
-
-  const supabase = getSupabase();
+  let products = [];
   let connected = false;
 
-  if (!shared?.products?.length && supabase) {
+  const supabase = getSupabase();
+
+  // Prefer live Supabase inventory so stock_quantity stays in sync with POS
+  if (supabase) {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, sku, barcode, name, category, price, cost, stock, image_urls, image')
-        .eq('active', true)
+        .select('id, barcode, name, description, image_url, wholesale_cost, retail_price, stock_quantity, min_stock_alert, is_active, created_at')
+        .eq('is_active', true)
         .order('name');
 
       if (!error && data?.length) {
-        products = data.map((row) => normalizeStoreProduct({
-          id: row.id,
-          sku: row.sku,
-          barcode: row.barcode ?? row.sku,
-          name: row.name,
-          category: row.category ?? 'General',
-          collectionName: row.category ?? 'General',
-          price: Number(row.price),
-          cost: Number(row.cost ?? 0),
-          stock: row.stock ?? 0,
-          imageUrls: row.image_urls ?? (row.image ? [row.image] : []),
-        }));
+        products = data.map(mapSupabaseProduct);
         connected = true;
+      } else if (error) {
+        console.warn('[storefront] Supabase products error:', error.message);
       }
-    } catch {
-      // Keep mock / shared catalog
+    } catch (err) {
+      console.warn('[storefront] Supabase product load failed:', err);
     }
-  } else if (shared?.products?.length) {
+  }
+
+  // Fallback: admin localStorage catalog, then mocks
+  if (!products.length && shared?.products?.length) {
+    products = shared.products.map(normalizeStoreProduct);
     connected = true;
+  }
+
+  if (!products.length) {
+    products = MOCK_PRODUCTS.map(normalizeStoreProduct);
   }
 
   const collections = buildCollectionsFromProducts(products, managedCollections);
@@ -66,7 +101,7 @@ export async function loadProducts() {
 /**
  * Filter products by category / collection name.
  * @param {Array} products
- * @param {string} filter - "All" or category/collection name
+ * @param {string} filter
  */
 export function filterProducts(products, filter) {
   if (!filter || filter === 'All') return products;

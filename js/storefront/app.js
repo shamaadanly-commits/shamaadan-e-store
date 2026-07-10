@@ -77,14 +77,31 @@ export async function mount(root) {
     }
 
     const btn = event.target.closest('[data-action="add-to-cart"]');
-    if (!btn) return;
+    if (!btn || btn.disabled) return;
 
     const id = btn.dataset.productId;
     const product = products.find((p) => p.id === id);
     if (!product) return;
 
+    const stock = Number(product.stockQuantity ?? product.stock ?? 0);
+    if (stock <= 0) {
+      showToast(root, i18n.t('shop.outOfStock'));
+      return;
+    }
+
     const display = i18n.translateProduct(product);
-    cart.add(product);
+    const result = cart.add(product);
+
+    if (!result.added) {
+      showToast(
+        root,
+        result.reason === 'max_stock'
+          ? i18n.t('shop.maxStock', { count: stock })
+          : i18n.t('shop.outOfStock'),
+      );
+      return;
+    }
+
     showToast(root, i18n.t('shop.addedToast', { name: display.displayName }));
 
     const original = btn.textContent;

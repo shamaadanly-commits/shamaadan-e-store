@@ -337,15 +337,47 @@ export function productCardHtml(product, i18n) {
   const gradient = CATEGORY_GRADIENTS[product.category] || CATEGORY_GRADIENTS.General;
   const initial = display.displayName.charAt(0);
   const imageUrl = product.imageUrls?.[0] || product.image || null;
-  const isNew = product.id === 'p1' || product.id === 'p5';
-  const badge = isNew ? `<span class="product-card__badge">${t('shop.new')}</span>` : '';
+
+  const stock = Number(product.stockQuantity ?? product.stock ?? 0);
+  const alertAt = Number(product.minStockAlert ?? product.min_stock_alert ?? 5);
+  const outOfStock = stock <= 0;
+  const lowStock = !outOfStock && (stock === 1 || stock <= alertAt);
+
+  let badge = '';
+  if (outOfStock) {
+    badge = `<span class="inventory-badge out-of-stock">${t('shop.outOfStock')}</span>`;
+  } else if (stock === 1) {
+    badge = `<span class="inventory-badge low-stock">${t('shop.onlyOneLeft')}</span>`;
+  } else if (lowStock) {
+    badge = `<span class="inventory-badge low-stock">${t('shop.lowStock', { count: stock })}</span>`;
+  } else if (product.id === 'p1' || product.id === 'p5') {
+    badge = `<span class="product-card__badge">${t('shop.new')}</span>`;
+  }
 
   const media = imageUrl
     ? `<img class="product-card__image" src="${escapeAttr(imageUrl)}" alt="${escapeAttr(display.displayName)}" loading="lazy" decoding="async">`
     : `<span class="product-card__monogram" aria-hidden="true">${escapeHtml(initial)}</span>`;
 
+  const addButtons = outOfStock
+    ? `
+        <button type="button" class="btn btn--copper btn--sm add-to-cart-btn" disabled aria-disabled="true">${t('shop.outOfStock')}</button>
+      `
+    : `
+        <button type="button" class="btn btn--copper btn--sm add-to-cart-btn" data-action="add-to-cart" data-product-id="${product.id}">${t('shop.add')}</button>
+      `;
+
+  const bagButton = outOfStock
+    ? `<button type="button" class="btn btn--ghost btn--sm add-to-cart-btn" disabled aria-disabled="true">${t('shop.outOfStock')}</button>`
+    : `<button type="button" class="btn btn--ghost btn--sm add-to-cart-btn" data-action="add-to-cart" data-product-id="${product.id}">${t('shop.bag')}</button>`;
+
   return `
-    <article class="product-card" role="listitem" data-product-id="${product.id}" style="--card-gradient: ${gradient}">
+    <article
+      class="product-card${outOfStock ? ' product-card--oos' : ''}${lowStock ? ' product-card--low' : ''}"
+      role="listitem"
+      data-product-id="${product.id}"
+      data-stock="${stock}"
+      style="--card-gradient: ${gradient}"
+    >
       <div class="product-card__media">
         <div class="product-card__visual${imageUrl ? ' product-card__visual--photo' : ''}">
           ${media}
@@ -353,15 +385,16 @@ export function productCardHtml(product, i18n) {
         <div class="product-card__shine" aria-hidden="true"></div>
         ${badge}
         <div class="product-card__quick-add">
-          <button type="button" class="btn btn--copper btn--sm" data-action="add-to-cart" data-product-id="${product.id}">${t('shop.add')}</button>
+          ${addButtons}
         </div>
       </div>
       <div class="product-card__body">
         <p class="product-card__category">${escapeHtml(display.displayCategory)}</p>
         <h3 class="product-card__name">${escapeHtml(display.displayName)}</h3>
+        ${lowStock && !outOfStock ? `<p class="product-card__stock-note">${stock === 1 ? t('shop.onlyOneLeft') : t('shop.lowStock', { count: stock })}</p>` : ''}
         <div class="product-card__footer">
           <span class="product-card__price" data-price="${product.price}">${i18n.formatPrice(product.price)}</span>
-          <button type="button" class="btn btn--ghost btn--sm" data-action="add-to-cart" data-product-id="${product.id}">${t('shop.bag')}</button>
+          ${bagButton}
         </div>
       </div>
     </article>

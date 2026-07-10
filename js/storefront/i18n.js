@@ -73,6 +73,10 @@ const MESSAGES = {
       new: 'New',
       added: 'Added ✦',
       addedToast: '{name} added to bag',
+      outOfStock: 'Out of Stock',
+      onlyOneLeft: 'Only 1 left',
+      lowStock: 'Only {count} left',
+      maxStock: 'Only {count} available',
     },
     checkout: {
       title: 'Checkout',
@@ -246,6 +250,10 @@ const MESSAGES = {
       new: 'جديد',
       added: 'تمت الإضافة ✦',
       addedToast: 'تمت إضافة {name} إلى السلة',
+      outOfStock: 'نفدت الكمية',
+      onlyOneLeft: 'تبقى قطعة واحدة
+      lowStock: 'تبقى {count} فقط',
+      maxStock: 'المتوفر {count} فقط',
     },
     checkout: {
       title: 'إتمام الطلب',

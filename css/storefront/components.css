@@ -376,6 +376,40 @@
   border: 1px solid var(--color-border-gold);
   border-radius: var(--radius-pill);
   color: var(--color-gold);
+  z-index: 2;
+}
+
+.product-card__badge--oos {
+  color: #f0d0c8;
+  border-color: rgb(196 92 92 / 45%);
+  background: rgb(80 28 24 / 78%);
+}
+
+.product-card__badge--low {
+  color: #f5e6c8;
+  border-color: rgb(201 168 76 / 55%);
+  background: rgb(90 60 18 / 78%);
+}
+
+.product-card--oos {
+  opacity: 0.72;
+}
+
+.product-card--oos .product-card__visual {
+  filter: grayscale(0.35);
+}
+
+.product-card--oos .product-card__quick-add {
+  opacity: 1;
+  transform: none;
+}
+
+.product-card__stock-note {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-gold);
 }
 
 .product-card__quick-add {
@@ -535,3 +569,47 @@
   color: var(--color-gold);
   font-size: 1rem;
 }
+
+/* ── Inventory badges (live stock_quantity) ─────────────────────── */
+/* Container positioning for the product image */
+.product-card {
+  position: relative; /* Crucial for badge positioning */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Absolute Badge Positioning Over Product Image */
+.inventory-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Out of Stock Style */
+.inventory-badge.out-of-stock {
+  background-color: #ef4444; /* High Contrast Red */
+  color: #ffffff;
+}
+
+/* Low Stock Style */
+.inventory-badge.low-stock {
+  background-color: #f97316; /* Urgency Orange */
+  color: #ffffff;
+}
+
+/* Styling for out-of-stock buy button */
+.add-to-cart-btn:disabled {
+  background-color: #cbd5e1;
+  color: #64748b;
+  cursor: not-allowed;
+  border-color: #cbd5e1;
+}
+

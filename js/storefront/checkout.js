@@ -226,7 +226,10 @@ function bindOverlayEvents(overlay, cart, i18n) {
     if (plus) {
       const id = plus.dataset.productId;
       const line = cart.getSnapshot().items.find((i) => i.product.id === id);
-      if (line) cart.updateQty(id, line.qty + 1);
+      if (!line) return;
+      const stock = Number(line.product.stockQuantity ?? line.product.stock ?? Infinity);
+      if (line.qty >= stock) return;
+      cart.updateQty(id, line.qty + 1);
       return;
     }
 

@@ -92,6 +92,7 @@ export function normalizeTaxonomyItem(raw, index = 0) {
 
 /**
  * Normalize any product shape into the storefront/admin shared schema.
+ * Supports unified Supabase columns: stock_quantity, retail_price, wholesale_cost, min_stock_alert.
  * @param {object} raw
  * @returns {StoreProduct}
  */
@@ -100,17 +101,21 @@ export function normalizeStoreProduct(raw) {
     ? raw.imageUrls.filter(Boolean)
     : Array.isArray(raw.image_urls)
       ? raw.image_urls.filter(Boolean)
-      : raw.image
-        ? [raw.image]
-        : [];
+      : raw.image_url
+        ? [raw.image_url]
+        : raw.image
+          ? [raw.image]
+          : [];
 
   const title = raw.title ?? raw.name ?? 'Untitled';
   const collectionName = String(raw.collectionName ?? raw.category ?? 'General').trim() || 'General';
   const category = String(raw.category ?? raw.collectionName ?? 'General').trim() || 'General';
   const barcode = String(raw.barcode ?? raw.sku ?? '');
-  const retailPrice = Number(raw.retailPrice ?? raw.price ?? 0);
-  const costPrice = Number(raw.costPrice ?? raw.cost ?? 0);
-  const stockQuantity = Number(raw.stockQuantity ?? raw.stock ?? 0);
+  const retailPrice = Number(raw.retailPrice ?? raw.retail_price ?? raw.price ?? 0);
+  const costPrice = Number(raw.costPrice ?? raw.wholesale_cost ?? raw.cost ?? 0);
+  const stockQuantity = Number(raw.stockQuantity ?? raw.stock_quantity ?? raw.stock ?? 0);
+  const minStockAlert = Number(raw.minStockAlert ?? raw.min_stock_alert ?? 5);
+  const isActive = raw.is_active !== false && raw.active !== false;
 
   return {
     id: String(raw.id || `p-${Date.now().toString(36)}`),
@@ -118,6 +123,7 @@ export function normalizeStoreProduct(raw) {
     barcode,
     name: title,
     title,
+    description: raw.description ? String(raw.description) : '',
     category,
     collectionName,
     price: retailPrice,
@@ -126,9 +132,12 @@ export function normalizeStoreProduct(raw) {
     costPrice,
     stock: stockQuantity,
     stockQuantity,
+    minStockAlert,
+    min_stock_alert: minStockAlert,
     image: imageUrls[0] ?? null,
     imageUrls,
-    active: raw.active !== false,
+    active: isActive,
+    is_active: isActive,
   };
 }
 
