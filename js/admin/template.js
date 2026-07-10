@@ -359,6 +359,7 @@ export function transactionFeedHtml(transactions) {
           <p class="dash-feed__detail">
             ${tx.lines.length} line(s) · ${formatLyd(tx.grossRevenue)} revenue
             · margin ${formatLyd(tx.netProfit)}
+            ${tx.staffName ? ` · ${escapeHtml(tx.staffName)}` : ''}
           </p>
         </li>
       `).join('')}
@@ -413,20 +414,24 @@ export function productFormHtml(product = null) {
 export function authGateHtml() {
   return `
     <div class="dash-auth" data-auth-gate>
-      <form class="dash-auth__card" data-auth-form>
+      <form class="dash-auth__card" data-auth-form autocomplete="on">
         <div class="dash-auth__brand">
           <span class="dash-auth__logo" aria-hidden="true">◈</span>
           <h1>Shamaadan Admin</h1>
-          <p>PIN-protected Accounting Suite</p>
-          <p class="dash-auth__note">POS register is separate — no admin PIN required there.</p>
+          <p>Secure Accounting Suite</p>
+          <p class="dash-auth__note">Username &amp; password required. POS uses a separate staff PIN.</p>
         </div>
         <div class="dash-field">
-          <label for="admin-pin">Admin Access PIN</label>
-          <input id="admin-pin" name="pin" type="password" autocomplete="current-password" required placeholder="Enter admin PIN">
+          <label for="admin-username">Username</label>
+          <input id="admin-username" name="username" type="text" autocomplete="username" required placeholder="admin" spellcheck="false">
+        </div>
+        <div class="dash-field">
+          <label for="admin-password">Password</label>
+          <input id="admin-password" name="password" type="password" autocomplete="current-password" required placeholder="••••••••">
         </div>
         <p class="dash-auth__error" data-auth-error hidden></p>
-        <button type="submit" class="dash-btn dash-btn--primary dash-btn--full">Unlock Admin Dashboard</button>
-        <p class="dash-auth__hint">Default admin PIN: <code>shamaadan</code></p>
+        <button type="submit" class="dash-btn dash-btn--primary dash-btn--full" data-auth-submit>Sign in</button>
+        <p class="dash-auth__hint">Demo: <code>admin</code> / <code>shamaadan</code></p>
         <p class="dash-auth__hint"><a href="/?app=pos">Open POS register →</a></p>
       </form>
     </div>
@@ -466,6 +471,7 @@ export function buildAdminShell() {
           </a>
         </nav>
         <footer class="dash-sidebar__footer">
+          <p class="dash-sidebar__user" data-admin-user hidden></p>
           <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm dash-btn--full" data-logout>Sign out</button>
         </footer>
       </aside>

@@ -66,6 +66,184 @@
   border-radius: 999px;
 }
 
+.pos__staff {
+  font-size: 0.8rem;
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.pos__lock-btn {
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  border-radius: var(--pos-radius-sm);
+  background: #374151;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: 0;
+  cursor: pointer;
+}
+
+.pos__lock-btn:active {
+  background: #4b5563;
+}
+
+/* ── PIN gate ────────────────────────────────────────────────────── */
+.pos-pin {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgb(37 99 235 / 10%) 0%, transparent 55%),
+    linear-gradient(180deg, #1f2937 0%, #111827 45%, #0b1220 100%);
+}
+
+.pos-pin__card {
+  width: min(100%, 22rem);
+  padding: 2rem 1.5rem 1.75rem;
+  background: var(--pos-surface);
+  border-radius: 1.25rem;
+  box-shadow: 0 28px 64px rgb(0 0 0 / 35%);
+  transform: translateZ(0);
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.pos-pin__card.is-shake {
+  animation: pos-pin-shake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes pos-pin-shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
+.pos-pin__brand {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.pos-pin__mark {
+  display: block;
+  font-size: 1.75rem;
+  color: var(--pos-blue);
+  margin-bottom: 0.5rem;
+}
+
+.pos-pin__brand h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.pos-pin__brand p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--pos-muted);
+}
+
+.pos-pin__dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.pos-pin__dot {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  border: 2px solid var(--pos-border-strong);
+  background: transparent;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pos-pin__dot.is-filled {
+  background: var(--pos-blue);
+  border-color: var(--pos-blue);
+  transform: scale(1.08);
+}
+
+.pos-pin__error {
+  min-height: 1.25rem;
+  margin: 0 0 0.75rem;
+  text-align: center;
+  color: var(--pos-danger);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.pos-pin__keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.pos-pin__key {
+  aspect-ratio: 1.35;
+  min-height: 3.5rem;
+  border: 0;
+  border-radius: 1rem;
+  background: #f3f4f6;
+  color: var(--pos-text);
+  font-size: 1.45rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.pos-pin__key:active {
+  background: #e5e7eb;
+  transform: scale(0.96);
+}
+
+.pos-pin__key--action {
+  font-size: 1.1rem;
+  color: var(--pos-muted);
+}
+
+.pos-pin__submit {
+  width: 100%;
+  min-height: 3.25rem;
+  border: 0;
+  border-radius: 0.9rem;
+  background: var(--pos-blue);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 150ms ease, opacity 150ms ease, transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pos-pin__submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pos-pin__submit:not(:disabled):active {
+  background: #1d4ed8;
+  transform: scale(0.985);
+}
+
+.pos-pin__hint {
+  margin: 0.9rem 0 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--pos-muted);
+}
+
+.pos-pin__hint code {
+  color: var(--pos-text);
+  font-weight: 700;
+}
+
 .pos__topbar-meta {
   display: flex;
   align-items: center;

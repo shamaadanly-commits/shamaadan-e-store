@@ -61,6 +61,8 @@ const STORAGE_KEY = 'shamaadan_dashboard_v1';
  * @property {number} netProfit
  * @property {string} [paymentMethod]
  * @property {string} [orderRef]
+ * @property {string} [staffUserId]
+ * @property {string} [staffName]
  */
 
 /**
@@ -146,6 +148,8 @@ export function buildTransaction(input) {
     netProfit: totals.netProfit,
     paymentMethod: input.paymentMethod,
     orderRef: input.orderRef,
+    staffUserId: input.staffUserId,
+    staffName: input.staffName,
   };
 }
 
@@ -269,16 +273,27 @@ export function createDashboardState(options = {}) {
 
   /**
    * Record POS checkout summary as a single transaction.
-   * @param {{ revenue: number, cost: number, profit: number, units: number, lines?: TransactionLine[] }} sale
+   * @param {{ revenue: number, cost: number, profit: number, units: number, lines?: TransactionLine[], staffUserId?: string, staffName?: string }} sale
    */
   function recordPosSale(sale) {
+    const staff = {
+      staffUserId: sale.staffUserId,
+      staffName: sale.staffName,
+    };
+
     if (sale.lines?.length) {
-      return processTransaction({ channel: 'pos', lines: sale.lines, paymentMethod: 'terminal' });
+      return processTransaction({
+        channel: 'pos',
+        lines: sale.lines,
+        paymentMethod: 'terminal',
+        ...staff,
+      });
     }
 
     return processTransaction({
       channel: 'pos',
       paymentMethod: 'terminal',
+      ...staff,
       lines: [{
         productId: 'pos-aggregate',
         title: 'POS Register Sale',

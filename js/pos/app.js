@@ -1,14 +1,16 @@
 /**
  * POS register — Loyverse-style tablet interface with camera barcode scanning.
- * Admin dashboard is a separate app (?app=admin) protected by PIN.
+ * Staff unlock via numeric PIN (mapped to user id for sale attribution).
  */
 import { getSupabase } from '../config/supabase.js';
 import { getSharedDashboardState, toPosCatalogRow } from '../dashboard.js';
 import { formatLyd } from '../shared/format.js';
+import { fetchSession, loginPosPin, logout } from '../shared/auth-client.js';
 import { createCartState } from './cart-state.js';
 import { createDashboard, renderDashboard } from './dashboard.js';
 import { createBarcodeScanner } from './scanner.js';
 import { printReceipt } from './receipt.js';
+import { pinGateHtml, bindPinGate } from './pin-gate.js';
 
 const CATEGORY_COLORS = {
   Candles: '#f59e0b',
@@ -27,6 +29,43 @@ const CATEGORY_COLORS = {
  * @param {HTMLElement} root
  */
 export async function mount(root) {
+  root.className = 'pos';
+  document.body.style.background = '#f3f4f6';
+  document.documentElement.style.colorScheme = 'light';
+
+  const session = await fetchSession('pos');
+  if (session.authenticated && session.user) {
+    await mountRegister(root, session.user);
+    return;
+  }
+
+  await mountPinGate(root);
+}
+
+/**
+ * @param {HTMLElement} root
+ */
+async function mountPinGate(root) {
+  root.innerHTML = pinGateHtml();
+  const gate = bindPinGate(root, {
+    onSubmit: async (pin) => {
+      const result = await loginPosPin(pin);
+      if (!result.ok || !result.user) {
+        gate.setError(result.error || 'Invalid PIN');
+        gate.shake();
+        gate.clear();
+        return;
+      }
+      await mountRegister(root, result.user);
+    },
+  });
+}
+
+/**
+ * @param {HTMLElement} root
+ * @param {{ id: string, username: string, displayName: string, role: string }} staff
+ */
+async function mountRegister(root, staff) {
   const supabase = getSupabase();
   const centralState = getSharedDashboardState();
   let catalog = centralState.getSnapshot().products.map(toPosCatalogRow);
@@ -55,10 +94,7 @@ export async function mount(root) {
   const dashboard = createDashboard(centralState);
   const categories = ['All', ...new Set(catalog.map((p) => p.category).filter(Boolean))];
 
-  root.className = 'pos';
-  document.body.style.background = '#f3f4f6';
-  document.documentElement.style.colorScheme = 'light';
-  root.innerHTML = buildShell(categories);
+  root.innerHTML = buildShell(categories, staff);
 
   const els = {
     clock: root.querySelector('[data-clock]'),
@@ -72,6 +108,7 @@ export async function mount(root) {
     categories: root.querySelector('[data-categories]'),
     dashboard: root.querySelector('[data-dashboard]'),
     toast: root.querySelector('[data-pos-toast]'),
+    staffLabel: root.querySelector('[data-staff-name]'),
   };
 
   let searchQuery = '';
@@ -119,8 +156,15 @@ export async function mount(root) {
 
   startClock(els.clock);
 
-  root.addEventListener('click', (event) => {
+  root.addEventListener('click', async (event) => {
     const target = event.target;
+
+    if (target.closest('[data-pos-lock]')) {
+      await logout('pos');
+      scanner.stop?.();
+      await mountPinGate(root);
+      return;
+    }
 
     if (target.closest('[data-open-scanner]')) {
       scanner.start();
@@ -172,9 +216,15 @@ export async function mount(root) {
           ...sale,
           receiptNo: `R${Date.now().toString(36).toUpperCase()}`,
           register: 'Register #1',
+          cashier: staff.displayName || staff.username,
+          staffUserId: staff.id,
           paidAt: new Date(),
         };
-        centralState.recordPosSale(sale);
+        centralState.recordPosSale({
+          ...sale,
+          staffUserId: staff.id,
+          staffName: staff.displayName || staff.username,
+        });
         dashboard.refresh();
         showSaleComplete(root, receiptSale, els.toast);
       }
@@ -229,12 +279,18 @@ export async function mount(root) {
   });
 }
 
-function buildShell(categories) {
+/**
+ * @param {string[]} categories
+ * @param {{ displayName?: string, username?: string }} staff
+ */
+function buildShell(categories, staff) {
+  const staffName = staff.displayName || staff.username || 'Staff';
   return `
     <header class="pos__topbar">
       <div class="pos__topbar-left">
         <span class="pos__brand">Shamaadan</span>
         <span class="pos__register">Register #1</span>
+        <span class="pos__staff" data-staff-name>${escapeHtml(staffName)}</span>
       </div>
       <div class="pos__topbar-meta">
         <span class="pos__clock" data-clock aria-live="off"></span>
@@ -246,6 +302,7 @@ function buildShell(categories) {
           Scan
         </button>
         <button type="button" class="pos__icon-btn" data-toggle-metrics aria-label="Toggle sales metrics">📊</button>
+        <button type="button" class="pos__lock-btn" data-pos-lock>Lock</button>
       </div>
     </header>
 
@@ -314,6 +371,8 @@ function showSaleComplete(root, sale, toastEl) {
     lines: sale.lines,
     receiptNo: sale.receiptNo,
     register: sale.register,
+    cashier: sale.cashier,
+    staffUserId: sale.staffUserId,
     paidAt: (sale.paidAt ?? new Date()).toISOString(),
   }));
 

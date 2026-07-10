@@ -1,9 +1,11 @@
 /**
  * Shamaadan Main Dashboard — accounting + store catalog CRUD.
  * Store Catalog publishes products to the website and POS.
+ * Auth: username + password via /api/auth (hashed server-side).
  */
 import { getSharedDashboardState, LEDGER_METRICS } from '../dashboard.js';
 import { formatLyd } from '../shared/format.js';
+import { fetchSession, loginAdmin, logout } from '../shared/auth-client.js';
 import { bindImageUploader } from './image-upload.js';
 import {
   buildAdminShell,
@@ -19,9 +21,6 @@ import {
   productFormHtml,
 } from './template.js';
 
-const AUTH_KEY = 'shamaadan_admin_auth';
-const DEFAULT_PIN = 'shamaadan';
-
 /**
  * @param {HTMLElement} root
  */
@@ -32,6 +31,9 @@ export async function mount(root) {
   let editingCollectionId = null;
   let editingCategoryId = null;
   let catalogFilter = 'All';
+  /** @type {{ id: string, username: string, displayName: string, role: string } | null} */
+  let currentUser = null;
+  let sessionTimer = 0;
 
   root.className = 'dashboard-app';
   root.innerHTML = buildAdminShell();
@@ -41,6 +43,8 @@ export async function mount(root) {
     dashApp: root.querySelector('[data-dash-app]'),
     authForm: root.querySelector('[data-auth-form]'),
     authError: root.querySelector('[data-auth-error]'),
+    authSubmit: root.querySelector('[data-auth-submit]'),
+    adminUser: root.querySelector('[data-admin-user]'),
     ledgerHost: root.querySelector('[data-ledger-host]'),
     transactionHost: root.querySelector('[data-transaction-host]'),
     marginHost: root.querySelector('[data-margin-host]'),
@@ -65,22 +69,35 @@ export async function mount(root) {
     navLinks: root.querySelectorAll('[data-view]'),
   };
 
-  if (isAuthenticated()) {
+  const session = await fetchSession('admin');
+  if (session.authenticated && session.user) {
+    currentUser = session.user;
     unlock();
+  } else {
+    lock();
   }
 
-  els.authForm?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const pin = String(new FormData(event.target).get('pin') ?? '').trim();
-    const configured = String(window.__ENV__?.ADMIN_PIN ?? '').trim();
-    const expected = configured || DEFAULT_PIN;
+  startSessionWatch();
 
-    if (pin === expected) {
-      sessionStorage.setItem(AUTH_KEY, '1');
+  els.authForm?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const data = new FormData(event.target);
+    const username = String(data.get('username') ?? '').trim();
+    const password = String(data.get('password') ?? '');
+
+    setAuthBusy(true);
+    showAuthError('');
+    const result = await loginAdmin(username, password);
+    setAuthBusy(false);
+
+    if (result.ok && result.user) {
+      currentUser = result.user;
+      event.target.reset();
       unlock();
-    } else {
-      showAuthError('Invalid PIN. Please try again.');
+      return;
     }
+
+    showAuthError(result.error || 'Invalid username or password');
   });
 
   els.catalogFilter?.addEventListener('change', (event) => {
@@ -88,11 +105,12 @@ export async function mount(root) {
     renderCatalog(state.getSnapshot());
   });
 
-  root.addEventListener('click', (event) => {
+  root.addEventListener('click', async (event) => {
     const target = event.target;
 
     if (target.matches('[data-logout]')) {
-      sessionStorage.removeItem(AUTH_KEY);
+      await logout('admin');
+      currentUser = null;
       lock();
       return;
     }
@@ -335,6 +353,10 @@ export async function mount(root) {
   function unlock() {
     els.authGate?.setAttribute('hidden', '');
     els.dashApp?.removeAttribute('hidden');
+    if (els.adminUser && currentUser) {
+      els.adminUser.hidden = false;
+      els.adminUser.textContent = currentUser.displayName || currentUser.username;
+    }
     renderForm();
     renderCatalogForm();
     renderTaxonomyForms();
@@ -344,6 +366,10 @@ export async function mount(root) {
   function lock() {
     els.authGate?.removeAttribute('hidden');
     els.dashApp?.setAttribute('hidden', '');
+    if (els.adminUser) {
+      els.adminUser.hidden = true;
+      els.adminUser.textContent = '';
+    }
     showAuthError('');
   }
 
@@ -356,6 +382,26 @@ export async function mount(root) {
     }
     els.authError.hidden = false;
     els.authError.textContent = msg;
+  }
+
+  function setAuthBusy(busy) {
+    if (els.authSubmit) {
+      els.authSubmit.disabled = busy;
+      els.authSubmit.textContent = busy ? 'Signing in…' : 'Sign in';
+    }
+  }
+
+  function startSessionWatch() {
+    window.clearInterval(sessionTimer);
+    sessionTimer = window.setInterval(async () => {
+      if (!currentUser) return;
+      const next = await fetchSession('admin');
+      if (!next.authenticated) {
+        currentUser = null;
+        lock();
+        showAuthError('Session expired. Please sign in again.');
+      }
+    }, 60_000);
   }
 
   function switchView(view) {
@@ -558,10 +604,6 @@ function marginSummaryHtml(ledgers) {
 function channelShare(part, total) {
   if (!total) return '0%';
   return `${((part / total) * 100).toFixed(1)}%`;
-}
-
-function isAuthenticated() {
-  return sessionStorage.getItem(AUTH_KEY) === '1';
 }
 
 function escapeHtml(str) {

@@ -54,7 +54,36 @@ Built with **Vanilla JS**, **Supabase**, deployed on **Vercel**. No UI framework
 Use query-param overrides:
 
 - Storefront: `http://localhost:3000/?app=storefront`
+- Admin: `http://localhost:3000/?app=admin`
 - POS: `http://localhost:3000/?app=pos`
+
+---
+
+## Authentication
+
+Two separate login flows (no heavy auth frameworks):
+
+| App | Credentials | Purpose |
+|-----|-------------|---------|
+| **Admin** (`?app=admin`) | Username + password | Inventory, costs, catalog, accounting |
+| **POS** (`?app=pos`) | Numeric PIN + on-screen keypad | Fast staff register access |
+
+**Backend** (`api/auth/*`):
+
+- `POST /api/auth/login` — admin username/password
+- `POST /api/auth/pin` — POS PIN → staff user
+- `GET /api/auth/session?scope=admin\|pos` — validate HttpOnly session cookie
+- `POST /api/auth/logout` — clear session
+- `POST /api/auth/hash` — generate scrypt hashes for seeding
+
+Passwords and PINs are stored as **scrypt hashes** (`api/lib/password.js`, equivalent to PHP `password_hash` / `password_verify`). Sessions are **HMAC-signed HttpOnly cookies**.
+
+**Demo credentials** (when `users` table is empty):
+
+- Admin: `admin` / `shamaadan`
+- POS PIN: `1234`
+
+Run the schema in Supabase: [`sql/auth_users.sql`](sql/auth_users.sql). Set `AUTH_SESSION_SECRET`, `AUTH_ADMIN_*`, and `AUTH_STAFF_PIN` in Vercel.
 
 ---
 
@@ -64,8 +93,11 @@ Use query-param overrides:
 npm install
 npm run dev
 # → http://localhost:3000/?app=storefront
+# → http://localhost:3000/?app=admin
 # → http://localhost:3000/?app=pos
 ```
+
+For full serverless auth locally, use `npx vercel dev` (static `serve` uses a secure offline demo fallback).
 
 ---
 
@@ -76,6 +108,10 @@ npm run dev
 3. Add environment variables:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` (for `users` table auth + inventory)
+   - `AUTH_SESSION_SECRET` (long random string)
+   - `AUTH_ADMIN_USERNAME` / `AUTH_ADMIN_PASSWORD`
+   - `AUTH_STAFF_PIN` / `AUTH_STAFF_NAME`
    - `STOREFRONT_HOST` (optional, default `store.com`)
    - `ADMIN_HOST` (optional, default `admin.store.com`)
    - `POS_HOST` (optional, default `pos.store.com`)
@@ -105,6 +141,8 @@ create table products (
   created_at timestamptz default now()
 );
 ```
+
+Also run [`sql/auth_users.sql`](sql/auth_users.sql) for the `users` table (`id`, `username`, `password_hash`, `pin_hash`, `role`, `created_at`).
 
 Enable Row Level Security and add policies appropriate for your auth model.
 

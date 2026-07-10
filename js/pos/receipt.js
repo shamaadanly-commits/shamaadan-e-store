@@ -32,6 +32,7 @@ export function buildReceiptHtml(sale) {
   const paidAt = sale.paidAt ?? new Date();
   const receiptNo = sale.receiptNo ?? `R${Date.now().toString(36).toUpperCase()}`;
   const register = sale.register ?? 'Register #1';
+  const cashier = sale.cashier || '';
   const when = paidAt.toLocaleString('en-LY', {
     year: 'numeric',
     month: 'short',
@@ -138,6 +139,7 @@ export function buildReceiptHtml(sale) {
       <p class="brand">Shamaadan</p>
       <p class="muted">Fragrance &amp; Home Rituals</p>
       <p class="muted">${escapeHtml(register)}</p>
+      ${cashier ? `<p class="muted">Cashier: ${escapeHtml(cashier)}</p>` : ''}
     </div>
     <hr class="rule">
     <p class="muted">Receipt: <strong>${escapeHtml(receiptNo)}</strong></p>
