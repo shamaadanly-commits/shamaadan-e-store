@@ -68,15 +68,15 @@ Two separate login flows (no heavy auth frameworks):
 | **Admin** (`?app=admin`) | Username + password | Inventory, costs, catalog, accounting |
 | **POS** (`?app=pos`) | Numeric PIN + on-screen keypad | Fast staff register access |
 
-**Backend** (`api/auth/*`):
+**Backend** (`api/auth.js` — single serverless function):
 
-- `POST /api/auth/login` — admin username/password
-- `POST /api/auth/pin` — POS PIN → staff user
-- `GET /api/auth/session?scope=admin\|pos` — validate HttpOnly session cookie
-- `POST /api/auth/logout` — clear session
-- `POST /api/auth/hash` — generate scrypt hashes for seeding
+- `POST /api/auth?action=login` — admin username/password
+- `POST /api/auth?action=pin` — POS PIN → staff user
+- `GET /api/auth?action=session&scope=admin|pos` — validate HttpOnly session cookie
+- `POST /api/auth?action=logout` — clear session
+- `POST /api/auth?action=hash` — generate scrypt hashes for seeding
 
-Passwords and PINs are stored as **scrypt hashes** (`api/lib/password.js`, equivalent to PHP `password_hash` / `password_verify`). Sessions are **HMAC-signed HttpOnly cookies**.
+Helpers live in `server/lib/` (not counted as Vercel functions).
 
 **Demo credentials** (when `users` table is empty):
 
