@@ -19,3 +19,6 @@ https://shamaadan-e-store.vercel.app/dashboard/
 
 POS (standalone page):
 https://shamaadan-e-store.vercel.app/pos/
+
+R2 Public (developer):
+https://pub-3314509d6af24c65be2310ded2efa6e2.r2.dev
