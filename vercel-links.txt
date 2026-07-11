@@ -1,0 +1,21 @@
+Shamaadan E Store — Vercel Links
+================================
+
+Base URL:
+https://shamaadan-e-store.vercel.app/
+
+Website (Storefront):
+https://shamaadan-e-store.vercel.app/
+https://shamaadan-e-store.vercel.app/?app=storefront
+
+Admin:
+https://shamaadan-e-store.vercel.app/?app=admin
+
+POS:
+https://shamaadan-e-store.vercel.app/?app=pos
+
+Dashboard (standalone inventory page):
+https://shamaadan-e-store.vercel.app/dashboard/
+
+POS (standalone page):
+https://shamaadan-e-store.vercel.app/pos/
