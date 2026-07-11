@@ -6,6 +6,7 @@
 import { getSharedDashboardState, LEDGER_METRICS } from '../dashboard.js';
 import { formatLyd } from '../shared/format.js';
 import { fetchSession, loginAdmin, logout } from '../shared/auth-client.js';
+import { isLiveDbId } from '../shared/ids.js';
 import { bindImageUploader } from './image-upload.js';
 import {
   fetchAdminCatalog,
@@ -91,7 +92,8 @@ export async function mount(root) {
   startSessionWatch();
 
   /**
-   * Await live Supabase catalog, hydrate local state, re-render.
+   * Await live Supabase catalog, replace local state, re-render.
+   * Prefer this over calling hydrateCatalog directly after mutations.
    */
   async function refreshFromSupabase() {
     if (!isSupabaseReady()) {
@@ -102,7 +104,11 @@ export async function mount(root) {
 
     try {
       const catalog = await fetchAdminCatalog();
-      state.hydrateCatalog(catalog);
+      if (typeof state.hydrateCatalog === 'function') {
+        state.hydrateCatalog(catalog);
+      } else if (typeof state.replaceProducts === 'function') {
+        state.replaceProducts(catalog.products || []);
+      }
       renderAll(state.getSnapshot());
       renderTaxonomyForms();
       renderCatalogForm();
@@ -112,6 +118,29 @@ export async function mount(root) {
       window.alert(err?.message || 'Failed to sync catalog from Supabase.');
       renderAll(state.getSnapshot());
     }
+  }
+
+  /**
+   * Read a live UUID from the clicked control or its row.
+   * @param {Element} el
+   * @param {string} [datasetKey]
+   */
+  function readRowId(el, datasetKey) {
+    const fromDataset = datasetKey ? el?.dataset?.[datasetKey] : '';
+    const fromAttr = el?.getAttribute?.('data-id') || '';
+    const fromRow = el?.closest?.('[data-id]')?.getAttribute('data-id') || '';
+    const id = String(fromDataset || fromAttr || fromRow || '').trim();
+    return id;
+  }
+
+  function assertLiveId(id, label = 'Item') {
+    if (!isLiveDbId(id)) {
+      throw new Error(
+        `${label} is missing a live Supabase UUID (got "${id || 'empty'}"). `
+          + 'Refresh the dashboard and try again — mock ids like p1 cannot be deleted from the database.',
+      );
+    }
+    return id;
   }
 
   els.authForm?.addEventListener('submit', async (event) => {
@@ -193,8 +222,17 @@ export async function mount(root) {
 
     const deleteCollection = target.closest('[data-delete-collection]');
     if (deleteCollection) {
-      const id = deleteCollection.dataset.deleteCollection;
-      const item = state.getSnapshot().collections.find((c) => c.id === id);
+      let id = '';
+      try {
+        id = assertLiveId(readRowId(deleteCollection, 'deleteCollection'), 'Collection');
+      } catch (err) {
+        window.alert(err.message);
+        await refreshFromSupabase();
+        return;
+      }
+
+      const item = state.getSnapshot().managedCollections?.find((c) => c.id === id)
+        || state.getSnapshot().collections.find((c) => c.id === id);
       if (!item) return;
       const reassignTo = window.prompt(
         `Delete collection "${item.name}"?\nProducts will move to this collection (leave blank to use General):`,
@@ -203,10 +241,8 @@ export async function mount(root) {
       if (reassignTo === null) return;
 
       try {
-        const catalog = await persistDeleteCollection(id, reassignTo.trim() || 'General');
-        state.hydrateCatalog(catalog);
-        renderAll(state.getSnapshot());
-        renderTaxonomyForms();
+        await persistDeleteCollection(id, reassignTo.trim() || 'General');
+        await refreshFromSupabase();
       } catch (err) {
         console.error('[admin] deleteCollection failed:', err);
         window.alert(err?.message || 'Cannot delete this collection because products are still assigned to it. Please reassign the products first.');
@@ -237,8 +273,17 @@ export async function mount(root) {
 
     const deleteCategory = target.closest('[data-delete-category]');
     if (deleteCategory) {
-      const id = deleteCategory.dataset.deleteCategory;
-      const item = state.getSnapshot().categories.find((c) => c.id === id);
+      let id = '';
+      try {
+        id = assertLiveId(readRowId(deleteCategory, 'deleteCategory'), 'Category');
+      } catch (err) {
+        window.alert(err.message);
+        await refreshFromSupabase();
+        return;
+      }
+
+      const item = state.getSnapshot().managedCategories?.find((c) => c.id === id)
+        || state.getSnapshot().categories.find((c) => c.id === id);
       if (!item) return;
       const reassignTo = window.prompt(
         `Delete category "${item.name}"?\nProducts will move to this category (leave blank to use General):`,
@@ -247,10 +292,8 @@ export async function mount(root) {
       if (reassignTo === null) return;
 
       try {
-        const catalog = await persistDeleteCategory(id, reassignTo.trim() || 'General');
-        state.hydrateCatalog(catalog);
-        renderAll(state.getSnapshot());
-        renderTaxonomyForms();
+        await persistDeleteCategory(id, reassignTo.trim() || 'General');
+        await refreshFromSupabase();
       } catch (err) {
         console.error('[admin] deleteCategory failed:', err);
         window.alert(err?.message || 'Cannot delete this category because products are still assigned to it. Please reassign the products first.');
@@ -281,12 +324,19 @@ export async function mount(root) {
 
     const deleteCatalog = target.closest('[data-delete-catalog]');
     if (deleteCatalog) {
-      const id = deleteCatalog.dataset.deleteCatalog;
+      let id = '';
+      try {
+        id = assertLiveId(readRowId(deleteCatalog, 'deleteCatalog'), 'Product');
+      } catch (err) {
+        window.alert(err.message);
+        await refreshFromSupabase();
+        return;
+      }
+
       if (confirm('Remove this product from the website store?')) {
         try {
-          const catalog = await persistDeleteProduct(id);
-          state.hydrateCatalog(catalog);
-          renderAll(state.getSnapshot());
+          await persistDeleteProduct(id);
+          await refreshFromSupabase();
         } catch (err) {
           console.error('[admin] deleteProduct failed:', err);
           window.alert(err?.message || 'Failed to delete product in Supabase.');
@@ -320,12 +370,19 @@ export async function mount(root) {
 
     const deleteBtn = target.closest('[data-delete-product]');
     if (deleteBtn) {
-      const id = deleteBtn.dataset.deleteProduct;
+      let id = '';
+      try {
+        id = assertLiveId(readRowId(deleteBtn, 'deleteProduct'), 'Product');
+      } catch (err) {
+        window.alert(err.message);
+        await refreshFromSupabase();
+        return;
+      }
+
       if (confirm('Delete this product from the master inventory?')) {
         try {
-          const catalog = await persistDeleteProduct(id);
-          state.hydrateCatalog(catalog);
-          renderAll(state.getSnapshot());
+          await persistDeleteProduct(id);
+          await refreshFromSupabase();
         } catch (err) {
           console.error('[admin] deleteProduct failed:', err);
           window.alert(err?.message || 'Failed to delete product in Supabase.');
@@ -355,13 +412,12 @@ export async function mount(root) {
       event.preventDefault();
       const data = new FormData(collectionForm);
       try {
-        const catalog = await persistUpsertCollection({
+        await persistUpsertCollection({
           id: String(data.get('id') || ''),
           name: String(data.get('name') || '').trim(),
           description: String(data.get('description') || '').trim(),
         }, String(data.get('renameFrom') || ''));
-        state.hydrateCatalog(catalog);
-        renderAll(state.getSnapshot());
+        await refreshFromSupabase();
       } catch (err) {
         console.error('[admin] upsertCollection failed:', err);
         window.alert(err?.message || 'Failed to save collection.');
@@ -376,13 +432,12 @@ export async function mount(root) {
       event.preventDefault();
       const data = new FormData(categoryForm);
       try {
-        const catalog = await persistUpsertCategory({
+        await persistUpsertCategory({
           id: String(data.get('id') || ''),
           name: String(data.get('name') || '').trim(),
           description: String(data.get('description') || '').trim(),
         }, String(data.get('renameFrom') || ''));
-        state.hydrateCatalog(catalog);
-        renderAll(state.getSnapshot());
+        await refreshFromSupabase();
       } catch (err) {
         console.error('[admin] upsertCategory failed:', err);
         window.alert(err?.message || 'Failed to save category.');
@@ -423,7 +478,7 @@ export async function mount(root) {
     const category = String(data.get('category') || collectionName);
 
     const product = {
-      id: data.get('id') || undefined,
+      id: isLiveDbId(data.get('id')) ? String(data.get('id')) : undefined,
       title: String(data.get('title')),
       collectionName,
       category,
@@ -435,16 +490,15 @@ export async function mount(root) {
     };
 
     try {
-      const catalog = await persistUpsertProduct(product);
-      state.hydrateCatalog(catalog);
-      renderAll(state.getSnapshot());
+      await persistUpsertProduct(product);
+      await refreshFromSupabase();
     } catch (err) {
       console.error('[admin] upsertProduct failed:', err);
       window.alert(err?.message || 'Failed to save product to Supabase.');
       // Keep a local draft so the user doesn't lose form work offline
       state.upsertProduct({
         ...product,
-        id: product.id || `p-${Date.now().toString(36)}`,
+        id: isLiveDbId(product.id) ? product.id : undefined,
       });
       if (collectionName) state.upsertCollection({ name: collectionName });
       if (category) state.upsertCategory({ name: category });
@@ -562,16 +616,24 @@ export async function mount(root) {
 
   function renderCollectionForm() {
     if (!els.collectionFormHost) return;
+    const snapshot = state.getSnapshot();
+    const pool = snapshot.managedCollections?.length
+      ? snapshot.managedCollections
+      : snapshot.collections;
     const item = editingCollectionId
-      ? state.getSnapshot().collections.find((c) => c.id === editingCollectionId)
+      ? pool.find((c) => c.id === editingCollectionId)
       : null;
     els.collectionFormHost.innerHTML = collectionFormHtml(item);
   }
 
   function renderCategoryForm() {
     if (!els.categoryFormHost) return;
+    const snapshot = state.getSnapshot();
+    const pool = snapshot.managedCategories?.length
+      ? snapshot.managedCategories
+      : snapshot.categories;
     const item = editingCategoryId
-      ? state.getSnapshot().categories.find((c) => c.id === editingCategoryId)
+      ? pool.find((c) => c.id === editingCategoryId)
       : null;
     els.categoryFormHost.innerHTML = categoryFormHtml(item);
   }
@@ -582,42 +644,61 @@ export async function mount(root) {
   }
 
   function renderCatalog(snapshot) {
-    const { products, collections, categories } = snapshot;
+    const { products, collections, categories, managedCollections = [], managedCategories = [] } = snapshot;
+
+    const collectionRows = (managedCollections.length ? managedCollections : collections)
+      .filter((c) => isLiveDbId(c.id))
+      .map((c) => ({
+        ...c,
+        count: products.filter((p) => p.collectionName === c.name).length,
+      }));
+
+    const categoryRows = (managedCategories.length ? managedCategories : categories)
+      .filter((c) => isLiveDbId(c.id))
+      .map((c) => ({
+        ...c,
+        count: products.filter((p) => p.category === c.name).length,
+      }));
 
     if (els.collectionsHost) {
-      els.collectionsHost.innerHTML = collectionsPanelHtml(collections);
+      els.collectionsHost.innerHTML = collectionsPanelHtml(collectionRows);
     }
 
     if (els.categoriesHost) {
-      els.categoriesHost.innerHTML = categoriesPanelHtml(categories);
+      els.categoriesHost.innerHTML = categoriesPanelHtml(categoryRows);
     }
 
     if (els.collectionCount) {
-      els.collectionCount.textContent = `${collections.length} collection${collections.length === 1 ? '' : 's'}`;
+      els.collectionCount.textContent = `${collectionRows.length} collection${collectionRows.length === 1 ? '' : 's'}`;
     }
 
     if (els.categoryCount) {
-      els.categoryCount.textContent = `${categories.length} categor${categories.length === 1 ? 'y' : 'ies'}`;
+      els.categoryCount.textContent = `${categoryRows.length} categor${categoryRows.length === 1 ? 'y' : 'ies'}`;
     }
 
     if (els.catalogFilter) {
       const current = catalogFilter;
+      const filterNames = collections.length ? collections : collectionRows;
       els.catalogFilter.innerHTML = `
         <option value="All">All collections</option>
-        ${collections.map((c) => `
+        ${filterNames.map((c) => `
           <option value="${escapeAttr(c.name)}"${c.name === current ? ' selected' : ''}>${escapeHtml(c.name)}</option>
         `).join('')}
       `;
     }
 
     if (els.catalogHost) {
-      els.catalogHost.innerHTML = catalogTableHtml(products, catalogFilter);
+      els.catalogHost.innerHTML = catalogTableHtml(
+        products.filter((p) => isLiveDbId(p.id)),
+        catalogFilter,
+      );
     }
 
     if (els.catalogCount) {
+      const liveProducts = products.filter((p) => isLiveDbId(p.id));
       const count = catalogFilter === 'All'
-        ? products.length
-        : products.filter((p) => p.collectionName === catalogFilter).length;
+        ? liveProducts.length
+        : liveProducts.filter((p) => p.collectionName === catalogFilter).length;
       els.catalogCount.textContent = `${count} product${count === 1 ? '' : 's'}`;
     }
 
@@ -640,11 +721,12 @@ export async function mount(root) {
     }
 
     if (els.inventoryHost) {
-      els.inventoryHost.innerHTML = inventoryTableHtml(products);
+      els.inventoryHost.innerHTML = inventoryTableHtml(products.filter((p) => isLiveDbId(p.id)));
     }
 
     if (els.productCount) {
-      els.productCount.textContent = `${products.length} product${products.length === 1 ? '' : 's'}`;
+      const liveCount = products.filter((p) => isLiveDbId(p.id)).length;
+      els.productCount.textContent = `${liveCount} product${liveCount === 1 ? '' : 's'}`;
     }
 
     renderCatalog(snapshot);

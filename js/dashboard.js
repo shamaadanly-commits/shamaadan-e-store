@@ -15,10 +15,7 @@ import {
   DEFAULT_COLLECTIONS,
   DEFAULT_CATEGORIES,
 } from './shared/catalog-store.js';
-import {
-  persistDeleteCategory,
-  persistDeleteCollection,
-} from './admin/catalog-api.js';
+import { isLiveDbId } from './shared/ids.js';
 
 const STORAGE_KEY = 'shamaadan_dashboard_v1';
 
@@ -163,16 +160,22 @@ export function buildTransaction(input) {
  * @param {boolean} [options.seedMock=true]
  */
 export function createDashboardState(options = {}) {
-  const { persist = true, seedMock = true } = options;
+  const supabaseReady = typeof window !== 'undefined'
+    && Boolean(window.__ENV__?.VITE_SUPABASE_URL && window.__ENV__?.VITE_SUPABASE_ANON_KEY);
+  const { persist = true, seedMock = !supabaseReady } = options;
 
   /** @type {ProductRecord[]} */
-  let products = cloneCatalog(MOCK_PRODUCTS).map(normalizeProduct);
+  let products = seedMock ? cloneCatalog(MOCK_PRODUCTS).map(normalizeProduct) : [];
 
   /** @type {import('./shared/catalog-store.js').TaxonomyItem[]} */
-  let collections = DEFAULT_COLLECTIONS.map((name, i) => normalizeTaxonomyItem({ name }, i));
+  let collections = seedMock
+    ? DEFAULT_COLLECTIONS.map((name, i) => normalizeTaxonomyItem({ name }, i))
+    : [];
 
   /** @type {import('./shared/catalog-store.js').TaxonomyItem[]} */
-  let categories = DEFAULT_CATEGORIES.map((name, i) => normalizeTaxonomyItem({ name }, i));
+  let categories = seedMock
+    ? DEFAULT_CATEGORIES.map((name, i) => normalizeTaxonomyItem({ name }, i))
+    : [];
 
   /** @type {Transaction[]} */
   let transactions = [];
@@ -192,20 +195,44 @@ export function createDashboardState(options = {}) {
       if (!raw) {
         const storeCatalog = loadStoreCatalog();
         if (storeCatalog) {
-          if (storeCatalog.products?.length) products = storeCatalog.products.map(normalizeProduct);
-          if (storeCatalog.collections?.length) collections = storeCatalog.collections.map(normalizeTaxonomyItem);
-          if (storeCatalog.categories?.length) categories = storeCatalog.categories.map(normalizeTaxonomyItem);
-          return Boolean(storeCatalog.products?.length || storeCatalog.collections?.length);
+          if (storeCatalog.products?.length) {
+            products = storeCatalog.products
+              .map(normalizeProduct)
+              .filter((p) => !supabaseReady || isLiveDbId(p.id));
+          }
+          if (storeCatalog.collections?.length) {
+            collections = storeCatalog.collections
+              .map(normalizeTaxonomyItem)
+              .filter((c) => !supabaseReady || isLiveDbId(c.id));
+          }
+          if (storeCatalog.categories?.length) {
+            categories = storeCatalog.categories
+              .map(normalizeTaxonomyItem)
+              .filter((c) => !supabaseReady || isLiveDbId(c.id));
+          }
+          return Boolean(products.length || collections.length || categories.length);
         }
         return false;
       }
       const data = JSON.parse(raw);
-      if (data.products?.length) products = data.products.map(normalizeProduct);
-      if (data.collections?.length) collections = data.collections.map(normalizeTaxonomyItem);
-      if (data.categories?.length) categories = data.categories.map(normalizeTaxonomyItem);
+      if (data.products?.length) {
+        products = data.products
+          .map(normalizeProduct)
+          .filter((p) => !supabaseReady || isLiveDbId(p.id));
+      }
+      if (data.collections?.length) {
+        collections = data.collections
+          .map(normalizeTaxonomyItem)
+          .filter((c) => !supabaseReady || isLiveDbId(c.id));
+      }
+      if (data.categories?.length) {
+        categories = data.categories
+          .map(normalizeTaxonomyItem)
+          .filter((c) => !supabaseReady || isLiveDbId(c.id));
+      }
       if (data.transactions?.length) transactions = data.transactions;
       syncStoreCatalog();
-      return Boolean(data.products?.length || data.collections?.length || data.categories?.length);
+      return Boolean(products.length || collections.length || categories.length);
     } catch {
       return false;
     }
@@ -327,15 +354,6 @@ export function createDashboardState(options = {}) {
   }
 
   /**
-   * @param {string} id
-   */
-  function deleteProduct(id) {
-    products = products.filter((p) => p.id !== id);
-    save();
-    notify();
-  }
-
-  /**
    * @param {string} barcode
    * @returns {ProductRecord | undefined}
    */
@@ -383,17 +401,40 @@ export function createDashboardState(options = {}) {
    */
   function hydrateCatalog(catalog = {}) {
     if (Array.isArray(catalog.products)) {
-      products = catalog.products.map(normalizeProduct);
+      products = catalog.products.map(normalizeProduct).filter((p) => isLiveDbId(p.id));
     }
     if (Array.isArray(catalog.collections)) {
-      collections = catalog.collections.map(normalizeTaxonomyItem);
+      collections = catalog.collections.map(normalizeTaxonomyItem).filter((c) => isLiveDbId(c.id));
     }
     if (Array.isArray(catalog.categories)) {
-      categories = catalog.categories.map(normalizeTaxonomyItem);
+      categories = catalog.categories.map(normalizeTaxonomyItem).filter((c) => isLiveDbId(c.id));
     }
     save();
     notify();
     return getSnapshot();
+  }
+
+  /**
+   * Delete a product in Supabase, then re-fetch catalog.
+   * @param {string} id
+   * @returns {Promise<{ ok: boolean, error?: string }>}
+   */
+  async function deleteProduct(id) {
+    try {
+      if (!isLiveDbId(id)) {
+        return { ok: false, error: 'Product id must be a live Supabase UUID.' };
+      }
+      const { persistDeleteProduct } = await import('./admin/catalog-api.js');
+      const catalog = await persistDeleteProduct(id);
+      hydrateCatalog(catalog);
+      return { ok: true };
+    } catch (err) {
+      console.error('[dashboard] deleteProduct failed:', err);
+      return {
+        ok: false,
+        error: err?.message || 'Failed to delete product.',
+      };
+    }
   }
 
   /**
@@ -436,6 +477,9 @@ export function createDashboardState(options = {}) {
       if (!target) {
         return { ok: false, error: 'Collection not found.' };
       }
+      if (!isLiveDbId(target.id)) {
+        return { ok: false, error: 'Collection id must be a live Supabase UUID.' };
+      }
 
       const linked = products.filter((p) => p.collectionName === target.name);
       const mode = options.mode || (options.reassignTo === null ? 'null' : 'reassign');
@@ -448,6 +492,7 @@ export function createDashboardState(options = {}) {
       }
 
       const reassignTo = String(options.reassignTo || 'General').trim() || 'General';
+      const { persistDeleteCollection } = await import('./admin/catalog-api.js');
       const catalog = await persistDeleteCollection(target.id, mode === 'null' ? 'General' : reassignTo);
       hydrateCatalog(catalog);
       return { ok: true, reassigned: linked.length };
@@ -500,6 +545,9 @@ export function createDashboardState(options = {}) {
       if (!target) {
         return { ok: false, error: 'Category not found.' };
       }
+      if (!isLiveDbId(target.id)) {
+        return { ok: false, error: 'Category id must be a live Supabase UUID.' };
+      }
 
       const linked = products.filter((p) => p.category === target.name);
       const mode = options.mode || (options.reassignTo === null ? 'null' : 'reassign');
@@ -512,6 +560,7 @@ export function createDashboardState(options = {}) {
       }
 
       const reassignTo = String(options.reassignTo || 'General').trim() || 'General';
+      const { persistDeleteCategory } = await import('./admin/catalog-api.js');
       const catalog = await persistDeleteCategory(target.id, mode === 'null' ? 'General' : reassignTo);
       hydrateCatalog(catalog);
       return { ok: true, reassigned: linked.length };

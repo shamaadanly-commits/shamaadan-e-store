@@ -28,9 +28,9 @@
 <body>
   <div id="app-root" aria-busy="true"></div>
 
-  <!-- Defaults for local dev; overwritten on Vercel by /api/env.js -->
+  <!-- Blocking /api/env.js so window.__ENV__ is ready before ES modules boot -->
   <script>window.__ENV__ = window.__ENV__ || {};</script>
-  <script src="/api/env.js" defer></script>
+  <script src="/api/env.js"></script>
   <script type="module" src="/js/router.js"></script>
 </body>
 </html>

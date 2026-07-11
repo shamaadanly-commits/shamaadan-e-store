@@ -77,7 +77,7 @@ function catalogRowHtml(product) {
     : `<span class="dash-table__thumb dash-table__thumb--placeholder" aria-hidden="true">${escapeHtml(product.title.charAt(0))}</span>`;
 
   return `
-    <tr data-product-row="${escapeAttr(product.id)}">
+    <tr data-id="${escapeAttr(product.id)}" data-product-row="${escapeAttr(product.id)}">
       <td>
         <div class="dash-table__product">
           ${thumb}
@@ -96,7 +96,7 @@ function catalogRowHtml(product) {
       <td>
         <div class="dash-table__actions">
           <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-edit-catalog="${escapeAttr(product.id)}">Edit</button>
-          <button type="button" class="dash-btn dash-btn--danger dash-btn--sm" data-delete-catalog="${escapeAttr(product.id)}">Remove</button>
+          <button type="button" class="dash-btn dash-btn--danger dash-btn--sm" data-id="${escapeAttr(product.id)}" data-delete-catalog="${escapeAttr(product.id)}">Remove</button>
         </div>
       </td>
     </tr>
@@ -114,7 +114,7 @@ export function collectionsPanelHtml(collections) {
   return `
     <div class="dash-taxonomy-list" data-taxonomy-list="collections">
       ${collections.map((c) => `
-        <div class="dash-taxonomy-row" data-collection-id="${escapeAttr(c.id)}">
+        <div class="dash-taxonomy-row" data-id="${escapeAttr(c.id)}" data-collection-id="${escapeAttr(c.id)}">
           <div class="dash-taxonomy-row__main">
             <button type="button" class="dash-collection-card" data-filter-collection="${escapeAttr(c.name)}">
               <span class="dash-collection-card__name">${escapeHtml(c.name)}</span>
@@ -123,7 +123,7 @@ export function collectionsPanelHtml(collections) {
           </div>
           <div class="dash-taxonomy-row__actions">
             <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-edit-collection="${escapeAttr(c.id)}">Edit</button>
-            <button type="button" class="dash-btn dash-btn--danger dash-btn--sm" data-delete-collection="${escapeAttr(c.id)}">Delete</button>
+            <button type="button" class="dash-btn dash-btn--danger dash-btn--sm" data-id="${escapeAttr(c.id)}" data-delete-collection="${escapeAttr(c.id)}">Delete</button>
           </div>
         </div>
       `).join('')}
@@ -142,14 +142,14 @@ export function categoriesPanelHtml(categories) {
   return `
     <div class="dash-taxonomy-list" data-taxonomy-list="categories">
       ${categories.map((c) => `
-        <div class="dash-taxonomy-row" data-category-id="${escapeAttr(c.id)}">
+        <div class="dash-taxonomy-row" data-id="${escapeAttr(c.id)}" data-category-id="${escapeAttr(c.id)}">
           <div class="dash-taxonomy-row__main">
             <span class="dash-chip">${escapeHtml(c.name)}</span>
             <span class="dash-taxonomy-row__count">${c.count} product${c.count === 1 ? '' : 's'}</span>
           </div>
           <div class="dash-taxonomy-row__actions">
             <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-edit-category="${escapeAttr(c.id)}">Edit</button>
-            <button type="button" class="dash-btn dash-btn--danger dash-btn--sm" data-delete-category="${escapeAttr(c.id)}">Delete</button>
+            <button type="button" class="dash-btn dash-btn--danger dash-btn--sm" data-id="${escapeAttr(c.id)}" data-delete-category="${escapeAttr(c.id)}">Delete</button>
           </div>
         </div>
       `).join('')}
@@ -315,7 +315,7 @@ function inventoryRowHtml(product) {
     : `<span class="dash-table__thumb dash-table__thumb--placeholder" aria-hidden="true">${escapeHtml(product.title.charAt(0))}</span>`;
 
   return `
-    <tr data-product-row="${escapeAttr(product.id)}">
+    <tr data-id="${escapeAttr(product.id)}" data-product-row="${escapeAttr(product.id)}">
       <td>
         <div class="dash-table__product">
           ${thumb}
@@ -331,7 +331,7 @@ function inventoryRowHtml(product) {
       <td>
         <div class="dash-table__actions">
           <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-edit-product="${escapeAttr(product.id)}">Edit</button>
-          <button type="button" class="dash-btn dash-btn--danger dash-btn--sm" data-delete-product="${escapeAttr(product.id)}">Delete</button>
+          <button type="button" class="dash-btn dash-btn--danger dash-btn--sm" data-id="${escapeAttr(product.id)}" data-delete-product="${escapeAttr(product.id)}">Delete</button>
         </div>
       </td>
     </tr>

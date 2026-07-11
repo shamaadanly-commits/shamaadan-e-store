@@ -2,8 +2,32 @@
  * Shared Supabase client — Dashboard + POS backend.
  * Schema: products, orders, order_items, inventory_transactions
  * Stock is adjusted by a DB trigger on inventory_transactions inserts.
+ *
+ * Credentials come from window.__ENV__ (via /api/env.js) in the browser.
+ * Never uses a placeholder host — missing keys throw a clear config error
+ * instead of an opaque "Failed to fetch".
  */
 import { createClient } from '@supabase/supabase-js';
+import { isLiveDbId } from './ids.js';
+
+const URL_KEYS = [
+  'VITE_SUPABASE_URL',
+  'SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'PUBLIC_SUPABASE_URL',
+];
+
+const ANON_KEYS = [
+  'VITE_SUPABASE_ANON_KEY',
+  'SUPABASE_ANON_KEY',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'PUBLIC_SUPABASE_ANON_KEY',
+  'VITE_SUPABASE_PUBLISHABLE_KEY',
+  'SUPABASE_PUBLISHABLE_KEY',
+];
+
+/** @type {import('@supabase/supabase-js').SupabaseClient | null} */
+let _client = null;
 
 function readEnv(key) {
   try {
@@ -24,30 +48,88 @@ function readEnv(key) {
   return '';
 }
 
-const supabaseUrl = readEnv('VITE_SUPABASE_URL');
-const supabaseAnonKey = readEnv('VITE_SUPABASE_ANON_KEY');
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    '[shared/supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Set them in .env / Vercel.',
-  );
+function firstEnv(keys) {
+  for (const key of keys) {
+    const value = readEnv(key);
+    if (value) return value;
+  }
+  return '';
 }
 
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key',
-  {
+/**
+ * @returns {{ url: string, anonKey: string }}
+ */
+export function resolveSupabaseCredentials() {
+  return {
+    url: firstEnv(URL_KEYS),
+    anonKey: firstEnv(ANON_KEYS),
+  };
+}
+
+export function isSupabaseConfigured() {
+  const { url, anonKey } = resolveSupabaseCredentials();
+  return Boolean(url && anonKey);
+}
+
+/**
+ * @param {unknown} err
+ * @param {string} action
+ */
+export function mapSupabaseNetworkError(err, action = 'talking to Supabase') {
+  const raw = err instanceof Error ? err.message : String(err ?? 'Unknown error');
+  if (/failed to fetch|networkerror|load failed|fetch failed|network request failed/i.test(raw)) {
+    return new Error(
+      `Could not reach Supabase while ${action}. `
+        + 'Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel → Project Settings → Environment Variables, then redeploy.',
+    );
+  }
+  return err instanceof Error ? err : new Error(raw);
+}
+
+function assertConfigured() {
+  if (!isSupabaseConfigured()) {
+    throw new Error(
+      'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY '
+        + 'in Vercel → Project Settings → Environment Variables (Production), then redeploy.',
+    );
+  }
+}
+
+/**
+ * Lazy singleton — reads window.__ENV__ at first use (after /api/env.js).
+ * @returns {import('@supabase/supabase-js').SupabaseClient}
+ */
+export function getSupabase() {
+  if (_client) return _client;
+
+  assertConfigured();
+  const { url, anonKey } = resolveSupabaseCredentials();
+
+  _client = createClient(url, anonKey, {
     auth: {
       persistSession: typeof window !== 'undefined',
       autoRefreshToken: typeof window !== 'undefined',
       detectSessionInUrl: typeof window !== 'undefined',
     },
+  });
+
+  return _client;
+}
+
+/**
+ * Back-compat proxy so existing `supabase.from(...)` call sites stay valid
+ * while still initializing lazily after /api/env.js injects credentials.
+ */
+export const supabase = new Proxy(
+  /** @type {import('@supabase/supabase-js').SupabaseClient} */ ({}),
+  {
+    get(_target, prop, receiver) {
+      const client = getSupabase();
+      const value = Reflect.get(client, prop, receiver);
+      return typeof value === 'function' ? value.bind(client) : value;
+    },
   },
 );
-
-export function getSupabase() {
-  return supabase;
-}
 
 /**
  * Fetch all products (active first).
@@ -179,7 +261,7 @@ export async function upsertCategoryRow(input, renameFrom = '') {
     description: input.description ? String(input.description) : null,
   };
 
-  if (input.id) {
+  if (input.id && isLiveDbId(input.id)) {
     const { data: previous } = await supabase
       .from('categories')
       .select('name')
@@ -223,7 +305,7 @@ export async function upsertCollectionRow(input, renameFrom = '') {
     description: input.description ? String(input.description) : null,
   };
 
-  if (input.id) {
+  if (input.id && isLiveDbId(input.id)) {
     const { data: previous } = await supabase
       .from('collections')
       .select('name')
@@ -304,11 +386,9 @@ export async function upsertProductRow(product) {
     collection_name: collectionName,
   };
 
-  const id = product.id && !String(product.id).startsWith('p-')
-    ? product.id
-    : product.id;
+  const id = isLiveDbId(product.id) ? String(product.id).trim() : '';
 
-  if (id && !String(id).startsWith('p-')) {
+  if (id) {
     const { data, error } = await supabase
       .from('products')
       .update({ ...row, ...optional })
@@ -361,19 +441,23 @@ export async function upsertProductRow(product) {
  * @param {string} productId
  */
 export async function deleteProductRow(productId) {
-  const id = String(productId || '').trim();
-  if (!id) throw new Error('Product id is required');
+  const id = isLiveDbId(productId) ? String(productId).trim() : '';
+  if (!id) throw new Error('Product id must be a live Supabase UUID.');
 
-  const { error } = await supabase
-    .from('products')
-    .delete()
-    .eq('id', id);
+  try {
+    const { error } = await getSupabase()
+      .from('products')
+      .delete()
+      .eq('id', id);
 
-  if (error) {
-    console.error('[shared/supabase] deleteProductRow failed:', error);
-    throw new Error(error.message);
+    if (error) {
+      console.error('[shared/supabase] deleteProductRow failed:', error);
+      throw new Error(error.message);
+    }
+    return { ok: true, id };
+  } catch (err) {
+    throw mapSupabaseNetworkError(err, 'deleting product');
   }
-  return { ok: true, id };
 }
 
 /**
@@ -627,7 +711,9 @@ async function countProductsForCollection(collectionId) {
  */
 export async function deleteCategory(id, options = {}) {
   const categoryId = String(id || '').trim();
-  if (!categoryId) throw new Error('Category id is required');
+  if (!isLiveDbId(categoryId)) {
+    throw new Error('Category id must be a live Supabase UUID.');
+  }
 
   const mode = options.mode || 'reassign';
 
@@ -714,7 +800,7 @@ export async function deleteCategory(id, options = {}) {
     return { ok: true, id: categoryId, reassigned: linked };
   } catch (err) {
     console.error('[shared/supabase] deleteCategory failed:', err);
-    throw err instanceof Error ? err : new Error(String(err));
+    throw mapSupabaseNetworkError(err, 'deleting category');
   }
 }
 
@@ -731,7 +817,9 @@ export async function deleteCategory(id, options = {}) {
  */
 export async function deleteCollection(id, options = {}) {
   const collectionId = String(id || '').trim();
-  if (!collectionId) throw new Error('Collection id is required');
+  if (!isLiveDbId(collectionId)) {
+    throw new Error('Collection id must be a live Supabase UUID.');
+  }
 
   const mode = options.mode || 'reassign';
 
@@ -813,7 +901,7 @@ export async function deleteCollection(id, options = {}) {
     return { ok: true, id: collectionId, reassigned: linked };
   } catch (err) {
     console.error('[shared/supabase] deleteCollection failed:', err);
-    throw err instanceof Error ? err : new Error(String(err));
+    throw mapSupabaseNetworkError(err, 'deleting collection');
   }
 }
 
