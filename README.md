@@ -126,7 +126,16 @@ For full serverless auth locally, use `npx vercel dev` (static `serve` uses a se
 
 The apps run in **demo mode** with mock products when credentials are missing.
 
-When ready, create a `products` table:
+**Required catalog schema** (fixes `public.collections` / `public.categories` missing):
+
+1. Open [Supabase SQL Editor](https://supabase.com/dashboard/project/_/sql)
+2. Paste and run [`sql/catalog_schema.sql`](sql/catalog_schema.sql)
+
+That script creates `categories`, `collections`, ensures `products` has `category_id` / `collection_id` (FK `ON DELETE SET NULL`), enables RLS policies for the anon client, and seeds a **General** row in each taxonomy table.
+
+Also run [`sql/auth_users.sql`](sql/auth_users.sql) for the `users` table when enabling production auth.
+
+When ready, create a `products` table (also covered by `catalog_schema.sql`):
 
 ```sql
 create table products (

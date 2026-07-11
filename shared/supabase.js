@@ -686,7 +686,14 @@ export async function getCategories() {
     .select('*')
     .order('name', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (/Could not find the table|schema cache/i.test(error.message)) {
+      throw new Error(
+        'Missing table public.categories. Run sql/catalog_schema.sql in the Supabase SQL Editor, then refresh.',
+      );
+    }
+    throw new Error(error.message);
+  }
   return data ?? [];
 }
 
@@ -699,7 +706,14 @@ export async function getCollections() {
     .select('*')
     .order('name', { ascending: true });
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (/Could not find the table|schema cache/i.test(error.message)) {
+      throw new Error(
+        'Missing table public.collections. Run sql/catalog_schema.sql in the Supabase SQL Editor, then refresh.',
+      );
+    }
+    throw new Error(error.message);
+  }
   return data ?? [];
 }
 

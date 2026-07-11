@@ -40,11 +40,11 @@ export async function fetchAdminCatalog() {
       getProducts(),
       getCategories().catch((err) => {
         console.error('[catalog-api] getCategories failed:', err);
-        return [];
+        throw err;
       }),
       getCollections().catch((err) => {
         console.error('[catalog-api] getCollections failed:', err);
-        return [];
+        throw err;
       }),
     ]);
 
