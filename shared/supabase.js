@@ -347,22 +347,55 @@ export async function upsertProductRow(product) {
   const name = String(product.title || product.name || '').trim();
   if (!name) throw new Error('Product title is required');
 
-  const collectionName = String(product.collectionName || product.category || 'General').trim() || 'General';
-  const categoryName = String(product.category || collectionName).trim() || 'General';
+  let categoryId = isLiveDbId(product.category_id) ? String(product.category_id).trim() : null;
+  let collectionId = isLiveDbId(product.collection_id) ? String(product.collection_id).trim() : null;
+  let collectionName = String(product.collectionName || product.category || '').trim();
+  let categoryName = String(product.category || product.collectionName || '').trim();
 
-  let categoryId = product.category_id || null;
-  let collectionId = product.collection_id || null;
-
-  try {
-    const [cat, col] = await Promise.all([
-      ensureNamedCategory(categoryName),
-      ensureNamedCollection(collectionName),
-    ]);
-    categoryId = cat.id;
-    collectionId = col.id;
-  } catch (err) {
-    console.warn('[shared/supabase] taxonomy ensure skipped:', err.message);
+  // Prefer explicit UUIDs from the admin selects; resolve names from those rows.
+  if (collectionId || categoryId) {
+    try {
+      if (collectionId) {
+        const { data: col } = await supabase
+          .from('collections')
+          .select('id, name')
+          .eq('id', collectionId)
+          .maybeSingle();
+        if (col?.name) collectionName = String(col.name);
+      }
+      if (categoryId) {
+        const { data: cat } = await supabase
+          .from('categories')
+          .select('id, name')
+          .eq('id', categoryId)
+          .maybeSingle();
+        if (cat?.name) categoryName = String(cat.name);
+      }
+    } catch (err) {
+      console.warn('[shared/supabase] taxonomy lookup by id skipped:', err.message);
+    }
+  } else {
+    // Legacy name-only path (POS / older callers)
+    collectionName = collectionName || 'General';
+    categoryName = categoryName || collectionName;
+    try {
+      const [cat, col] = await Promise.all([
+        ensureNamedCategory(categoryName),
+        ensureNamedCollection(collectionName),
+      ]);
+      categoryId = cat.id;
+      collectionId = col.id;
+    } catch (err) {
+      console.warn('[shared/supabase] taxonomy ensure skipped:', err.message);
+    }
   }
+
+  if (!collectionId || !categoryId) {
+    throw new Error('Please create a Collection and Category first, then select them when adding a product.');
+  }
+
+  collectionName = collectionName || 'General';
+  categoryName = categoryName || collectionName;
 
   const row = {
     barcode: String(product.barcode || product.sku || ''),

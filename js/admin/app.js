@@ -474,12 +474,30 @@ export async function mount(root) {
       .map((s) => s.trim())
       .filter(Boolean);
 
-    const collectionName = String(data.get('collectionName'));
-    const category = String(data.get('category') || collectionName);
+    const snapshot = state.getSnapshot();
+    const managedCollections = snapshot.managedCollections?.length
+      ? snapshot.managedCollections
+      : snapshot.collections;
+    const managedCategories = snapshot.managedCategories?.length
+      ? snapshot.managedCategories
+      : snapshot.categories;
+
+    const collectionId = String(data.get('collection_id') || '').trim();
+    const categoryId = String(data.get('category_id') || '').trim();
+
+    if (!isLiveDbId(collectionId) || !isLiveDbId(categoryId)) {
+      window.alert('Please create a Collection and Category first, then select them from the dropdowns.');
+      return;
+    }
+
+    const collectionName = managedCollections.find((c) => c.id === collectionId)?.name || '';
+    const category = managedCategories.find((c) => c.id === categoryId)?.name || '';
 
     const product = {
       id: isLiveDbId(data.get('id')) ? String(data.get('id')) : undefined,
       title: String(data.get('title')),
+      collection_id: collectionId,
+      category_id: categoryId,
       collectionName,
       category,
       costPrice: Number(data.get('costPrice')),
@@ -495,14 +513,93 @@ export async function mount(root) {
     } catch (err) {
       console.error('[admin] upsertProduct failed:', err);
       window.alert(err?.message || 'Failed to save product to Supabase.');
-      // Keep a local draft so the user doesn't lose form work offline
-      state.upsertProduct({
-        ...product,
-        id: isLiveDbId(product.id) ? product.id : undefined,
-      });
-      if (collectionName) state.upsertCollection({ name: collectionName });
-      if (category) state.upsertCategory({ name: category });
     }
+  }
+
+  /**
+   * Rebuild Collection / Category <select> options from live Supabase rows.
+   * @param {Array<{ id: string, name: string }>} collections
+   * @param {Array<{ id: string, name: string }>} categories
+   * @param {HTMLElement} [scope]
+   * @param {{ collectionId?: string, categoryId?: string }} [selected]
+   */
+  function populateFormDropdowns(collections, categories, scope = root, selected = {}) {
+    const liveCollections = (collections || []).filter((c) => isLiveDbId(c.id) && c.name);
+    const liveCategories = (categories || []).filter((c) => isLiveDbId(c.id) && c.name);
+
+    scope.querySelectorAll('[data-collection-select]').forEach((select) => {
+      const current = selected.collectionId || select.value || '';
+      select.innerHTML = '';
+      if (!liveCollections.length) {
+        select.disabled = true;
+        select.required = false;
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'Please create a Collection first';
+        select.appendChild(opt);
+        return;
+      }
+
+      select.disabled = false;
+      select.required = true;
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.disabled = true;
+      placeholder.textContent = 'Select…';
+      if (!liveCollections.some((c) => c.id === current)) placeholder.selected = true;
+      select.appendChild(placeholder);
+
+      liveCollections.forEach((c) => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name;
+        if (c.id === current) opt.selected = true;
+        select.appendChild(opt);
+      });
+    });
+
+    scope.querySelectorAll('[data-category-select]').forEach((select) => {
+      const current = selected.categoryId || select.value || '';
+      select.innerHTML = '';
+      if (!liveCategories.length) {
+        select.disabled = true;
+        select.required = false;
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'Please create a Category first';
+        select.appendChild(opt);
+        return;
+      }
+
+      select.disabled = false;
+      select.required = true;
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.disabled = true;
+      placeholder.textContent = 'Select…';
+      if (!liveCategories.some((c) => c.id === current)) placeholder.selected = true;
+      select.appendChild(placeholder);
+
+      liveCategories.forEach((c) => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name;
+        if (c.id === current) opt.selected = true;
+        select.appendChild(opt);
+      });
+    });
+  }
+
+  function liveTaxonomy(snapshot = state.getSnapshot()) {
+    const collections = (snapshot.managedCollections?.length
+      ? snapshot.managedCollections
+      : snapshot.collections || []
+    ).filter((c) => isLiveDbId(c.id));
+    const categories = (snapshot.managedCategories?.length
+      ? snapshot.managedCategories
+      : snapshot.categories || []
+    ).filter((c) => isLiveDbId(c.id));
+    return { collections, categories };
   }
 
   function unlock() {
@@ -585,16 +682,24 @@ export async function mount(root) {
 
   function renderForm(product = null) {
     if (!els.formHost) return;
+    const snapshot = state.getSnapshot();
     const editing = product ?? (editingProductId
-      ? state.getSnapshot().products.find((p) => p.id === editingProductId)
+      ? snapshot.products.find((p) => p.id === editingProductId)
       : null);
+    const { collections, categories } = liveTaxonomy(snapshot);
 
     if (els.formTitle) {
       els.formTitle.textContent = editing ? 'Edit Product' : 'Add Product';
     }
-    els.formHost.innerHTML = productFormHtml(editing);
+    els.formHost.innerHTML = productFormHtml(editing, collections, categories);
     const form = els.formHost.querySelector('[data-product-form]');
-    if (form) bindImageUploader(form);
+    if (form) {
+      bindImageUploader(form);
+      populateFormDropdowns(collections, categories, form, {
+        collectionId: editing?.collection_id || '',
+        categoryId: editing?.category_id || '',
+      });
+    }
   }
 
   function renderCatalogForm(product = null) {
@@ -603,15 +708,20 @@ export async function mount(root) {
     const editing = product ?? (editingCatalogId
       ? snapshot.products.find((p) => p.id === editingCatalogId)
       : null);
-    const collectionOptions = snapshot.collections.map((c) => c.name);
-    const categoryOptions = snapshot.categories.map((c) => c.name);
+    const { collections, categories } = liveTaxonomy(snapshot);
 
     if (els.catalogFormTitle) {
       els.catalogFormTitle.textContent = editing ? 'Edit Store Product' : 'Add Store Product';
     }
-    els.catalogFormHost.innerHTML = catalogFormHtml(editing, collectionOptions, categoryOptions);
+    els.catalogFormHost.innerHTML = catalogFormHtml(editing, collections, categories);
     const form = els.catalogFormHost.querySelector('[data-catalog-form]');
-    if (form) bindImageUploader(form);
+    if (form) {
+      bindImageUploader(form);
+      populateFormDropdowns(collections, categories, form, {
+        collectionId: editing?.collection_id || '',
+        categoryId: editing?.category_id || '',
+      });
+    }
   }
 
   function renderCollectionForm() {

@@ -213,19 +213,15 @@ export function categoryFormHtml(item = null) {
 
 /**
  * @param {import('../dashboard.js').ProductRecord | null} product
- * @param {string[]} collectionOptions
+ * @param {Array<{ id: string, name: string }>} [collections]
+ * @param {Array<{ id: string, name: string }>} [categories]
  */
-export function catalogFormHtml(product = null, collectionOptions = [], categoryOptions = []) {
+export function catalogFormHtml(product = null, collections = [], categories = []) {
   const isEdit = Boolean(product);
-  const collections = [...new Set([
-    ...collectionOptions,
-    ...(product?.collectionName ? [product.collectionName] : []),
-  ])].filter(Boolean).sort();
-  const cats = [...new Set([
-    ...categoryOptions,
-    ...(product?.category ? [product.category] : []),
-    'General',
-  ])].filter(Boolean).sort();
+  const liveCollections = (collections || []).filter((c) => c?.id && c?.name);
+  const liveCategories = (categories || []).filter((c) => c?.id && c?.name);
+  const selectedCollectionId = product?.collection_id || '';
+  const selectedCategoryId = product?.category_id || '';
 
   return `
     <form class="dash-form" data-catalog-form autocomplete="off">
@@ -238,17 +234,15 @@ export function catalogFormHtml(product = null, collectionOptions = [], category
         </div>
         <div class="dash-field">
           <label for="cat-collection">Collection</label>
-          <input id="cat-collection" name="collectionName" type="text" list="collection-suggestions" required value="${escapeAttr(product?.collectionName ?? '')}" placeholder="Candles">
-          <datalist id="collection-suggestions">
-            ${collections.map((o) => `<option value="${escapeAttr(o)}"></option>`).join('')}
-          </datalist>
+          <select id="cat-collection" name="collection_id" data-collection-select required ${liveCollections.length ? '' : 'disabled'}>
+            ${taxonomySelectOptionsHtml(liveCollections, selectedCollectionId, 'Please create a Collection first')}
+          </select>
         </div>
         <div class="dash-field">
           <label for="cat-category">Category</label>
-          <input id="cat-category" name="category" type="text" list="category-suggestions" required value="${escapeAttr(product?.category ?? product?.collectionName ?? '')}" placeholder="Oils">
-          <datalist id="category-suggestions">
-            ${cats.map((o) => `<option value="${escapeAttr(o)}"></option>`).join('')}
-          </datalist>
+          <select id="cat-category" name="category_id" data-category-select required ${liveCategories.length ? '' : 'disabled'}>
+            ${taxonomySelectOptionsHtml(liveCategories, selectedCategoryId, 'Please create a Category first')}
+          </select>
         </div>
         <div class="dash-field">
           <label for="cat-barcode">Barcode / SKU</label>
@@ -271,13 +265,35 @@ export function catalogFormHtml(product = null, collectionOptions = [], category
       ${imageUploaderHtml(product?.imageUrls ?? [], 'cat-images')}
 
       <div class="dash-form__actions">
-        <button type="submit" class="dash-btn dash-btn--primary">${isEdit ? 'Save & Publish' : 'Add to Website'}</button>
+        <button type="submit" class="dash-btn dash-btn--primary" ${liveCollections.length && liveCategories.length ? '' : 'disabled'}>${isEdit ? 'Save & Publish' : 'Add to Website'}</button>
         ${isEdit ? '<button type="button" class="dash-btn dash-btn--ghost" data-cancel-catalog-edit>Cancel</button>' : ''}
       </div>
-      <p class="dash-form__note">Saving publishes this product to the online store and POS catalog.</p>
+      <p class="dash-form__note">${liveCollections.length && liveCategories.length
+    ? 'Saving publishes this product to the online store and POS catalog.'
+    : 'Create at least one Collection and one Category under “Collections &amp; Categories” before adding products.'}</p>
     </form>
   `;
 }
+
+/**
+ * @param {Array<{ id: string, name: string }>} items
+ * @param {string} selectedId
+ * @param {string} emptyLabel
+ */
+function taxonomySelectOptionsHtml(items, selectedId = '', emptyLabel = 'None available') {
+  if (!items.length) {
+    return `<option value="">${escapeHtml(emptyLabel)}</option>`;
+  }
+
+  const hasSelected = items.some((item) => String(item.id) === String(selectedId));
+  return `
+    <option value="" disabled ${hasSelected ? '' : 'selected'}>Select…</option>
+    ${items.map((item) => `
+      <option value="${escapeAttr(item.id)}"${String(item.id) === String(selectedId) ? ' selected' : ''}>${escapeHtml(item.name)}</option>
+    `).join('')}
+  `;
+}
+
 /**
  * @param {import('../dashboard.js').ProductRecord[]} products
  */
@@ -367,8 +383,17 @@ export function transactionFeedHtml(transactions) {
   `;
 }
 
-export function productFormHtml(product = null) {
+/**
+ * @param {import('../dashboard.js').ProductRecord | null} product
+ * @param {Array<{ id: string, name: string }>} [collections]
+ * @param {Array<{ id: string, name: string }>} [categories]
+ */
+export function productFormHtml(product = null, collections = [], categories = []) {
   const isEdit = Boolean(product);
+  const liveCollections = (collections || []).filter((c) => c?.id && c?.name);
+  const liveCategories = (categories || []).filter((c) => c?.id && c?.name);
+  const selectedCollectionId = product?.collection_id || '';
+  const selectedCategoryId = product?.category_id || '';
 
   return `
     <form class="dash-form" data-product-form autocomplete="off">
@@ -380,8 +405,16 @@ export function productFormHtml(product = null) {
           <input id="product-title" name="title" type="text" required value="${escapeAttr(product?.title ?? '')}" placeholder="Oud Noir Candle">
         </div>
         <div class="dash-field">
-          <label for="product-collection">Collection Name</label>
-          <input id="product-collection" name="collectionName" type="text" required value="${escapeAttr(product?.collectionName ?? '')}" placeholder="Candles">
+          <label for="product-collection">Collection</label>
+          <select id="product-collection" name="collection_id" data-collection-select required ${liveCollections.length ? '' : 'disabled'}>
+            ${taxonomySelectOptionsHtml(liveCollections, selectedCollectionId, 'Please create a Collection first')}
+          </select>
+        </div>
+        <div class="dash-field">
+          <label for="product-category">Category</label>
+          <select id="product-category" name="category_id" data-category-select required ${liveCategories.length ? '' : 'disabled'}>
+            ${taxonomySelectOptionsHtml(liveCategories, selectedCategoryId, 'Please create a Category first')}
+          </select>
         </div>
         <div class="dash-field">
           <label for="product-cost">Cost Price <span lang="ar">سعر التكلفة</span></label>
@@ -404,7 +437,7 @@ export function productFormHtml(product = null) {
       ${imageUploaderHtml(product?.imageUrls ?? [], 'product-images')}
 
       <div class="dash-form__actions">
-        <button type="submit" class="dash-btn dash-btn--primary">${isEdit ? 'Save Changes' : 'Add Product'}</button>
+        <button type="submit" class="dash-btn dash-btn--primary" ${liveCollections.length && liveCategories.length ? '' : 'disabled'}>${isEdit ? 'Save Changes' : 'Add Product'}</button>
         ${isEdit ? '<button type="button" class="dash-btn dash-btn--ghost" data-cancel-edit>Cancel</button>' : ''}
       </div>
     </form>

@@ -126,6 +126,8 @@ export function normalizeStoreProduct(raw) {
     description: raw.description ? String(raw.description) : '',
     category,
     collectionName,
+    category_id: raw.category_id ?? raw.categoryId ?? null,
+    collection_id: raw.collection_id ?? raw.collectionId ?? null,
     price: retailPrice,
     retailPrice,
     cost: costPrice,

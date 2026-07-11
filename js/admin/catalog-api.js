@@ -65,11 +65,13 @@ export async function fetchAdminCatalog() {
 
     const products = (rawProducts || []).map((row) => {
       const mapped = mapProductFromDb(row);
-      if (row.category_id && categoryById.has(row.category_id)) {
-        mapped.category = categoryById.get(row.category_id);
+      mapped.category_id = row.category_id ? String(row.category_id) : null;
+      mapped.collection_id = row.collection_id ? String(row.collection_id) : null;
+      if (row.category_id && categoryById.has(String(row.category_id))) {
+        mapped.category = categoryById.get(String(row.category_id));
       }
-      if (row.collection_id && collectionById.has(row.collection_id)) {
-        mapped.collectionName = collectionById.get(row.collection_id);
+      if (row.collection_id && collectionById.has(String(row.collection_id))) {
+        mapped.collectionName = collectionById.get(String(row.collection_id));
       }
       return mapped;
     });
