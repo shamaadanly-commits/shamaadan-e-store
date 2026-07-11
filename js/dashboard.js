@@ -255,12 +255,26 @@ export function createDashboardState(options = {}) {
   }
 
   function getSnapshot() {
+    const liveCollections = collections.filter((c) => !supabaseReady || isLiveDbId(c.id));
+    const liveCategories = categories.filter((c) => !supabaseReady || isLiveDbId(c.id));
+
     return {
       products: products.map((p) => ({ ...p, imageUrls: [...(p.imageUrls || [])] })),
-      collections: buildCollectionsFromProducts(products, collections),
-      categories: buildCategoriesFromProducts(products, categories),
-      managedCollections: collections.map((c) => ({ ...c })),
-      managedCategories: categories.map((c) => ({ ...c })),
+      // Prefer live managed taxonomy only — never inject DEFAULT_* mock names into the UI.
+      collections: supabaseReady
+        ? liveCollections.map((c) => ({
+          ...c,
+          count: products.filter((p) => p.collectionName === c.name).length,
+        }))
+        : buildCollectionsFromProducts(products, collections),
+      categories: supabaseReady
+        ? liveCategories.map((c) => ({
+          ...c,
+          count: products.filter((p) => p.category === c.name).length,
+        }))
+        : buildCategoriesFromProducts(products, categories),
+      managedCollections: liveCollections.map((c) => ({ ...c })),
+      managedCategories: liveCategories.map((c) => ({ ...c })),
       transactions: [...transactions],
       ledgers: {
         online: computeChannelLedger(transactions, 'online'),

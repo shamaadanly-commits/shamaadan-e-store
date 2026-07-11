@@ -787,14 +787,25 @@ export async function mount(root) {
     }
 
     if (els.catalogFilter) {
+      const liveFilters = collectionRows;
+      if (catalogFilter !== 'All' && !liveFilters.some((c) => c.name === catalogFilter)) {
+        catalogFilter = 'All';
+      }
       const current = catalogFilter;
-      const filterNames = collections.length ? collections : collectionRows;
-      els.catalogFilter.innerHTML = `
-        <option value="All">All collections</option>
-        ${filterNames.map((c) => `
-          <option value="${escapeAttr(c.name)}"${c.name === current ? ' selected' : ''}>${escapeHtml(c.name)}</option>
-        `).join('')}
-      `;
+
+      if (!liveFilters.length) {
+        els.catalogFilter.innerHTML = `
+          <option value="All" selected>All collections</option>
+          <option value="" disabled>Please create a Collection first</option>
+        `;
+      } else {
+        els.catalogFilter.innerHTML = `
+          <option value="All"${current === 'All' ? ' selected' : ''}>All collections</option>
+          ${liveFilters.map((c) => `
+            <option value="${escapeAttr(c.name)}"${c.name === current ? ' selected' : ''}>${escapeHtml(c.name)}</option>
+          `).join('')}
+        `;
+      }
     }
 
     if (els.catalogHost) {
