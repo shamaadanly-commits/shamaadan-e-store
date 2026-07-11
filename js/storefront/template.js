@@ -338,7 +338,9 @@ export function productCardHtml(product, i18n) {
   const initial = display.displayName.charAt(0);
   const imageUrl = product.imageUrls?.[0] || product.image || null;
 
-  const stock = Number(product.stockQuantity ?? product.stock ?? 0);
+  const stock = Number(
+    product.stockQuantity ?? product.stock_quantity ?? product.stock ?? 0,
+  );
   const alertAt = Number(product.minStockAlert ?? product.min_stock_alert ?? 5);
   const outOfStock = stock <= 0;
   const lowStock = !outOfStock && (stock === 1 || stock <= alertAt);
@@ -350,8 +352,6 @@ export function productCardHtml(product, i18n) {
     badge = `<span class="inventory-badge low-stock">${t('shop.onlyOneLeft')}</span>`;
   } else if (lowStock) {
     badge = `<span class="inventory-badge low-stock">${t('shop.lowStock', { count: stock })}</span>`;
-  } else if (product.id === 'p1' || product.id === 'p5') {
-    badge = `<span class="product-card__badge">${t('shop.new')}</span>`;
   }
 
   const media = imageUrl

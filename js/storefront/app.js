@@ -1,6 +1,8 @@
 /**
  * Shamaadan Luxury Storefront — orchestrator.
+ * Catalog is loaded live from Supabase (same DB as Admin).
  */
+import { isSupabaseConfigured } from '../../shared/supabase.js';
 import { createI18n } from './i18n.js';
 import { buildStorefrontHtml } from './template.js';
 import { loadProducts, filterProducts, renderProductGrid } from './products.js';
@@ -16,7 +18,33 @@ import { initAnimations, animateProductGrid } from './animations.js';
  */
 export async function mount(root) {
   const i18n = createI18n();
-  const { products, categories, collections } = await loadProducts();
+
+  let products = [];
+  let categories = [];
+  let collections = [];
+
+  try {
+    const catalog = await loadProducts();
+    products = catalog.products;
+    categories = catalog.categories;
+    collections = catalog.collections;
+
+    if (!catalog.connected && !isSupabaseConfigured()) {
+      console.warn('[storefront] Supabase credentials missing — empty shop');
+    }
+  } catch (err) {
+    console.error('[storefront] catalog load failed:', err);
+    root.className = 'shop';
+    root.innerHTML = `
+      <div class="boot-error" role="alert" style="padding:3rem;text-align:center">
+        <h1>Unable to load the shop</h1>
+        <p>${err?.message || 'Failed to load products from Supabase.'}</p>
+        <button type="button" onclick="location.reload()">Retry</button>
+      </div>
+    `;
+    return;
+  }
+
   const cart = createCart();
   const checkout = initCheckout(root, cart, i18n);
 
@@ -70,7 +98,6 @@ export async function mount(root) {
     if (collectionLink) {
       const name = collectionLink.dataset.collection;
       if (name) {
-        // Let hash navigation happen, then filter shop
         setTimeout(() => applyFilter(name), 0);
       }
       return;
@@ -83,7 +110,7 @@ export async function mount(root) {
     const product = products.find((p) => p.id === id);
     if (!product) return;
 
-    const stock = Number(product.stockQuantity ?? product.stock ?? 0);
+    const stock = Number(product.stockQuantity ?? product.stock ?? product.stock_quantity ?? 0);
     if (stock <= 0) {
       showToast(root, i18n.t('shop.outOfStock'));
       return;

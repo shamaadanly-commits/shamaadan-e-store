@@ -1,101 +1,151 @@
 /**
- * Product data layer — Supabase `public.products` (live stock) → local catalog → mock.
- * Reads stock_quantity / min_stock_alert / retail_price from the unified schema.
+ * Storefront catalog — live Supabase only (same source of truth as Admin).
+ * No localStorage catalog and no MOCK_PRODUCTS fallback when Supabase is configured.
  */
-import { getSupabase } from '../config/supabase.js';
-import { MOCK_PRODUCTS } from '../shared/mock-products.js';
 import {
-  loadStoreCatalog,
-  normalizeStoreProduct,
-  buildCollectionsFromProducts,
-  buildCategoriesFromProducts,
-} from '../shared/catalog-store.js';
+  getSupabase,
+  isSupabaseConfigured,
+  mapProductFromDb,
+  mapSupabaseNetworkError,
+} from '../../shared/supabase.js';
+import { normalizeStoreProduct } from '../shared/catalog-store.js';
 import { productCardHtml } from './template.js';
 
+const COLLECTION_GRADIENTS = [
+  'linear-gradient(160deg, #2a1f14 0%, #1c1914 60%, #242019 100%)',
+  'linear-gradient(200deg, #1a1814 0%, #2a2018 50%, #1c1914 100%)',
+  'linear-gradient(140deg, #1e1a10 0%, #3a2a18 40%, #1c1914 100%)',
+  'linear-gradient(180deg, #241a10 0%, #1c1914 100%)',
+  'linear-gradient(160deg, #1a2018 0%, #1c1914 100%)',
+  'linear-gradient(200deg, #201a14 0%, #1c1914 100%)',
+];
+
 /**
- * Map a Supabase products row into the storefront product shape.
+ * Map a DB product row into the storefront card shape (stock_quantity → stockQuantity).
  * @param {object} row
  */
-function mapSupabaseProduct(row) {
-  const imageUrl = row.image_url || null;
-  const imageUrls = Array.isArray(row.image_urls)
-    ? row.image_urls.filter(Boolean)
-    : imageUrl
-      ? [imageUrl]
-      : row.image
-        ? [row.image]
-        : [];
-
+function toStorefrontProduct(row) {
+  const mapped = mapProductFromDb(row);
   return normalizeStoreProduct({
-    id: row.id,
-    barcode: row.barcode ?? row.sku ?? '',
-    sku: row.sku ?? row.barcode ?? '',
-    name: row.name,
-    title: row.name,
-    description: row.description ?? '',
-    category: row.category ?? 'General',
-    collectionName: row.category ?? 'General',
-    retailPrice: Number(row.retail_price ?? row.price ?? 0),
-    price: Number(row.retail_price ?? row.price ?? 0),
-    wholesale_cost: Number(row.wholesale_cost ?? row.cost ?? 0),
-    cost: Number(row.wholesale_cost ?? row.cost ?? 0),
-    stock_quantity: Number(row.stock_quantity ?? row.stock ?? 0),
-    stock: Number(row.stock_quantity ?? row.stock ?? 0),
-    min_stock_alert: Number(row.min_stock_alert ?? 5),
-    imageUrls,
-    image: imageUrls[0] ?? null,
-    active: row.is_active !== false && row.active !== false,
-    is_active: row.is_active !== false && row.active !== false,
+    ...mapped,
+    stock_quantity: mapped.stockQuantity,
+    stock: mapped.stockQuantity,
+    min_stock_alert: mapped.minStockAlert,
   });
 }
 
 /**
+ * @param {object[]} products
+ * @param {Array<{ id: string, name: string, description?: string }>} managedCollections
+ */
+function buildCollectionCards(products, managedCollections) {
+  const counts = new Map();
+  for (const product of products) {
+    const name = product.collectionName || product.category || 'General';
+    counts.set(name, (counts.get(name) || 0) + 1);
+  }
+
+  if (managedCollections.length) {
+    return managedCollections.map((c, i) => ({
+      id: String(c.id),
+      name: String(c.name || 'Untitled'),
+      description: c.description ? String(c.description) : '',
+      count: counts.get(c.name) || 0,
+      gradient: COLLECTION_GRADIENTS[i % COLLECTION_GRADIENTS.length],
+    }));
+  }
+
+  return [...counts.entries()].map(([name, count], i) => ({
+    id: name.toLowerCase().replace(/\s+/g, '-'),
+    name,
+    count,
+    gradient: COLLECTION_GRADIENTS[i % COLLECTION_GRADIENTS.length],
+  }));
+}
+
+/**
+ * Load active products + taxonomy directly from Supabase.
  * @returns {Promise<{ products: Array, categories: string[], collections: Array, connected: boolean }>}
  */
 export async function loadProducts() {
-  const shared = loadStoreCatalog();
-  let managedCollections = shared?.collections || [];
-  let managedCategories = shared?.categories || [];
-  let products = [];
-  let connected = false;
+  if (!isSupabaseConfigured()) {
+    console.warn('[storefront] Supabase not configured — showing empty catalog');
+    return { products: [], categories: [], collections: [], connected: false };
+  }
 
   const supabase = getSupabase();
 
-  // Prefer live Supabase inventory so stock_quantity stays in sync with POS
-  if (supabase) {
-    try {
-      const { data, error } = await supabase
+  try {
+    const [productsRes, categoriesRes, collectionsRes] = await Promise.all([
+      supabase
         .from('products')
-        .select('id, barcode, name, description, image_url, wholesale_cost, retail_price, stock_quantity, min_stock_alert, is_active, created_at')
+        .select('*')
         .eq('is_active', true)
-        .order('name');
+        .order('name', { ascending: true }),
+      supabase.from('categories').select('*').order('name', { ascending: true }),
+      supabase.from('collections').select('*').order('name', { ascending: true }),
+    ]);
 
-      if (!error && data?.length) {
-        products = data.map(mapSupabaseProduct);
-        connected = true;
-      } else if (error) {
-        console.warn('[storefront] Supabase products error:', error.message);
-      }
-    } catch (err) {
-      console.warn('[storefront] Supabase product load failed:', err);
+    if (productsRes.error) {
+      throw new Error(productsRes.error.message);
     }
+
+    const categoryRows = categoriesRes.error ? [] : (categoriesRes.data || []);
+    const collectionRows = collectionsRes.error ? [] : (collectionsRes.data || []);
+
+    if (categoriesRes.error) {
+      console.warn('[storefront] categories query:', categoriesRes.error.message);
+    }
+    if (collectionsRes.error) {
+      console.warn('[storefront] collections query:', collectionsRes.error.message);
+    }
+
+    const categoryById = new Map(categoryRows.map((c) => [String(c.id), String(c.name || 'General')]));
+    const collectionById = new Map(collectionRows.map((c) => [String(c.id), String(c.name || 'General')]));
+
+    const products = (productsRes.data || []).map((row) => {
+      const product = toStorefrontProduct(row);
+      if (row.category_id && categoryById.has(String(row.category_id))) {
+        product.category = categoryById.get(String(row.category_id));
+      }
+      if (row.collection_id && collectionById.has(String(row.collection_id))) {
+        product.collectionName = collectionById.get(String(row.collection_id));
+      } else if (!product.collectionName || product.collectionName === 'General') {
+        product.collectionName = product.category || 'General';
+      }
+      return product;
+    });
+
+    const categories = categoryRows.length
+      ? categoryRows.map((c) => String(c.name || 'Untitled')).filter(Boolean)
+      : [...new Set(products.map((p) => p.category).filter(Boolean))];
+
+    const collections = buildCollectionCards(
+      products,
+      collectionRows.map((c) => ({
+        id: String(c.id),
+        name: String(c.name || 'Untitled'),
+        description: c.description ? String(c.description) : '',
+      })),
+    );
+
+    console.info('[storefront] live catalog', {
+      products: products.length,
+      categories: categories.length,
+      collections: collections.length,
+    });
+
+    return {
+      products,
+      categories,
+      collections,
+      connected: true,
+    };
+  } catch (err) {
+    const mapped = mapSupabaseNetworkError(err, 'loading the storefront catalog');
+    console.error('[storefront] loadProducts failed:', mapped);
+    throw mapped;
   }
-
-  // Fallback: admin localStorage catalog, then mocks
-  if (!products.length && shared?.products?.length) {
-    products = shared.products.map(normalizeStoreProduct);
-    connected = true;
-  }
-
-  if (!products.length) {
-    products = MOCK_PRODUCTS.map(normalizeStoreProduct);
-  }
-
-  const collections = buildCollectionsFromProducts(products, managedCollections);
-  const categoryRecords = buildCategoriesFromProducts(products, managedCategories);
-  const categories = categoryRecords.map((c) => c.name);
-
-  return { products, categories, collections, connected };
 }
 
 /**
