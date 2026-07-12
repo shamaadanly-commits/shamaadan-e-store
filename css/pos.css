@@ -219,22 +219,59 @@
   transform: scale(0.97);
 }
 
+.pos__tickets-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.5rem;
+  padding: 0.4rem 1rem;
+  border-radius: var(--pos-radius-sm);
+  background: var(--pos-surface);
+  color: var(--pos-text);
+  border: 1px solid var(--pos-border-strong);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: background 160ms ease, border-color 160ms ease, transform 120ms var(--pos-ease);
+}
+
+.pos__tickets-btn:active {
+  background: var(--pos-surface-2);
+  border-color: var(--pos-gold);
+  transform: scale(0.97);
+}
+
+.pos__tickets-btn svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  color: var(--pos-gold);
+}
+
 .pos__badge {
   position: absolute;
-  top: -0.25rem;
-  right: -0.25rem;
+  top: -0.35rem;
+  right: -0.35rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.15rem;
-  height: 1.15rem;
+  min-width: 1.2rem;
+  height: 1.2rem;
   padding: 0 0.3rem;
   border-radius: 999px;
   background: var(--pos-danger);
   color: #fff;
-  font-size: 0.62rem;
+  font-size: 0.65rem;
   font-weight: 800;
   border: 2px solid var(--pos-topbar);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.pos__badge[hidden] {
+  display: none !important;
 }
 
 /* ── PIN gate ────────────────────────────────────────────────────── */

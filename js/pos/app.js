@@ -525,11 +525,12 @@ function buildShell(categories, staff) {
           </svg>
           Scan
         </button>
-        <button type="button" class="pos__icon-btn" data-open-tickets aria-label="Open tickets">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <button type="button" class="pos__tickets-btn" data-open-tickets aria-label="Open tickets">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
             <path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4V8z"/>
             <path d="M9 8v8M15 8v8"/>
           </svg>
+          Tickets
           <span class="pos__badge" data-open-tickets-count hidden>0</span>
         </button>
         <button type="button" class="pos__icon-btn" data-toggle-metrics aria-label="Toggle sales metrics">
