@@ -1126,6 +1126,103 @@
   text-align: start;
 }
 
+.pos-park-form {
+  max-width: 26rem;
+  width: min(94vw, 26rem);
+  text-align: start;
+}
+
+.pos-park-form h2 {
+  font-family: var(--pos-display);
+  font-weight: 400;
+  color: var(--pos-text) !important;
+  font-size: 1.55rem !important;
+  text-align: start;
+}
+
+.pos-park-form__total {
+  margin: 0.35rem 0 1.1rem;
+  color: var(--pos-gold);
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.pos-park-form__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pos-park-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-align: start;
+}
+
+.pos-park-form__field span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pos-muted);
+}
+
+.pos-park-form__field input {
+  min-height: 2.85rem;
+  padding: 0 0.9rem;
+  border-radius: 10px;
+  border: 1px solid var(--pos-border-strong);
+  background: var(--pos-bg-elevated);
+  color: var(--pos-text);
+  font-size: 1rem;
+  font-family: inherit;
+  outline: none;
+}
+
+.pos-park-form__field input:focus {
+  border-color: var(--pos-gold);
+  box-shadow: 0 0 0 3px rgb(201 168 76 / 16%);
+}
+
+.pos-park-form__balance {
+  margin: 0.15rem 0 0;
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--pos-text);
+}
+
+.pos-park-form__error {
+  margin: 0;
+  min-height: 1.1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--pos-danger);
+}
+
+.pos-park-form__actions {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 0.55rem;
+  margin-top: 0.35rem;
+}
+
+.pos-park-form__submit {
+  min-height: 3rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--pos-gold) 0%, var(--pos-copper) 100%);
+  color: #16130f;
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.pos-park-form__submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .pos-open-tickets h2 {
   font-family: var(--pos-display);
   font-weight: 400;

@@ -599,6 +599,10 @@ export async function logInventoryTransaction(tx) {
  *   staff_user_id?: string,
  *   staff_name?: string,
  *   ticket_label?: string,
+ *   customer_name?: string,
+ *   customer_phone?: string,
+ *   customer_location?: string,
+ *   downpayment?: number,
  * }} orderData
  * @param {Array<{ product_id: string, quantity: number, unit_price: number, wholesale_cost?: number, product_name?: string }>} itemsArray
  * @returns {Promise<{ order: object, items: object[], inventory: object[] }>}
@@ -624,6 +628,9 @@ export async function createOrder(orderData, itemsArray) {
       0,
     );
 
+  const customerName = String(orderData?.customer_name || '').trim() || null;
+  const downpayment = Math.max(0, Number(orderData?.downpayment) || 0);
+
   const now = new Date().toISOString();
   const orderPayload = {
     source: orderData?.source || 'pos',
@@ -632,7 +639,11 @@ export async function createOrder(orderData, itemsArray) {
     notes: orderData?.notes || null,
     staff_user_id: orderData?.staff_user_id || null,
     staff_name: orderData?.staff_name || null,
-    ticket_label: orderData?.ticket_label || null,
+    ticket_label: orderData?.ticket_label || customerName || null,
+    customer_name: customerName,
+    customer_phone: String(orderData?.customer_phone || '').trim() || null,
+    customer_location: String(orderData?.customer_location || '').trim() || null,
+    downpayment,
     updated_at: now,
   };
 
@@ -711,6 +722,10 @@ export async function createOrder(orderData, itemsArray) {
  *   ticket_label?: string,
  *   notes?: string,
  *   total_amount?: number,
+ *   customer_name?: string,
+ *   customer_phone?: string,
+ *   customer_location?: string,
+ *   downpayment?: number,
  * }} meta
  * @param {Array<{ product_id: string, quantity: number, unit_price: number, wholesale_cost?: number, product_name?: string }>} items
  */
@@ -720,9 +735,13 @@ export async function saveOpenTicket(meta, items) {
     status: 'open',
     staff_user_id: meta?.staff_user_id,
     staff_name: meta?.staff_name,
-    ticket_label: meta?.ticket_label,
+    ticket_label: meta?.ticket_label || meta?.customer_name,
     notes: meta?.notes,
     total_amount: meta?.total_amount,
+    customer_name: meta?.customer_name,
+    customer_phone: meta?.customer_phone,
+    customer_location: meta?.customer_location,
+    downpayment: meta?.downpayment,
   }, items);
 }
 

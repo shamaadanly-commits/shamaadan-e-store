@@ -398,12 +398,21 @@ export function openTicketsPanelHtml(tickets = []) {
         const lines = t.order_items || [];
         const qty = lines.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
         const when = t.parked_at || t.created_at;
+        const total = Number(t.total_amount || 0);
+        const down = Number(t.downpayment || 0);
+        const balance = Math.max(0, total - down);
+        const title = t.customer_name || t.ticket_label || `Ticket ${String(t.id).slice(0, 8)}`;
         return `
           <li class="dash-open-tickets__item" data-open-ticket-id="${escapeAttr(t.id)}">
             <div>
-              <p class="dash-open-tickets__title">${escapeHtml(t.ticket_label || `Ticket ${String(t.id).slice(0, 8)}`)}</p>
+              <p class="dash-open-tickets__title">${escapeHtml(title)}</p>
               <p class="dash-open-tickets__meta">
-                ${qty} item${qty === 1 ? '' : 's'} · ${formatLyd(Number(t.total_amount || 0))}
+                ${t.customer_phone ? `${escapeHtml(t.customer_phone)} · ` : ''}
+                ${t.customer_location ? `${escapeHtml(t.customer_location)} · ` : ''}
+                ${qty} item${qty === 1 ? '' : 's'}
+                · Total ${formatLyd(total)}
+                · Paid ${formatLyd(down)}
+                · Due ${formatLyd(balance)}
                 · ${escapeHtml(t.staff_name || 'Staff')}
                 ${when ? ` · ${escapeHtml(new Date(when).toLocaleString('en-LY'))}` : ''}
               </p>

@@ -187,28 +187,133 @@ async function mountRegister(root, staff) {
       return;
     }
 
-    const label = window.prompt('Ticket label (optional)', '') ?? null;
-    if (label === null) return;
+    showParkTicketForm(snapshot.subtotal);
+  }
 
-    try {
-      els.park && (els.park.disabled = true);
-      await saveOpenTicket({
-        staff_user_id: staff.id,
-        staff_name: staff.displayName || staff.username,
-        ticket_label: String(label || '').trim() || null,
-        total_amount: snapshot.subtotal,
-      }, ticketItemsPayload(snapshot.items));
+  /**
+   * @param {number} ticketTotal
+   */
+  function showParkTicketForm(ticketTotal) {
+    root.querySelector('[data-park-modal]')?.remove();
 
-      cart.clear();
-      activeOpenTicketId = null;
-      showToast(els.toast, 'Ticket parked — visible in Admin');
-      await refreshOpenTicketBadge();
-    } catch (err) {
-      console.error('[pos] park ticket failed:', err);
-      window.alert(err?.message || 'Failed to park ticket.');
-    } finally {
-      if (els.park) els.park.disabled = cart.getSnapshot().items.length === 0;
+    const modal = document.createElement('div');
+    modal.className = 'pos-sale-modal';
+    modal.dataset.parkModal = '';
+    modal.innerHTML = `
+      <div class="pos-sale-modal__backdrop" data-park-backdrop></div>
+      <div class="pos-sale-modal__card pos-park-form" role="dialog" aria-modal="true" aria-labelledby="pos-park-title">
+        <p class="pos-sale-modal__badge">Park ticket</p>
+        <h2 id="pos-park-title">Customer details</h2>
+        <p class="pos-park-form__total">Ticket total · ${formatLyd(ticketTotal)}</p>
+        <form class="pos-park-form__fields" data-park-form>
+          <label class="pos-park-form__field">
+            <span>Customer name</span>
+            <input type="text" name="customer_name" data-park-name required autocomplete="name" placeholder="Full name">
+          </label>
+          <label class="pos-park-form__field">
+            <span>Phone number</span>
+            <input type="tel" name="customer_phone" data-park-phone required autocomplete="tel" inputmode="tel" placeholder="09xxxxxxx">
+          </label>
+          <label class="pos-park-form__field">
+            <span>Location</span>
+            <input type="text" name="customer_location" data-park-location required autocomplete="street-address" placeholder="City / area / address">
+          </label>
+          <label class="pos-park-form__field">
+            <span>Downpayment (LYD)</span>
+            <input type="number" name="downpayment" data-park-downpayment required min="0" step="0.01" max="${ticketTotal}" value="0" inputmode="decimal">
+          </label>
+          <p class="pos-park-form__balance" data-park-balance>Balance due · ${formatLyd(ticketTotal)}</p>
+          <p class="pos-park-form__error" data-park-error hidden></p>
+          <div class="pos-park-form__actions">
+            <button type="button" class="pos-sale-modal__skip" data-park-cancel>Cancel</button>
+            <button type="submit" class="pos-park-form__submit" data-park-submit>Park ticket</button>
+          </div>
+        </form>
+      </div>
+    `;
+    root.appendChild(modal);
+
+    const form = modal.querySelector('[data-park-form]');
+    const downpaymentInput = modal.querySelector('[data-park-downpayment]');
+    const balanceEl = modal.querySelector('[data-park-balance]');
+    const errorEl = modal.querySelector('[data-park-error]');
+    const nameInput = modal.querySelector('[data-park-name]');
+
+    function updateBalance() {
+      const paid = Math.max(0, Number(downpaymentInput?.value) || 0);
+      const balance = Math.max(0, ticketTotal - paid);
+      if (balanceEl) balanceEl.textContent = `Balance due · ${formatLyd(balance)}`;
     }
+
+    downpaymentInput?.addEventListener('input', updateBalance);
+    nameInput?.focus();
+
+    form?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const customerName = String(modal.querySelector('[data-park-name]')?.value || '').trim();
+      const customerPhone = String(modal.querySelector('[data-park-phone]')?.value || '').trim();
+      const customerLocation = String(modal.querySelector('[data-park-location]')?.value || '').trim();
+      const downpayment = Math.max(0, Number(modal.querySelector('[data-park-downpayment]')?.value) || 0);
+
+      if (!customerName || !customerPhone || !customerLocation) {
+        if (errorEl) {
+          errorEl.hidden = false;
+          errorEl.textContent = 'Name, phone, and location are required.';
+        }
+        return;
+      }
+
+      if (downpayment > ticketTotal) {
+        if (errorEl) {
+          errorEl.hidden = false;
+          errorEl.textContent = 'Downpayment cannot exceed ticket total.';
+        }
+        return;
+      }
+
+      const submitBtn = modal.querySelector('[data-park-submit]');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Parking…';
+      }
+      if (errorEl) {
+        errorEl.hidden = true;
+        errorEl.textContent = '';
+      }
+
+      try {
+        els.park && (els.park.disabled = true);
+        const snapshot = cart.getSnapshot();
+        await saveOpenTicket({
+          staff_user_id: staff.id,
+          staff_name: staff.displayName || staff.username,
+          ticket_label: customerName,
+          customer_name: customerName,
+          customer_phone: customerPhone,
+          customer_location: customerLocation,
+          downpayment,
+          total_amount: snapshot.subtotal,
+        }, ticketItemsPayload(snapshot.items));
+
+        modal.remove();
+        cart.clear();
+        activeOpenTicketId = null;
+        showToast(els.toast, `Parked for ${customerName}`);
+        await refreshOpenTicketBadge();
+      } catch (err) {
+        console.error('[pos] park ticket failed:', err);
+        if (errorEl) {
+          errorEl.hidden = false;
+          errorEl.textContent = err?.message || 'Failed to park ticket.';
+        }
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Park ticket';
+        }
+      } finally {
+        if (els.park) els.park.disabled = cart.getSnapshot().items.length === 0;
+      }
+    });
   }
 
   async function showOpenTicketsPanel() {
@@ -240,12 +345,25 @@ async function mountRegister(root, staff) {
             const lines = t.order_items || [];
             const qty = lines.reduce((s, l) => s + Number(l.quantity || 0), 0);
             const when = t.parked_at || t.created_at;
+            const total = Number(t.total_amount || 0);
+            const down = Number(t.downpayment || 0);
+            const balance = Math.max(0, total - down);
+            const title = t.customer_name || t.ticket_label || `Ticket ${String(t.id).slice(0, 8)}`;
             return `
               <article class="pos-open-tickets__item" data-ticket-id="${escapeAttr(t.id)}">
                 <div>
-                  <p class="pos-open-tickets__label">${escapeHtml(t.ticket_label || `Ticket ${String(t.id).slice(0, 8)}`)}</p>
-                  <p class="pos-open-tickets__meta">${qty} item${qty === 1 ? '' : 's'} · ${formatLyd(Number(t.total_amount || 0))} · ${escapeHtml(t.staff_name || 'Staff')}</p>
-                  <p class="pos-open-tickets__time">${when ? new Date(when).toLocaleString() : ''}</p>
+                  <p class="pos-open-tickets__label">${escapeHtml(title)}</p>
+                  <p class="pos-open-tickets__meta">
+                    ${t.customer_phone ? `${escapeHtml(t.customer_phone)} · ` : ''}
+                    ${t.customer_location ? `${escapeHtml(t.customer_location)} · ` : ''}
+                    ${qty} item${qty === 1 ? '' : 's'}
+                  </p>
+                  <p class="pos-open-tickets__meta">
+                    Total ${formatLyd(total)}
+                    · Paid ${formatLyd(down)}
+                    · Due ${formatLyd(balance)}
+                  </p>
+                  <p class="pos-open-tickets__time">${when ? new Date(when).toLocaleString() : ''} · ${escapeHtml(t.staff_name || 'Staff')}</p>
                 </div>
                 <div class="pos-open-tickets__actions">
                   <button type="button" class="pos-open-tickets__resume" data-resume-ticket="${escapeAttr(t.id)}">Resume</button>
@@ -374,6 +492,11 @@ async function mountRegister(root, staff) {
 
     if (target.matches('[data-park-ticket]')) {
       await parkCurrentTicket();
+      return;
+    }
+
+    if (target.matches('[data-park-cancel]') || target.matches('[data-park-backdrop]')) {
+      root.querySelector('[data-park-modal]')?.remove();
       return;
     }
 

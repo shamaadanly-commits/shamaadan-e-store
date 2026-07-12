@@ -10,6 +10,10 @@ create table if not exists public.orders (
   staff_name text,
   ticket_label text,
   notes text,
+  customer_name text,
+  customer_phone text,
+  customer_location text,
+  downpayment numeric(12, 2) not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   parked_at timestamptz,
@@ -27,6 +31,10 @@ alter table public.orders add column if not exists created_at timestamptz defaul
 alter table public.orders add column if not exists updated_at timestamptz default now();
 alter table public.orders add column if not exists parked_at timestamptz;
 alter table public.orders add column if not exists completed_at timestamptz;
+alter table public.orders add column if not exists customer_name text;
+alter table public.orders add column if not exists customer_phone text;
+alter table public.orders add column if not exists customer_location text;
+alter table public.orders add column if not exists downpayment numeric(12, 2) not null default 0;
 
 create index if not exists orders_status_idx on public.orders (status);
 create index if not exists orders_source_idx on public.orders (source);
