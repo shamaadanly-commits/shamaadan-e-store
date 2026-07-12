@@ -1123,6 +1123,67 @@
   }
 
   .dash-ledger__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── Phones ──────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .dash-topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .dash-topbar__actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .dash-topbar__actions .dash-btn {
+    flex: 1 1 auto;
+  }
+
+  .dash-views {
+    padding: 1rem;
+  }
+
+  /* Larger tap targets for controls. */
+  .dash-btn {
+    min-height: 44px;
+  }
+
+  /* Barcode field: input on its own row, buttons below it. */
+  .dash-barcode-row input {
+    flex-basis: 100%;
+  }
+
+  .dash-barcode-row .dash-btn {
+    flex: 1 1 auto;
+  }
+
+  /* Keep wide tables usable via horizontal scroll with momentum. */
+  .dash-table-wrap {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dash-table {
+    font-size: 0.8rem;
+  }
+
+  .dash-table th,
+  .dash-table td {
+    padding: 0.55rem 0.6rem;
+  }
+
+  .dash-auth__card {
+    padding: 1.5rem 1.25rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .dash-ledger__grid {
     grid-template-columns: 1fr;
   }
 }

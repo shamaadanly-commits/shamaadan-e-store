@@ -368,6 +368,8 @@
 .checkout-drawer__footer {
   flex-shrink: 0;
   padding: 1rem 1.25rem 1.25rem;
+  /* Keep the pay button above the home indicator on notched phones. */
+  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
   border-top: 1px solid var(--co-border-soft);
   background: #322e28;
 }

@@ -41,7 +41,9 @@ img {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -49,6 +51,18 @@ button {
   cursor: pointer;
   border: none;
   background: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* ── Global mobile safeguards ─────────────────────────────────────── */
+/* Prevent iOS Safari from auto-zooming when focusing small form fields. */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 
 /* ── Boot screen (shared) ────────────────────────────────────────── */
