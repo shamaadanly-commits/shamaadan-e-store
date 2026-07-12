@@ -1,5 +1,5 @@
 /**
- * POS register — Loyverse-style tablet interface with camera barcode scanning.
+ * POS register — high-end tablet interface with camera barcode scanning.
  * Staff unlock via numeric PIN (mapped to user id for sale attribution).
  */
 import { getSupabase } from '../config/supabase.js';
@@ -12,6 +12,7 @@ import {
 } from '../../shared/supabase.js';
 import { getSharedDashboardState, toPosCatalogRow } from '../dashboard.js';
 import { formatLyd } from '../shared/format.js';
+import { BRAND, logoImg } from '../shared/brand.js';
 import { fetchSession, loginPosPin, logout } from '../shared/auth-client.js';
 import { createCartState } from './cart-state.js';
 import { createDashboard, renderDashboard } from './dashboard.js';
@@ -20,16 +21,16 @@ import { printReceipt } from './receipt.js';
 import { pinGateHtml, bindPinGate } from './pin-gate.js';
 
 const CATEGORY_COLORS = {
-  Candles: '#f59e0b',
-  Diffusers: '#10b981',
-  Incense: '#8b5cf6',
-  Sprays: '#06b6d4',
-  Sets: '#ef4444',
-  Bakhoor: '#d97706',
-  Accessories: '#64748b',
-  Oils: '#eab308',
-  General: '#3b82f6',
-  'Gift Sets': '#ef4444',
+  Candles: '#c9a84c',
+  Diffusers: '#8a6238',
+  Incense: '#a8842f',
+  Sprays: '#b89a5a',
+  Sets: '#d4b65e',
+  Bakhoor: '#8f6b3a',
+  Accessories: '#9a9286',
+  Oils: '#c9a84c',
+  General: '#c9a84c',
+  'Gift Sets': '#d4b65e',
 };
 
 /**
@@ -37,8 +38,8 @@ const CATEGORY_COLORS = {
  */
 export async function mount(root) {
   root.className = 'pos';
-  document.body.style.background = '#f3f4f6';
-  document.documentElement.style.colorScheme = 'light';
+  document.body.style.background = '#16130f';
+  document.documentElement.style.colorScheme = 'dark';
 
   const session = await fetchSession('pos');
   if (session.authenticated && session.user) {
@@ -508,7 +509,10 @@ function buildShell(categories, staff) {
   return `
     <header class="pos__topbar">
       <div class="pos__topbar-left">
-        <span class="pos__brand">Shamaadan</span>
+        <div class="pos__brand-lockup">
+          ${logoImg({ className: 'pos__brand-logo', size: 'mark', alt: BRAND.name, loading: 'eager' })}
+          <span class="pos__brand">${escapeHtml(BRAND.name)}</span>
+        </div>
         <span class="pos__register">Register #1</span>
         <span class="pos__staff" data-staff-name>${escapeHtml(staffName)}</span>
       </div>
@@ -522,9 +526,17 @@ function buildShell(categories, staff) {
           Scan
         </button>
         <button type="button" class="pos__icon-btn" data-open-tickets aria-label="Open tickets">
-          🎫<span class="pos__badge" data-open-tickets-count hidden>0</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4V8z"/>
+            <path d="M9 8v8M15 8v8"/>
+          </svg>
+          <span class="pos__badge" data-open-tickets-count hidden>0</span>
         </button>
-        <button type="button" class="pos__icon-btn" data-toggle-metrics aria-label="Toggle sales metrics">📊</button>
+        <button type="button" class="pos__icon-btn" data-toggle-metrics aria-label="Toggle sales metrics">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M4 19V5M10 19V9M16 19v-6M22 19H2"/>
+          </svg>
+        </button>
         <button type="button" class="pos__lock-btn" data-pos-lock>Lock</button>
       </div>
     </header>
@@ -537,7 +549,12 @@ function buildShell(categories, staff) {
               <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>
             </svg>
             <input type="search" class="pos__search" placeholder="Search or scan barcode…" data-search aria-label="Search products">
-            <button type="button" class="pos__search-scan" data-open-scanner aria-label="Open camera scanner">📷</button>
+            <button type="button" class="pos__search-scan" data-open-scanner aria-label="Open camera scanner">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3"/>
+                <path d="M7 12h10"/>
+              </svg>
+            </button>
           </div>
           <div class="pos__categories" data-categories role="tablist" aria-label="Categories">
             ${categories.map((cat, i) => `
@@ -554,7 +571,7 @@ function buildShell(categories, staff) {
             <h2>Ticket</h2>
             <p class="pos__ticket-count" data-item-count>Empty</p>
           </div>
-          <button type="button" class="pos__ticket-clear" data-clear-ticket>Clear all</button>
+          <button type="button" class="pos__ticket-clear" data-clear-ticket>Clear</button>
         </div>
         <div class="pos__line-items" data-line-items></div>
         <footer class="pos__ticket-footer">
@@ -567,8 +584,8 @@ function buildShell(categories, staff) {
             <span data-grand-total>${formatLyd(0)}</span>
           </div>
           <div class="pos__ticket-actions">
-            <button type="button" class="pos__park-btn" data-park-ticket disabled>Park ticket</button>
-            <button type="button" class="pos__checkout-btn" data-checkout disabled>CHARGE</button>
+            <button type="button" class="pos__park-btn" data-park-ticket disabled>Park</button>
+            <button type="button" class="pos__checkout-btn" data-checkout disabled>Charge</button>
           </div>
           <p class="pos__checkout-hint">Park keeps the ticket open for Admin · Charge completes the sale</p>
         </footer>
@@ -613,7 +630,7 @@ function showSaleComplete(root, sale, toastEl) {
       <p class="pos-sale-modal__meta">${sale.units} item${sale.units === 1 ? '' : 's'} · ${escapeHtml(sale.receiptNo || '')}</p>
       <div class="pos-sale-modal__actions">
         <button type="button" class="pos-sale-modal__print" data-print-receipt="${payload}">
-          🖨 Print receipt
+          Print receipt
         </button>
         <button type="button" class="pos-sale-modal__skip" data-skip-receipt>Continue without printing</button>
       </div>
@@ -651,6 +668,12 @@ function productCardHtml(product) {
     product.stock <= 0 ? 'pos-card--out-of-stock' : product.stock <= 5 ? 'pos-card--low-stock' : '';
   const color = CATEGORY_COLORS[product.category] || CATEGORY_COLORS.General;
   const initial = escapeHtml(product.name.charAt(0).toUpperCase());
+  const thumb = product.image
+    ? `<img class="pos-card__img" src="${escapeAttr(product.image)}" alt="" loading="lazy" decoding="async">`
+    : `<span class="pos-card__thumb-fallback">${initial}</span>`;
+  const stockBadge = product.stock > 0 && product.stock <= 5
+    ? `<span class="pos-card__stock">${product.stock} left</span>`
+    : '';
 
   return `
     <button
@@ -661,7 +684,8 @@ function productCardHtml(product) {
       aria-label="${escapeAttr(product.name)}, ${formatLyd(product.price)}"
     >
       <div class="pos-card__thumb" style="--thumb-color:${color}" aria-hidden="true">
-        <span>${initial}</span>
+        ${thumb}
+        ${stockBadge}
       </div>
       <div class="pos-card__info">
         <p class="pos-card__name">${escapeHtml(product.name)}</p>
@@ -675,7 +699,8 @@ function renderLineItems(container, items) {
   if (!items.length) {
     container.innerHTML = `
       <div class="pos__empty-ticket">
-        <p class="pos__empty-ticket-title">No items yet</p>
+        <span class="pos__empty-ticket-mark" aria-hidden="true">S</span>
+        <p class="pos__empty-ticket-title">Ready for the next guest</p>
         <p>Tap a product or scan a barcode</p>
       </div>
     `;

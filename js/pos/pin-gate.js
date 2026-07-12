@@ -1,6 +1,7 @@
 /**
  * POS PIN gate — on-screen numeric keypad for staff login.
  */
+import { BRAND, logoImg } from '../shared/brand.js';
 
 /**
  * @param {{ error?: string, busy?: boolean }} [opts]
@@ -12,8 +13,8 @@ export function pinGateHtml(opts = {}) {
     <div class="pos-pin" data-pos-pin-gate>
       <div class="pos-pin__card">
         <div class="pos-pin__brand">
-          <span class="pos-pin__mark" aria-hidden="true">◈</span>
-          <h1>Shamaadan POS</h1>
+          ${logoImg({ className: 'pos-pin__logo', size: 'ritual', alt: BRAND.name, loading: 'eager' })}
+          <h1>${escapeHtml(BRAND.name)}</h1>
           <p>Enter your staff PIN to open the register</p>
         </div>
 
