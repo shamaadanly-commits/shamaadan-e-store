@@ -590,7 +590,7 @@ export async function logInventoryTransaction(tx) {
 
 /**
  * Create a sale: orders → order_items → inventory_transactions (stock via trigger).
- * Pass status: 'open' to park a ticket without deducting inventory.
+ * Pass status: 'open' | 'parked' to park a ticket (still reserves stock).
  * @param {{
  *   source?: string,
  *   status?: string,
@@ -679,21 +679,13 @@ export async function createOrder(orderData, itemsArray) {
     throw new Error(`Order items failed: ${itemsError.message}`);
   }
 
-  // 3) Inventory only for completed sales
-  if (isOpen) {
-    return {
-      order,
-      items: insertedItems ?? [],
-      inventory: [],
-    };
-  }
-
+  // 3) Inventory: completed sales AND parked tickets both reserve stock
   const inventoryRows = items.map((item) => ({
     product_id: item.product_id,
     quantity_changed: -Math.abs(Number(item.quantity)),
-    type: 'sale',
+    type: isOpen ? 'park' : 'sale',
     source: orderData?.source || 'pos',
-    notes: `Order ${order.id}`,
+    notes: isOpen ? `Parked ticket ${order.id}` : `Order ${order.id}`,
   }));
 
   const { data: inventory, error: inventoryError } = await getSupabase()
@@ -703,7 +695,7 @@ export async function createOrder(orderData, itemsArray) {
 
   if (inventoryError) {
     throw new Error(
-      `Sale saved but inventory log failed: ${inventoryError.message}. Check stock manually for order ${order.id}.`,
+      `Order saved but inventory log failed: ${inventoryError.message}. Check stock manually for order ${order.id}.`,
     );
   }
 
@@ -715,7 +707,7 @@ export async function createOrder(orderData, itemsArray) {
 }
 
 /**
- * Park the current POS ticket as an open order (no stock deduction).
+ * Park the current POS ticket as an open order (reserves / deducts stock).
  * @param {{
  *   staff_user_id?: string,
  *   staff_name?: string,
@@ -732,7 +724,7 @@ export async function createOrder(orderData, itemsArray) {
 export async function saveOpenTicket(meta, items) {
   return createOrder({
     source: 'pos',
-    status: 'open',
+    status: 'parked',
     staff_user_id: meta?.staff_user_id,
     staff_name: meta?.staff_name,
     ticket_label: meta?.ticket_label || meta?.customer_name,
@@ -788,7 +780,8 @@ export async function getOpenTicket(orderId) {
 }
 
 /**
- * Charge a parked ticket: mark completed + write inventory transactions.
+ * Charge a parked ticket: mark completed.
+ * Stock was already reserved when the ticket was parked — do not deduct again.
  * @param {string} orderId
  */
 export async function completeOpenTicket(orderId) {
@@ -814,35 +807,38 @@ export async function completeOpenTicket(orderId) {
 
   if (updateError) throw new Error(updateError.message);
 
-  const inventoryRows = items.map((item) => ({
-    product_id: item.product_id,
-    quantity_changed: -Math.abs(Number(item.quantity)),
-    type: 'sale',
-    source: 'pos',
-    notes: `Completed open ticket ${ticket.id}`,
-  }));
-
-  const { data: inventory, error: inventoryError } = await getSupabase()
-    .from('inventory_transactions')
-    .insert(inventoryRows)
-    .select('*');
-
-  if (inventoryError) {
-    throw new Error(
-      `Ticket completed but inventory log failed: ${inventoryError.message}`,
-    );
-  }
-
-  return { order, items, inventory: inventory ?? [] };
+  return { order, items, inventory: [] };
 }
 
 /**
- * Cancel / void an open ticket (no inventory impact).
+ * Cancel / void an open ticket and restore reserved inventory.
  * @param {string} orderId
  */
 export async function cancelOpenTicket(orderId) {
-  const id = String(orderId || '').trim();
-  if (!id) throw new Error('Order id is required');
+  const ticket = await getOpenTicket(orderId);
+  if (ticket.status !== 'open' && ticket.status !== 'parked') {
+    throw new Error('This ticket is not open.');
+  }
+
+  const items = (ticket.order_items || []).filter((item) => item.product_id && Number(item.quantity) > 0);
+
+  if (items.length) {
+    const restoreRows = items.map((item) => ({
+      product_id: item.product_id,
+      quantity_changed: Math.abs(Number(item.quantity)),
+      type: 'park_void',
+      source: 'pos',
+      notes: `Voided parked ticket ${ticket.id}`,
+    }));
+
+    const { error: inventoryError } = await getSupabase()
+      .from('inventory_transactions')
+      .insert(restoreRows);
+
+    if (inventoryError) {
+      throw new Error(`Could not restore stock: ${inventoryError.message}`);
+    }
+  }
 
   const now = new Date().toISOString();
   const { data, error } = await getSupabase()
@@ -851,7 +847,7 @@ export async function cancelOpenTicket(orderId) {
       status: 'cancelled',
       updated_at: now,
     })
-    .eq('id', id)
+    .eq('id', ticket.id)
     .in('status', ['open', 'parked'])
     .select('*')
     .single();

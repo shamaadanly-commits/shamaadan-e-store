@@ -8,6 +8,7 @@ import {
   saveOpenTicket,
   getOpenTickets,
   cancelOpenTicket,
+  completeOpenTicket,
   isSupabaseConfigured,
 } from '../../shared/supabase.js';
 import { getSharedDashboardState, toPosCatalogRow } from '../dashboard.js';
@@ -19,6 +20,7 @@ import { createDashboard, renderDashboard } from './dashboard.js';
 import { createBarcodeScanner } from './scanner.js';
 import { printReceipt } from './receipt.js';
 import { pinGateHtml, bindPinGate } from './pin-gate.js';
+import { ticketsPageHtml, ticketsListHtml } from './tickets-page.js';
 
 const CATEGORY_COLORS = {
   Candles: '#c9a84c',
@@ -126,10 +128,43 @@ async function mountRegister(root, staff) {
     dashboard: root.querySelector('[data-dashboard]'),
     toast: root.querySelector('[data-pos-toast]'),
     staffLabel: root.querySelector('[data-staff-name]'),
+    registerView: root.querySelector('[data-register-view]'),
+    ticketsView: root.querySelector('[data-tickets-view]'),
   };
 
   let searchQuery = '';
   let activeCategory = 'All';
+  /** @type {'register' | 'tickets'} */
+  let activeView = 'register';
+
+  async function fetchLiveCatalogRows() {
+    if (!supabase) return [];
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_active', true);
+      if (error || !data?.length) return [];
+      return data.map((row) => toPosCatalogRow({
+        id: row.id,
+        barcode: row.barcode ?? row.sku,
+        title: row.name,
+        collectionName: row.category ?? 'General',
+        category: row.category ?? 'General',
+        retailPrice: Number(row.retail_price ?? row.price ?? 0),
+        costPrice: Number(row.wholesale_cost ?? row.cost ?? 0),
+        stockQuantity: Number(row.stock_quantity ?? row.stock ?? 0),
+        imageUrls: row.image_urls ?? (row.image_url ? [row.image_url] : []),
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  async function syncCartStockFromServer() {
+    const rows = await fetchLiveCatalogRows();
+    if (rows.length) cart.syncCatalogStock(rows);
+  }
 
   const scanner = createBarcodeScanner({
     root,
@@ -296,10 +331,12 @@ async function mountRegister(root, staff) {
         }, ticketItemsPayload(snapshot.items));
 
         modal.remove();
-        cart.clear();
+        cart.clear({ restoreStock: false });
         activeOpenTicketId = null;
-        showToast(els.toast, `Parked for ${customerName}`);
+        await syncCartStockFromServer();
+        showToast(els.toast, `Parked for ${customerName} · stock reserved`);
         await refreshOpenTicketBadge();
+        await showTicketsPage();
       } catch (err) {
         console.error('[pos] park ticket failed:', err);
         if (errorEl) {
@@ -316,13 +353,11 @@ async function mountRegister(root, staff) {
     });
   }
 
-  async function showOpenTicketsPanel() {
+  async function showTicketsPage() {
     if (!isSupabaseConfigured()) {
       showToast(els.toast, 'Supabase not configured');
       return;
     }
-
-    root.querySelector('[data-open-tickets-modal]')?.remove();
 
     let tickets = [];
     try {
@@ -332,51 +367,39 @@ async function mountRegister(root, staff) {
       return;
     }
 
-    const modal = document.createElement('div');
-    modal.className = 'pos-sale-modal';
-    modal.dataset.openTicketsModal = '';
-    modal.innerHTML = `
-      <div class="pos-sale-modal__backdrop" data-open-tickets-backdrop></div>
-      <div class="pos-sale-modal__card pos-open-tickets" role="dialog" aria-modal="true" aria-labelledby="pos-open-title">
-        <p class="pos-sale-modal__badge">Open tickets</p>
-        <h2 id="pos-open-title">${tickets.length} parked</h2>
-        <div class="pos-open-tickets__list">
-          ${tickets.length ? tickets.map((t) => {
-            const lines = t.order_items || [];
-            const qty = lines.reduce((s, l) => s + Number(l.quantity || 0), 0);
-            const when = t.parked_at || t.created_at;
-            const total = Number(t.total_amount || 0);
-            const down = Number(t.downpayment || 0);
-            const balance = Math.max(0, total - down);
-            const title = t.customer_name || t.ticket_label || `Ticket ${String(t.id).slice(0, 8)}`;
-            return `
-              <article class="pos-open-tickets__item" data-ticket-id="${escapeAttr(t.id)}">
-                <div>
-                  <p class="pos-open-tickets__label">${escapeHtml(title)}</p>
-                  <p class="pos-open-tickets__meta">
-                    ${t.customer_phone ? `${escapeHtml(t.customer_phone)} · ` : ''}
-                    ${t.customer_location ? `${escapeHtml(t.customer_location)} · ` : ''}
-                    ${qty} item${qty === 1 ? '' : 's'}
-                  </p>
-                  <p class="pos-open-tickets__meta">
-                    Total ${formatLyd(total)}
-                    · Paid ${formatLyd(down)}
-                    · Due ${formatLyd(balance)}
-                  </p>
-                  <p class="pos-open-tickets__time">${when ? new Date(when).toLocaleString() : ''} · ${escapeHtml(t.staff_name || 'Staff')}</p>
-                </div>
-                <div class="pos-open-tickets__actions">
-                  <button type="button" class="pos-open-tickets__resume" data-resume-ticket="${escapeAttr(t.id)}">Resume</button>
-                  <button type="button" class="pos-open-tickets__void" data-void-ticket="${escapeAttr(t.id)}">Void</button>
-                </div>
-              </article>
-            `;
-          }).join('') : '<p class="pos-open-tickets__empty">No open tickets</p>'}
-        </div>
-        <button type="button" class="pos-sale-modal__skip" data-close-open-tickets>Close</button>
-      </div>
-    `;
-    root.appendChild(modal);
+    activeView = 'tickets';
+    if (els.registerView) els.registerView.hidden = true;
+    if (els.ticketsView) {
+      els.ticketsView.hidden = false;
+      els.ticketsView.innerHTML = ticketsPageHtml(tickets);
+    }
+    root.classList.add('pos--tickets');
+    await refreshOpenTicketBadge();
+  }
+
+  async function showRegisterView() {
+    activeView = 'register';
+    if (els.ticketsView) {
+      els.ticketsView.hidden = true;
+      els.ticketsView.innerHTML = '';
+    }
+    if (els.registerView) els.registerView.hidden = false;
+    root.classList.remove('pos--tickets');
+  }
+
+  async function refreshTicketsList() {
+    if (!els.ticketsView || activeView !== 'tickets') return;
+    const list = els.ticketsView.querySelector('[data-tickets-list]');
+    if (!list) return;
+    try {
+      const tickets = await getOpenTickets();
+      list.innerHTML = ticketsListHtml(tickets);
+      const subtitle = els.ticketsView.querySelector('.pos-tickets__subtitle');
+      if (subtitle) subtitle.textContent = `${tickets.length} open · stock already reserved`;
+      await refreshOpenTicketBadge();
+    } catch (err) {
+      window.alert(err?.message || 'Could not refresh tickets.');
+    }
   }
 
   async function resumeTicket(orderId) {
@@ -384,6 +407,10 @@ async function mountRegister(root, staff) {
       const tickets = await getOpenTickets();
       const ticket = tickets.find((t) => t.id === orderId);
       if (!ticket) throw new Error('Ticket not found.');
+
+      // Void restores DB stock, then load onto register for editing / re-charge
+      await cancelOpenTicket(orderId);
+      await syncCartStockFromServer();
 
       const mapped = (ticket.order_items || []).map((line) => ({
         productId: line.product_id,
@@ -394,23 +421,77 @@ async function mountRegister(root, staff) {
       }));
 
       const result = cart.loadTicketLines(mapped);
-      activeOpenTicketId = orderId;
-
-      // Remove the parked row so we don't duplicate if they park again
-      await cancelOpenTicket(orderId);
       activeOpenTicketId = null;
 
-      root.querySelector('[data-open-tickets-modal]')?.remove();
+      await showRegisterView();
       showToast(
         els.toast,
         result.missing?.length
           ? `Resumed (skipped: ${result.missing.join(', ')})`
-          : 'Ticket resumed',
+          : 'Ticket resumed on register',
       );
       await refreshOpenTicketBadge();
     } catch (err) {
       console.error('[pos] resume ticket failed:', err);
       window.alert(err?.message || 'Failed to resume ticket.');
+    }
+  }
+
+  async function chargeParkedTicket(orderId) {
+    try {
+      const ticket = (await getOpenTickets()).find((t) => t.id === orderId);
+      if (!ticket) throw new Error('Ticket not found.');
+
+      const total = Number(ticket.total_amount || 0);
+      const down = Number(ticket.downpayment || 0);
+      const balance = Math.max(0, total - down);
+      const name = ticket.customer_name || ticket.ticket_label || 'customer';
+
+      if (!confirm(`Charge remaining ${formatLyd(balance)} for ${name}?`)) return;
+
+      const result = await completeOpenTicket(orderId);
+      await syncCartStockFromServer();
+
+      const lines = (ticket.order_items || []).map((line) => ({
+        productId: line.product_id,
+        title: line.product_name || 'Item',
+        quantity: Number(line.quantity || 0),
+        unitPrice: Number(line.unit_price || 0),
+        unit_cost_at_sale: Number(line.wholesale_cost || 0),
+      }));
+      const units = lines.reduce((s, l) => s + l.quantity, 0);
+      const cost = lines.reduce((s, l) => s + l.unit_cost_at_sale * l.quantity, 0);
+
+      centralState.recordPosSale({
+        revenue: total,
+        cost,
+        profit: total - cost,
+        units,
+        lines,
+        staffUserId: staff.id,
+        staffName: staff.displayName || staff.username,
+      });
+      dashboard.refresh();
+
+      showSaleComplete(root, {
+        revenue: total,
+        cost,
+        profit: total - cost,
+        units,
+        lines,
+        receiptNo: `R${Date.now().toString(36).toUpperCase()}`,
+        register: 'Register #1',
+        cashier: staff.displayName || staff.username,
+        staffUserId: staff.id,
+        paidAt: new Date(),
+      }, els.toast);
+
+      await refreshTicketsList();
+      showToast(els.toast, `Charged ${name} · ${formatLyd(balance)} collected`);
+      return result;
+    } catch (err) {
+      console.error('[pos] charge parked ticket failed:', err);
+      window.alert(err?.message || 'Failed to charge ticket.');
     }
   }
 
@@ -501,12 +582,28 @@ async function mountRegister(root, staff) {
     }
 
     if (target.matches('[data-open-tickets]')) {
-      await showOpenTicketsPanel();
+      await showTicketsPage();
+      return;
+    }
+
+    if (target.matches('[data-tickets-back]')) {
+      await showRegisterView();
+      return;
+    }
+
+    if (target.matches('[data-tickets-refresh]')) {
+      await refreshTicketsList();
       return;
     }
 
     if (target.matches('[data-close-open-tickets]') || target.matches('[data-open-tickets-backdrop]')) {
       root.querySelector('[data-open-tickets-modal]')?.remove();
+      return;
+    }
+
+    const chargeParkedBtn = target.closest('[data-charge-ticket]');
+    if (chargeParkedBtn) {
+      await chargeParkedTicket(chargeParkedBtn.dataset.chargeTicket);
       return;
     }
 
@@ -518,13 +615,15 @@ async function mountRegister(root, staff) {
 
     const voidBtn = target.closest('[data-void-ticket]');
     if (voidBtn) {
-      if (!confirm('Void this open ticket?')) return;
+      if (!confirm('Void this parked ticket and restore stock to inventory?')) return;
       try {
         await cancelOpenTicket(voidBtn.dataset.voidTicket);
-        showToast(els.toast, 'Ticket voided');
+        await syncCartStockFromServer();
+        showToast(els.toast, 'Ticket voided · stock restored');
         root.querySelector('[data-open-tickets-modal]')?.remove();
         await refreshOpenTicketBadge();
-        await showOpenTicketsPanel();
+        if (activeView === 'tickets') await refreshTicketsList();
+        else await showTicketsPage();
       } catch (err) {
         window.alert(err?.message || 'Failed to void ticket.');
       }
@@ -665,7 +764,7 @@ function buildShell(categories, staff) {
       </div>
     </header>
 
-    <div class="pos__workspace">
+    <div class="pos__workspace" data-register-view>
       <section class="pos__catalog" aria-label="Product catalog">
         <div class="pos__catalog-toolbar">
           <div class="pos__search-wrap">
@@ -711,10 +810,12 @@ function buildShell(categories, staff) {
             <button type="button" class="pos__park-btn" data-park-ticket disabled>Park</button>
             <button type="button" class="pos__checkout-btn" data-checkout disabled>Charge</button>
           </div>
-          <p class="pos__checkout-hint">Park keeps the ticket open for Admin · Charge completes the sale</p>
+          <p class="pos__checkout-hint">Park reserves stock for the customer · Charge completes the sale</p>
         </footer>
       </aside>
     </div>
+
+    <div class="pos__tickets-host" data-tickets-view hidden></div>
 
     <section class="pos__dashboard" data-dashboard aria-label="Sales metrics" hidden></section>
     <div class="pos__toast" data-pos-toast hidden></div>

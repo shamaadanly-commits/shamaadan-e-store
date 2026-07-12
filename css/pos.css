@@ -464,6 +464,23 @@
   grid-template-columns: 1fr var(--pos-ticket-w);
   min-height: 0;
   overflow: hidden;
+  grid-row: 2;
+  grid-column: 1;
+}
+
+.pos__tickets-host {
+  grid-row: 2;
+  grid-column: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pos__tickets-host[hidden] {
+  display: none !important;
+}
+
+.pos__workspace[hidden] {
+  display: none !important;
 }
 
 /* ── Catalog (left) ──────────────────────────────────────────────── */
@@ -1124,6 +1141,201 @@
   max-width: 28rem;
   width: min(92vw, 28rem);
   text-align: start;
+}
+
+/* ── Dedicated parked tickets page ───────────────────────────────── */
+.pos-tickets {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  padding: 1.15rem 1.25rem 2rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pos-tickets__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.pos-tickets__back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  margin-bottom: 0.55rem;
+  padding: 0 0.75rem;
+  border-radius: var(--pos-radius-sm);
+  border: 1px solid var(--pos-border-strong);
+  background: var(--pos-surface);
+  color: var(--pos-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pos-tickets__back:active {
+  color: var(--pos-text);
+  border-color: var(--pos-gold);
+}
+
+.pos-tickets__title {
+  margin: 0;
+  font-family: var(--pos-display);
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  font-weight: 400;
+  color: var(--pos-text);
+}
+
+.pos-tickets__subtitle {
+  margin: 0.35rem 0 0;
+  color: var(--pos-muted);
+  font-size: 0.88rem;
+}
+
+.pos-tickets__refresh {
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border-radius: var(--pos-radius-sm);
+  border: 1px solid var(--pos-border-strong);
+  background: transparent;
+  color: var(--pos-gold);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.pos-tickets__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+}
+
+.pos-tickets__card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.15rem;
+  border: 1px solid var(--pos-border);
+  border-radius: var(--pos-radius);
+  background:
+    linear-gradient(165deg, rgb(255 255 255 / 3%) 0%, transparent 40%),
+    var(--pos-surface);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 22%);
+  animation: pos-card-in 360ms var(--pos-ease) both;
+}
+
+.pos-tickets__card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.pos-tickets__name {
+  margin: 0;
+  font-family: var(--pos-display);
+  font-size: 1.35rem;
+  font-weight: 400;
+}
+
+.pos-tickets__due {
+  flex-shrink: 0;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: var(--pos-gold-soft);
+  color: var(--pos-gold);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.pos-tickets__meta,
+.pos-tickets__money,
+.pos-tickets__time {
+  margin: 0.4rem 0 0;
+  color: var(--pos-muted);
+  font-size: 0.82rem;
+}
+
+.pos-tickets__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+}
+
+.pos-tickets__money {
+  color: var(--pos-text);
+  font-weight: 650;
+}
+
+.pos-tickets__lines {
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0 0;
+  border-top: 1px solid var(--pos-border);
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.pos-tickets__lines li {
+  font-size: 0.82rem;
+  color: var(--pos-muted);
+}
+
+.pos-tickets__card-actions {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: auto;
+}
+
+.pos-tickets__charge,
+.pos-tickets__resume,
+.pos-tickets__void {
+  min-height: 2.75rem;
+  border-radius: var(--pos-radius-sm);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.pos-tickets__charge {
+  background: linear-gradient(135deg, var(--pos-gold) 0%, var(--pos-copper) 100%);
+  color: #16130f;
+}
+
+.pos-tickets__resume {
+  background: var(--pos-bg-elevated);
+  border: 1px solid var(--pos-border-strong) !important;
+  color: var(--pos-text);
+}
+
+.pos-tickets__void {
+  background: transparent;
+  border: 1px solid rgb(196 92 74 / 35%) !important;
+  color: var(--pos-danger);
+}
+
+.pos-tickets__empty {
+  grid-column: 1 / -1;
+  padding: 4rem 1.5rem;
+  text-align: center;
+  color: var(--pos-muted);
+  border: 1px dashed var(--pos-border-strong);
+  border-radius: var(--pos-radius);
+  background: rgb(255 255 255 / 2%);
+}
+
+.pos-tickets__empty-title {
+  margin: 0 0 0.4rem;
+  font-family: var(--pos-display);
+  font-size: 1.4rem;
+  color: var(--pos-text);
 }
 
 .pos-park-form {

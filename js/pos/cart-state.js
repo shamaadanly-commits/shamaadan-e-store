@@ -106,12 +106,29 @@ export function createCartState(initialCatalog) {
     notify();
   }
 
-  function clear() {
-    for (const line of lines.values()) {
-      const product = inventory.get(line.productId);
-      if (product) product.stock += line.quantity;
+  function clear(opts = {}) {
+    const restoreStock = opts.restoreStock !== false;
+    if (restoreStock) {
+      for (const line of lines.values()) {
+        const product = inventory.get(line.productId);
+        if (product) product.stock += line.quantity;
+      }
     }
     lines.clear();
+    notify();
+  }
+
+  /**
+   * Sync local catalog stock from server rows (after park / void / charge).
+   * @param {Array<{ id: string, stock?: number, stockQuantity?: number }>} rows
+   */
+  function syncCatalogStock(rows) {
+    for (const row of rows || []) {
+      const product = inventory.get(row.id);
+      if (!product) continue;
+      const next = Number(row.stockQuantity ?? row.stock);
+      if (Number.isFinite(next)) product.stock = Math.max(0, next);
+    }
     notify();
   }
 
@@ -223,6 +240,7 @@ export function createCartState(initialCatalog) {
     findByBarcode,
     adjustQuantity,
     clear,
+    syncCatalogStock,
     checkout,
     loadTicketLines,
     getLines,
