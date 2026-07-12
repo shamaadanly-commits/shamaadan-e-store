@@ -422,29 +422,42 @@ export async function upsertProductRow(product) {
   const id = isLiveDbId(product.id) ? String(product.id).trim() : '';
 
   if (id) {
-    const { data, error } = await supabase
+    let updated = null;
+    const primary = await supabase
       .from('products')
       .update({ ...row, ...optional })
       .eq('id', id)
       .select('*')
-      .single();
+      .maybeSingle();
 
-    if (error) {
+    if (primary.error) {
       // Retry without optional columns if schema differs
-      console.warn('[shared/supabase] product update with taxonomy failed, retrying core fields:', error.message);
-      const { data: retry, error: retryError } = await supabase
+      console.warn('[shared/supabase] product update with taxonomy failed, retrying core fields:', primary.error.message);
+      const retry = await supabase
         .from('products')
         .update(row)
         .eq('id', id)
         .select('*')
-        .single();
-      if (retryError) {
-        console.error('[shared/supabase] upsertProductRow update failed:', retryError);
-        throw new Error(retryError.message);
+        .maybeSingle();
+      if (retry.error) {
+        console.error('[shared/supabase] upsertProductRow update failed:', retry.error);
+        throw new Error(retry.error.message);
       }
-      return retry;
+      updated = retry.data;
+    } else {
+      updated = primary.data;
     }
-    return data;
+
+    // maybeSingle() returns null when the UPDATE matched 0 rows — almost always
+    // a row-level security policy blocking UPDATE on public.products.
+    if (!updated) {
+      throw new Error(
+        'Could not save product changes: the row was not updated. This is usually a '
+          + 'row-level security (RLS) policy that allows INSERT but not UPDATE on '
+          + 'public.products. Run sql/catalog_rls.sql in the Supabase SQL Editor, then try again.',
+      );
+    }
+    return updated;
   }
 
   const { data, error } = await supabase

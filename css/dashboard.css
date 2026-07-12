@@ -587,6 +587,45 @@
   color: var(--dash-text-muted);
 }
 
+.dash-barcode-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.dash-barcode-row input {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.dash-barcode-row .dash-btn {
+  flex: 0 0 auto;
+}
+
+.dash-barcode-preview {
+  margin-top: 0.6rem;
+}
+
+.dash-barcode-preview svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  padding: 6px 8px;
+  background: #fff;
+  border: 1px solid var(--dash-border-soft);
+  border-radius: var(--dash-radius-sm);
+}
+
+.dash-barcode-preview:empty {
+  margin-top: 0;
+}
+
+.dash-barcode-error {
+  font-size: 0.75rem;
+  color: rgb(196 92 92);
+}
+
 .dash-table__actions {
   display: flex;
   gap: 0.35rem;

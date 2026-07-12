@@ -23,6 +23,11 @@ import {
   cancelOpenTicket,
 } from '../../shared/supabase.js';
 import {
+  generateBarcodeValue,
+  renderBarcodeInto,
+  printBarcodeLabels,
+} from '../shared/barcode.js';
+import {
   buildAdminShell,
   ledgerMatrixHtml,
   inventoryTableHtml,
@@ -195,8 +200,46 @@ export async function mount(root) {
     renderCatalog(state.getSnapshot());
   });
 
+  root.addEventListener('input', (event) => {
+    if (event.target.matches('[data-barcode-input]')) {
+      updateBarcodePreview(event.target.closest('form'));
+    }
+  });
+
   root.addEventListener('click', async (event) => {
     const target = event.target;
+
+    const generateBarcode = target.closest('[data-barcode-generate]');
+    if (generateBarcode) {
+      const form = generateBarcode.closest('form');
+      const input = form?.querySelector('[data-barcode-input]');
+      if (input) {
+        input.value = generateBarcodeValue();
+        updateBarcodePreview(form);
+      }
+      return;
+    }
+
+    const printBarcode = target.closest('[data-barcode-print]');
+    if (printBarcode) {
+      const form = printBarcode.closest('form');
+      const input = form?.querySelector('[data-barcode-input]');
+      const value = String(input?.value ?? '').trim();
+      if (!value) {
+        window.alert('Enter or generate a barcode first.');
+        return;
+      }
+      try {
+        printBarcodeLabels({
+          value,
+          title: form?.querySelector('[name="title"]')?.value || '',
+          price: form?.querySelector('[name="retailPrice"]')?.value || '',
+        });
+      } catch (err) {
+        window.alert(err?.message || 'Could not open the print dialog.');
+      }
+      return;
+    }
 
     if (target.matches('[data-logout]')) {
       await logout('admin');
@@ -568,6 +611,23 @@ export async function mount(root) {
    * @param {HTMLElement} [scope]
    * @param {{ collectionId?: string, categoryId?: string }} [selected]
    */
+  function updateBarcodePreview(form) {
+    if (!form) return;
+    const input = form.querySelector('[data-barcode-input]');
+    const host = form.querySelector('[data-barcode-preview]');
+    if (!host) return;
+    const value = String(input?.value ?? '').trim();
+    if (!value) {
+      host.innerHTML = '';
+      return;
+    }
+    try {
+      renderBarcodeInto(host, value);
+    } catch (err) {
+      host.innerHTML = `<span class="dash-barcode-error">${escapeHtml(err?.message || 'Invalid barcode')}</span>`;
+    }
+  }
+
   function populateFormDropdowns(collections, categories, scope = root, selected = {}) {
     const liveCollections = (collections || []).filter((c) => isLiveDbId(c.id) && c.name);
     const liveCategories = (categories || []).filter((c) => isLiveDbId(c.id) && c.name);
@@ -745,6 +805,7 @@ export async function mount(root) {
         collectionId: editing?.collection_id || '',
         categoryId: editing?.category_id || '',
       });
+      updateBarcodePreview(form);
     }
   }
 
@@ -767,6 +828,7 @@ export async function mount(root) {
         collectionId: editing?.collection_id || '',
         categoryId: editing?.category_id || '',
       });
+      updateBarcodePreview(form);
     }
   }
 

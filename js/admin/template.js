@@ -5,6 +5,29 @@ import { imageUploaderHtml } from './image-upload.js';
 import { stockStatusCellHtml } from '../shared/stock-status.js';
 
 /**
+ * Barcode field with manual Generate + Print controls and a live preview.
+ * The owner presses Generate to create a code (never automatic), then Print
+ * to open the device print dialog.
+ * @param {string} inputId
+ * @param {string} barcode
+ * @param {string} [label]
+ */
+function barcodeFieldHtml(inputId, barcode = '', label = 'Barcode') {
+  return `
+    <div class="dash-field dash-field--full dash-barcode-field">
+      <label for="${inputId}">${label}</label>
+      <div class="dash-barcode-row">
+        <input id="${inputId}" name="barcode" type="text" required
+          value="${escapeAttr(barcode)}" placeholder="Scan, type, or generate"
+          data-barcode-input autocomplete="off">
+        <button type="button" class="dash-btn dash-btn--ghost" data-barcode-generate>Generate</button>
+        <button type="button" class="dash-btn dash-btn--ghost" data-barcode-print>Print</button>
+      </div>
+      <div class="dash-barcode-preview" data-barcode-preview aria-live="polite"></div>
+    </div>`;
+}
+
+/**
  * @param {{ online: object, pos: object }} ledgers
  * @param {Array} metrics
  */
@@ -245,10 +268,7 @@ export function catalogFormHtml(product = null, collections = [], categories = [
             ${taxonomySelectOptionsHtml(liveCategories, selectedCategoryId, 'Please create a Category first')}
           </select>
         </div>
-        <div class="dash-field">
-          <label for="cat-barcode">Barcode / SKU</label>
-          <input id="cat-barcode" name="barcode" type="text" required value="${escapeAttr(product?.barcode ?? '')}" placeholder="6281001001001">
-        </div>
+        ${barcodeFieldHtml('cat-barcode', product?.barcode ?? '', 'Barcode / SKU')}
         <div class="dash-field">
           <label for="cat-retail">Retail Price <span lang="ar">سعر البيع</span></label>
           <input id="cat-retail" name="retailPrice" type="number" min="0" step="0.01" required value="${product?.retailPrice ?? ''}" placeholder="48.00">
@@ -477,10 +497,7 @@ export function productFormHtml(product = null, collections = [], categories = [
           <label for="product-stock">Stock Quantity</label>
           <input id="product-stock" name="stockQuantity" type="number" min="0" step="1" required value="${product?.stockQuantity ?? ''}" placeholder="24">
         </div>
-        <div class="dash-field">
-          <label for="product-barcode">Barcode String</label>
-          <input id="product-barcode" name="barcode" type="text" required value="${escapeAttr(product?.barcode ?? '')}" placeholder="6281001001001">
-        </div>
+        ${barcodeFieldHtml('product-barcode', product?.barcode ?? '', 'Barcode String')}
       </div>
 
       ${imageUploaderHtml(product?.imageUrls ?? [], 'product-images')}
