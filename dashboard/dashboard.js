@@ -153,7 +153,11 @@ function renderProducts(rows) {
               <div class="muted">${escapeHtml(p.barcode || '—')}${p.is_active === false ? ' · inactive' : ''}</div>
             </td>
             <td>
-              <span class="stock ${stockClass(p)}">${Number(p.stock_quantity ?? 0)}</span>
+              <span class="stock ${stockClass(p)}">
+                ${Number(p.stock_quantity ?? 0) <= 0
+                  ? 'Out of stock'
+                  : Number(p.stock_quantity ?? 0)}
+              </span>
             </td>
             <td>
               <input class="input" type="number" min="0" step="0.01" data-cost

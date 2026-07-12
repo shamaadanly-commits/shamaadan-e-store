@@ -545,6 +545,40 @@
   font-weight: 700;
 }
 
+.dash-stock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.dash-stock small {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.dash-stock--ok {
+  color: var(--dash-text);
+}
+
+.dash-stock--low {
+  color: #d4a017;
+}
+
+.dash-stock--out {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgb(196 92 74 / 16%);
+  color: #e07a6a;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
 .dash-barcode {
   font-size: 0.75rem;
   padding: 0.15rem 0.4rem;

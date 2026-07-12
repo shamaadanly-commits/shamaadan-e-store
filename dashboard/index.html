@@ -150,14 +150,15 @@
       display: inline-block;
       min-width: 2rem;
       text-align: center;
-      padding: 0.15rem 0.45rem;
+      padding: 0.15rem 0.55rem;
       border-radius: 999px;
       font-weight: 700;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
+      white-space: nowrap;
     }
     .stock.is-ok { background: rgb(92 184 122 / 15%); color: var(--profit); }
     .stock.is-low { background: rgb(212 132 106 / 15%); color: var(--warn); }
-    .stock.is-out { background: rgb(196 92 92 / 15%); color: var(--danger); }
+    .stock.is-out { background: rgb(196 92 92 / 15%); color: var(--danger); text-transform: uppercase; letter-spacing: 0.03em; font-size: 0.72rem; }
     .actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
     .empty { padding: 2rem; text-align: center; color: var(--muted); }
     .visually-hidden {

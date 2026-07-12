@@ -661,9 +661,18 @@
 }
 
 .pos-card--out-of-stock {
-  opacity: 0.38;
   pointer-events: none;
-  filter: grayscale(0.35);
+  cursor: not-allowed;
+  filter: grayscale(0.45);
+}
+
+.pos-card--out-of-stock .pos-card__thumb {
+  opacity: 0.55;
+}
+
+.pos-card--out-of-stock .pos-card__name,
+.pos-card--out-of-stock .pos-card__price {
+  opacity: 0.7;
 }
 
 .pos-card__thumb {
@@ -712,6 +721,21 @@
   background: rgb(18 15 12 / 75%);
   color: var(--pos-gold);
   backdrop-filter: blur(6px);
+}
+
+.pos-card__stock--out {
+  background: rgb(196 92 74 / 92%);
+  color: #fff;
+  letter-spacing: 0.03em;
+}
+
+.pos-card__oos {
+  margin: 0.15rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pos-danger);
 }
 
 .pos-card__info {

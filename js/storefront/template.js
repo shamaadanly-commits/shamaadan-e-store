@@ -391,6 +391,7 @@ export function productCardHtml(product, i18n) {
       <div class="product-card__body">
         <p class="product-card__category">${escapeHtml(display.displayCategory)}</p>
         <h3 class="product-card__name">${escapeHtml(display.displayName)}</h3>
+        ${outOfStock ? `<p class="product-card__stock-note product-card__stock-note--oos">${t('shop.outOfStock')}</p>` : ''}
         ${lowStock && !outOfStock ? `<p class="product-card__stock-note">${stock === 1 ? t('shop.onlyOneLeft') : t('shop.lowStock', { count: stock })}</p>` : ''}
         <div class="product-card__footer">
           <span class="product-card__price" data-price="${product.price}">${i18n.formatPrice(product.price)}</span>

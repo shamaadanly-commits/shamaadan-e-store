@@ -2,6 +2,7 @@
  * Admin dashboard HTML templates — semantic panel blocks.
  */
 import { imageUploaderHtml } from './image-upload.js';
+import { stockStatusCellHtml } from '../shared/stock-status.js';
 
 /**
  * @param {{ online: object, pos: object }} ledgers
@@ -90,7 +91,7 @@ function catalogRowHtml(product) {
       <td><span class="dash-chip">${escapeHtml(product.collectionName)}</span></td>
       <td><span class="dash-chip dash-chip--muted">${escapeHtml(product.category || product.collectionName)}</span></td>
       <td class="dash-table__num">${formatNum(product.retailPrice)} LYD</td>
-      <td class="dash-table__num${product.stockQuantity <= 5 ? ' dash-table__num--low' : ''}">${product.stockQuantity}</td>
+      <td class="dash-table__num">${stockStatusCellHtml(product.stockQuantity, product.minStockAlert)}</td>
       <td><code class="dash-barcode">${escapeHtml(product.barcode)}</code></td>
       <td><span class="dash-status dash-status--live">Live</span></td>
       <td>
@@ -341,7 +342,7 @@ function inventoryRowHtml(product) {
       <td>${escapeHtml(product.collectionName)}</td>
       <td class="dash-table__num" data-field="cost">${formatNum(product.costPrice)}</td>
       <td class="dash-table__num" data-field="retail">${formatNum(product.retailPrice)}</td>
-      <td class="dash-table__num${product.stockQuantity <= 5 ? ' dash-table__num--low' : ''}" data-field="stock">${product.stockQuantity}</td>
+      <td class="dash-table__num" data-field="stock">${stockStatusCellHtml(product.stockQuantity, product.minStockAlert)}</td>
       <td><code class="dash-barcode">${escapeHtml(product.barcode)}</code></td>
       <td class="dash-table__num">${product.imageUrls.length}</td>
       <td>

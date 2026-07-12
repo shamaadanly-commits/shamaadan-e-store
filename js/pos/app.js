@@ -544,8 +544,13 @@ async function mountRegister(root, staff) {
 
     const productCard = target.closest('[data-pos-product]');
     if (productCard) {
+      if (productCard.disabled || productCard.classList.contains('pos-card--out-of-stock')) {
+        showToast(els.toast, 'Out of stock');
+        return;
+      }
       const added = cart.addItem(productCard.dataset.posProduct);
       if (added) showToast(els.toast, 'Added to ticket');
+      else showToast(els.toast, 'Out of stock');
       return;
     }
 
@@ -889,15 +894,25 @@ function renderProductGrid(container, catalog, query, category) {
 }
 
 function productCardHtml(product) {
-  const stockClass =
-    product.stock <= 0 ? 'pos-card--out-of-stock' : product.stock <= 5 ? 'pos-card--low-stock' : '';
+  const outOfStock = product.stock <= 0;
+  const lowStock = !outOfStock && product.stock <= 5;
+  const stockClass = outOfStock
+    ? 'pos-card--out-of-stock'
+    : lowStock
+      ? 'pos-card--low-stock'
+      : '';
   const color = CATEGORY_COLORS[product.category] || CATEGORY_COLORS.General;
   const initial = escapeHtml(product.name.charAt(0).toUpperCase());
   const thumb = product.image
     ? `<img class="pos-card__img" src="${escapeAttr(product.image)}" alt="" loading="lazy" decoding="async">`
     : `<span class="pos-card__thumb-fallback">${initial}</span>`;
-  const stockBadge = product.stock > 0 && product.stock <= 5
-    ? `<span class="pos-card__stock">${product.stock} left</span>`
+  const stockBadge = outOfStock
+    ? '<span class="pos-card__stock pos-card__stock--out">Out of stock</span>'
+    : lowStock
+      ? `<span class="pos-card__stock">${product.stock} left</span>`
+      : '';
+  const stockNote = outOfStock
+    ? '<p class="pos-card__oos">Out of stock</p>'
     : '';
 
   return `
@@ -906,7 +921,8 @@ function productCardHtml(product) {
       class="pos-card ${stockClass}"
       data-pos-product="${product.id}"
       role="listitem"
-      aria-label="${escapeAttr(product.name)}, ${formatLyd(product.price)}"
+      ${outOfStock ? 'disabled aria-disabled="true"' : ''}
+      aria-label="${escapeAttr(product.name)}, ${formatLyd(product.price)}${outOfStock ? ', out of stock' : ''}"
     >
       <div class="pos-card__thumb" style="--thumb-color:${color}" aria-hidden="true">
         ${thumb}
@@ -915,6 +931,7 @@ function productCardHtml(product) {
       <div class="pos-card__info">
         <p class="pos-card__name">${escapeHtml(product.name)}</p>
         <p class="pos-card__price">${formatLyd(product.price)}</p>
+        ${stockNote}
       </div>
     </button>
   `;

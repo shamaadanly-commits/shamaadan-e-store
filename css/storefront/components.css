@@ -412,6 +412,12 @@
   color: var(--color-gold);
 }
 
+.product-card__stock-note--oos {
+  color: #c45c4a;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .product-card__quick-add {
   position: absolute;
   bottom: 0.75rem;

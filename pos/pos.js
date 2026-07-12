@@ -118,13 +118,13 @@ function renderGrid() {
     const alertAt = Number(p.min_stock_alert ?? 5);
     const disabled = stock <= 0 ? 'disabled' : '';
     const stockLabel = stock <= 0
-      ? 'Out'
+      ? 'Out of stock'
       : stock <= alertAt
         ? `Low · ${stock}`
         : `${stock} left`;
 
     return `
-      <button type="button" class="product ${stock <= 0 ? 'is-out' : ''}" data-add="${escapeAttr(p.id)}" ${disabled}>
+      <button type="button" class="product ${stock <= 0 ? 'is-out' : ''}" data-add="${escapeAttr(p.id)}" ${disabled} aria-label="${escapeAttr(p.name || 'Untitled')}${stock <= 0 ? ', out of stock' : ''}">
         <span class="product__name">${escapeHtml(p.name || 'Untitled')}</span>
         <span class="product__price">${money(p.retail_price)}</span>
         <span class="product__stock">${stockLabel}</span>
