@@ -590,8 +590,17 @@ export async function logInventoryTransaction(tx) {
 
 /**
  * Create a sale: orders → order_items → inventory_transactions (stock via trigger).
- * @param {{ source?: string, status?: string, total_amount?: number, notes?: string }} orderData
- * @param {Array<{ product_id: string, quantity: number, unit_price: number, wholesale_cost?: number }>} itemsArray
+ * Pass status: 'open' to park a ticket without deducting inventory.
+ * @param {{
+ *   source?: string,
+ *   status?: string,
+ *   total_amount?: number,
+ *   notes?: string,
+ *   staff_user_id?: string,
+ *   staff_name?: string,
+ *   ticket_label?: string,
+ * }} orderData
+ * @param {Array<{ product_id: string, quantity: number, unit_price: number, wholesale_cost?: number, product_name?: string }>} itemsArray
  * @returns {Promise<{ order: object, items: object[], inventory: object[] }>}
  */
 export async function createOrder(orderData, itemsArray) {
@@ -605,6 +614,9 @@ export async function createOrder(orderData, itemsArray) {
     }
   }
 
+  const status = String(orderData?.status || 'completed').trim() || 'completed';
+  const isOpen = status === 'open' || status === 'parked';
+
   const total_amount = Number.isFinite(Number(orderData?.total_amount))
     ? Number(orderData.total_amount)
     : items.reduce(
@@ -612,14 +624,25 @@ export async function createOrder(orderData, itemsArray) {
       0,
     );
 
+  const now = new Date().toISOString();
+  const orderPayload = {
+    source: orderData?.source || 'pos',
+    status,
+    total_amount,
+    notes: orderData?.notes || null,
+    staff_user_id: orderData?.staff_user_id || null,
+    staff_name: orderData?.staff_name || null,
+    ticket_label: orderData?.ticket_label || null,
+    updated_at: now,
+  };
+
+  if (isOpen) orderPayload.parked_at = now;
+  if (status === 'completed') orderPayload.completed_at = now;
+
   // 1) Insert order
-  const { data: order, error: orderError } = await supabase
+  const { data: order, error: orderError } = await getSupabase()
     .from('orders')
-    .insert({
-      source: orderData?.source || 'pos',
-      status: orderData?.status || 'completed',
-      total_amount,
-    })
+    .insert(orderPayload)
     .select('*')
     .single();
 
@@ -632,20 +655,28 @@ export async function createOrder(orderData, itemsArray) {
     quantity: Number(item.quantity),
     unit_price: Number(item.unit_price),
     wholesale_cost: Number(item.wholesale_cost ?? 0),
+    product_name: item.product_name || null,
   }));
 
-  const { data: insertedItems, error: itemsError } = await supabase
+  const { data: insertedItems, error: itemsError } = await getSupabase()
     .from('order_items')
     .insert(orderItemRows)
     .select('*');
 
   if (itemsError) {
-    // Best-effort cleanup so we don't leave orphan orders
-    await supabase.from('orders').delete().eq('id', order.id);
+    await getSupabase().from('orders').delete().eq('id', order.id);
     throw new Error(`Order items failed: ${itemsError.message}`);
   }
 
-  // 3) Inventory deductions (negative quantity_changed → trigger decrements stock)
+  // 3) Inventory only for completed sales
+  if (isOpen) {
+    return {
+      order,
+      items: insertedItems ?? [],
+      inventory: [],
+    };
+  }
+
   const inventoryRows = items.map((item) => ({
     product_id: item.product_id,
     quantity_changed: -Math.abs(Number(item.quantity)),
@@ -654,7 +685,7 @@ export async function createOrder(orderData, itemsArray) {
     notes: `Order ${order.id}`,
   }));
 
-  const { data: inventory, error: inventoryError } = await supabase
+  const { data: inventory, error: inventoryError } = await getSupabase()
     .from('inventory_transactions')
     .insert(inventoryRows)
     .select('*');
@@ -670,6 +701,144 @@ export async function createOrder(orderData, itemsArray) {
     items: insertedItems ?? [],
     inventory: inventory ?? [],
   };
+}
+
+/**
+ * Park the current POS ticket as an open order (no stock deduction).
+ * @param {{
+ *   staff_user_id?: string,
+ *   staff_name?: string,
+ *   ticket_label?: string,
+ *   notes?: string,
+ *   total_amount?: number,
+ * }} meta
+ * @param {Array<{ product_id: string, quantity: number, unit_price: number, wholesale_cost?: number, product_name?: string }>} items
+ */
+export async function saveOpenTicket(meta, items) {
+  return createOrder({
+    source: 'pos',
+    status: 'open',
+    staff_user_id: meta?.staff_user_id,
+    staff_name: meta?.staff_name,
+    ticket_label: meta?.ticket_label,
+    notes: meta?.notes,
+    total_amount: meta?.total_amount,
+  }, items);
+}
+
+/**
+ * List open / parked POS tickets with line items.
+ * @returns {Promise<object[]>}
+ */
+export async function getOpenTickets() {
+  const { data, error } = await getSupabase()
+    .from('orders')
+    .select('*, order_items(*)')
+    .eq('source', 'pos')
+    .in('status', ['open', 'parked'])
+    .order('parked_at', { ascending: false });
+
+  if (error) {
+    if (/Could not find the table|schema cache|column/i.test(error.message)) {
+      throw new Error(
+        'Open tickets need sql/open_tickets.sql run in the Supabase SQL Editor.',
+      );
+    }
+    throw mapSupabaseNetworkError(error, 'loading open tickets');
+  }
+  return data ?? [];
+}
+
+/**
+ * Load one open ticket (for resume on POS).
+ * @param {string} orderId
+ */
+export async function getOpenTicket(orderId) {
+  const id = String(orderId || '').trim();
+  if (!id) throw new Error('Order id is required');
+
+  const { data, error } = await getSupabase()
+    .from('orders')
+    .select('*, order_items(*)')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('Ticket not found.');
+  return data;
+}
+
+/**
+ * Charge a parked ticket: mark completed + write inventory transactions.
+ * @param {string} orderId
+ */
+export async function completeOpenTicket(orderId) {
+  const ticket = await getOpenTicket(orderId);
+  if (ticket.status !== 'open' && ticket.status !== 'parked') {
+    throw new Error('This ticket is not open.');
+  }
+
+  const items = ticket.order_items || [];
+  if (!items.length) throw new Error('Open ticket has no line items.');
+
+  const now = new Date().toISOString();
+  const { data: order, error: updateError } = await getSupabase()
+    .from('orders')
+    .update({
+      status: 'completed',
+      completed_at: now,
+      updated_at: now,
+    })
+    .eq('id', ticket.id)
+    .select('*')
+    .single();
+
+  if (updateError) throw new Error(updateError.message);
+
+  const inventoryRows = items.map((item) => ({
+    product_id: item.product_id,
+    quantity_changed: -Math.abs(Number(item.quantity)),
+    type: 'sale',
+    source: 'pos',
+    notes: `Completed open ticket ${ticket.id}`,
+  }));
+
+  const { data: inventory, error: inventoryError } = await getSupabase()
+    .from('inventory_transactions')
+    .insert(inventoryRows)
+    .select('*');
+
+  if (inventoryError) {
+    throw new Error(
+      `Ticket completed but inventory log failed: ${inventoryError.message}`,
+    );
+  }
+
+  return { order, items, inventory: inventory ?? [] };
+}
+
+/**
+ * Cancel / void an open ticket (no inventory impact).
+ * @param {string} orderId
+ */
+export async function cancelOpenTicket(orderId) {
+  const id = String(orderId || '').trim();
+  if (!id) throw new Error('Order id is required');
+
+  const now = new Date().toISOString();
+  const { data, error } = await getSupabase()
+    .from('orders')
+    .update({
+      status: 'cancelled',
+      updated_at: now,
+    })
+    .eq('id', id)
+    .in('status', ['open', 'parked'])
+    .select('*')
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 // ── Categories & collections (taxonomy) ─────────────────────────────

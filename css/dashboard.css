@@ -848,6 +848,46 @@
   font-size: 0.9rem;
 }
 
+.dash-open-tickets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dash-open-tickets__item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--dash-border, #e5e7eb);
+}
+
+.dash-open-tickets__item:last-child {
+  border-bottom: 0;
+}
+
+.dash-open-tickets__title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.dash-open-tickets__meta {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--dash-text-dim);
+}
+
+.dash-open-tickets__lines {
+  margin: 0.45rem 0 0;
+  padding-inline-start: 1rem;
+  font-size: 0.8rem;
+  color: var(--dash-text-dim);
+}
+
 /* ── Image uploader (PC + mobile) ────────────────────────────────── */
 .dash-upload {
   position: relative;

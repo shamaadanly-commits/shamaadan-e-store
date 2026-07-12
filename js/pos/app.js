@@ -3,6 +3,13 @@
  * Staff unlock via numeric PIN (mapped to user id for sale attribution).
  */
 import { getSupabase } from '../config/supabase.js';
+import {
+  createOrder,
+  saveOpenTicket,
+  getOpenTickets,
+  cancelOpenTicket,
+  isSupabaseConfigured,
+} from '../../shared/supabase.js';
 import { getSharedDashboardState, toPosCatalogRow } from '../dashboard.js';
 import { formatLyd } from '../shared/format.js';
 import { fetchSession, loginPosPin, logout } from '../shared/auth-client.js';
@@ -72,17 +79,21 @@ async function mountRegister(root, staff) {
 
   if (supabase) {
     try {
-      const { data, error } = await supabase.from('products').select('*').eq('active', true);
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_active', true);
       if (!error && data?.length) {
         catalog = data.map((row) => toPosCatalogRow({
           id: row.id,
           barcode: row.barcode ?? row.sku,
           title: row.name,
           collectionName: row.category ?? 'General',
-          retailPrice: Number(row.price),
-          costPrice: Number(row.cost ?? 0),
-          stockQuantity: row.stock ?? 0,
-          imageUrls: row.image_urls ?? (row.image ? [row.image] : []),
+          category: row.category ?? 'General',
+          retailPrice: Number(row.retail_price ?? row.price ?? 0),
+          costPrice: Number(row.wholesale_cost ?? row.cost ?? 0),
+          stockQuantity: Number(row.stock_quantity ?? row.stock ?? 0),
+          imageUrls: row.image_urls ?? (row.image_url ? [row.image_url] : []),
         }));
       }
     } catch {
@@ -93,6 +104,8 @@ async function mountRegister(root, staff) {
   const cart = createCartState(catalog);
   const dashboard = createDashboard(centralState);
   const categories = ['All', ...new Set(catalog.map((p) => p.category).filter(Boolean))];
+  /** @type {string | null} */
+  let activeOpenTicketId = null;
 
   root.innerHTML = buildShell(categories, staff);
 
@@ -104,6 +117,9 @@ async function mountRegister(root, staff) {
     subtotal: root.querySelector('[data-subtotal]'),
     grand: root.querySelector('[data-grand-total]'),
     checkout: root.querySelector('[data-checkout]'),
+    park: root.querySelector('[data-park-ticket]'),
+    openTicketsBtn: root.querySelector('[data-open-tickets]'),
+    openTicketsBadge: root.querySelector('[data-open-tickets-count]'),
     search: root.querySelector('[data-search]'),
     categories: root.querySelector('[data-categories]'),
     dashboard: root.querySelector('[data-dashboard]'),
@@ -137,6 +153,148 @@ async function mountRegister(root, staff) {
     showToast(els.toast, `No product for barcode ${code}`);
   }
 
+  function ticketItemsPayload(items) {
+    return items.map((line) => ({
+      product_id: line.productId,
+      quantity: line.quantity,
+      unit_price: line.unitPrice,
+      wholesale_cost: line.unitCost,
+      product_name: line.name,
+    }));
+  }
+
+  async function refreshOpenTicketBadge() {
+    if (!els.openTicketsBadge || !isSupabaseConfigured()) return;
+    try {
+      const tickets = await getOpenTickets();
+      const count = tickets.length;
+      els.openTicketsBadge.hidden = count === 0;
+      els.openTicketsBadge.textContent = String(count);
+    } catch {
+      els.openTicketsBadge.hidden = true;
+    }
+  }
+
+  async function parkCurrentTicket() {
+    const snapshot = cart.getSnapshot();
+    if (!snapshot.items.length) {
+      showToast(els.toast, 'Ticket is empty');
+      return;
+    }
+    if (!isSupabaseConfigured()) {
+      showToast(els.toast, 'Supabase not configured — cannot park ticket');
+      return;
+    }
+
+    const label = window.prompt('Ticket label (optional)', '') ?? null;
+    if (label === null) return;
+
+    try {
+      els.park && (els.park.disabled = true);
+      await saveOpenTicket({
+        staff_user_id: staff.id,
+        staff_name: staff.displayName || staff.username,
+        ticket_label: String(label || '').trim() || null,
+        total_amount: snapshot.subtotal,
+      }, ticketItemsPayload(snapshot.items));
+
+      cart.clear();
+      activeOpenTicketId = null;
+      showToast(els.toast, 'Ticket parked — visible in Admin');
+      await refreshOpenTicketBadge();
+    } catch (err) {
+      console.error('[pos] park ticket failed:', err);
+      window.alert(err?.message || 'Failed to park ticket.');
+    } finally {
+      if (els.park) els.park.disabled = cart.getSnapshot().items.length === 0;
+    }
+  }
+
+  async function showOpenTicketsPanel() {
+    if (!isSupabaseConfigured()) {
+      showToast(els.toast, 'Supabase not configured');
+      return;
+    }
+
+    root.querySelector('[data-open-tickets-modal]')?.remove();
+
+    let tickets = [];
+    try {
+      tickets = await getOpenTickets();
+    } catch (err) {
+      window.alert(err?.message || 'Could not load open tickets.');
+      return;
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'pos-sale-modal';
+    modal.dataset.openTicketsModal = '';
+    modal.innerHTML = `
+      <div class="pos-sale-modal__backdrop" data-open-tickets-backdrop></div>
+      <div class="pos-sale-modal__card pos-open-tickets" role="dialog" aria-modal="true" aria-labelledby="pos-open-title">
+        <p class="pos-sale-modal__badge">Open tickets</p>
+        <h2 id="pos-open-title">${tickets.length} parked</h2>
+        <div class="pos-open-tickets__list">
+          ${tickets.length ? tickets.map((t) => {
+            const lines = t.order_items || [];
+            const qty = lines.reduce((s, l) => s + Number(l.quantity || 0), 0);
+            const when = t.parked_at || t.created_at;
+            return `
+              <article class="pos-open-tickets__item" data-ticket-id="${escapeAttr(t.id)}">
+                <div>
+                  <p class="pos-open-tickets__label">${escapeHtml(t.ticket_label || `Ticket ${String(t.id).slice(0, 8)}`)}</p>
+                  <p class="pos-open-tickets__meta">${qty} item${qty === 1 ? '' : 's'} · ${formatLyd(Number(t.total_amount || 0))} · ${escapeHtml(t.staff_name || 'Staff')}</p>
+                  <p class="pos-open-tickets__time">${when ? new Date(when).toLocaleString() : ''}</p>
+                </div>
+                <div class="pos-open-tickets__actions">
+                  <button type="button" class="pos-open-tickets__resume" data-resume-ticket="${escapeAttr(t.id)}">Resume</button>
+                  <button type="button" class="pos-open-tickets__void" data-void-ticket="${escapeAttr(t.id)}">Void</button>
+                </div>
+              </article>
+            `;
+          }).join('') : '<p class="pos-open-tickets__empty">No open tickets</p>'}
+        </div>
+        <button type="button" class="pos-sale-modal__skip" data-close-open-tickets>Close</button>
+      </div>
+    `;
+    root.appendChild(modal);
+  }
+
+  async function resumeTicket(orderId) {
+    try {
+      const tickets = await getOpenTickets();
+      const ticket = tickets.find((t) => t.id === orderId);
+      if (!ticket) throw new Error('Ticket not found.');
+
+      const mapped = (ticket.order_items || []).map((line) => ({
+        productId: line.product_id,
+        name: line.product_name || 'Item',
+        unitPrice: Number(line.unit_price),
+        unitCost: Number(line.wholesale_cost || 0),
+        quantity: Number(line.quantity),
+      }));
+
+      const result = cart.loadTicketLines(mapped);
+      activeOpenTicketId = orderId;
+
+      // Remove the parked row so we don't duplicate if they park again
+      await cancelOpenTicket(orderId);
+      activeOpenTicketId = null;
+
+      root.querySelector('[data-open-tickets-modal]')?.remove();
+      showToast(
+        els.toast,
+        result.missing?.length
+          ? `Resumed (skipped: ${result.missing.join(', ')})`
+          : 'Ticket resumed',
+      );
+      await refreshOpenTicketBadge();
+    } catch (err) {
+      console.error('[pos] resume ticket failed:', err);
+      window.alert(err?.message || 'Failed to resume ticket.');
+    }
+  }
+
   cart.subscribe((snapshot) => {
     refreshCatalog();
     renderLineItems(els.lines, snapshot.items);
@@ -147,7 +305,9 @@ async function mountRegister(root, staff) {
     }
     els.subtotal.textContent = formatLyd(snapshot.subtotal);
     els.grand.textContent = formatLyd(snapshot.subtotal);
-    els.checkout.disabled = snapshot.items.length === 0;
+    const empty = snapshot.items.length === 0;
+    els.checkout.disabled = empty;
+    if (els.park) els.park.disabled = empty || !isSupabaseConfigured();
   });
 
   dashboard.subscribe((state) => {
@@ -155,6 +315,7 @@ async function mountRegister(root, staff) {
   });
 
   startClock(els.clock);
+  refreshOpenTicketBadge();
 
   root.addEventListener('click', async (event) => {
     const target = event.target;
@@ -206,27 +367,86 @@ async function mountRegister(root, staff) {
 
     if (target.matches('[data-clear-ticket]')) {
       cart.clear();
+      activeOpenTicketId = null;
+      return;
+    }
+
+    if (target.matches('[data-park-ticket]')) {
+      await parkCurrentTicket();
+      return;
+    }
+
+    if (target.matches('[data-open-tickets]')) {
+      await showOpenTicketsPanel();
+      return;
+    }
+
+    if (target.matches('[data-close-open-tickets]') || target.matches('[data-open-tickets-backdrop]')) {
+      root.querySelector('[data-open-tickets-modal]')?.remove();
+      return;
+    }
+
+    const resumeBtn = target.closest('[data-resume-ticket]');
+    if (resumeBtn) {
+      await resumeTicket(resumeBtn.dataset.resumeTicket);
+      return;
+    }
+
+    const voidBtn = target.closest('[data-void-ticket]');
+    if (voidBtn) {
+      if (!confirm('Void this open ticket?')) return;
+      try {
+        await cancelOpenTicket(voidBtn.dataset.voidTicket);
+        showToast(els.toast, 'Ticket voided');
+        root.querySelector('[data-open-tickets-modal]')?.remove();
+        await refreshOpenTicketBadge();
+        await showOpenTicketsPanel();
+      } catch (err) {
+        window.alert(err?.message || 'Failed to void ticket.');
+      }
       return;
     }
 
     if (target.matches('[data-checkout]')) {
-      const sale = cart.checkout();
-      if (sale.units > 0) {
-        const receiptSale = {
-          ...sale,
-          receiptNo: `R${Date.now().toString(36).toUpperCase()}`,
-          register: 'Register #1',
-          cashier: staff.displayName || staff.username,
-          staffUserId: staff.id,
-          paidAt: new Date(),
-        };
-        centralState.recordPosSale({
-          ...sale,
-          staffUserId: staff.id,
-          staffName: staff.displayName || staff.username,
-        });
-        dashboard.refresh();
-        showSaleComplete(root, receiptSale, els.toast);
+      const snapshot = cart.getSnapshot();
+      if (!snapshot.items.length) return;
+
+      els.checkout.disabled = true;
+      try {
+        if (isSupabaseConfigured()) {
+          await createOrder({
+            source: 'pos',
+            status: 'completed',
+            total_amount: snapshot.subtotal,
+            staff_user_id: staff.id,
+            staff_name: staff.displayName || staff.username,
+          }, ticketItemsPayload(snapshot.items));
+        }
+
+        const sale = cart.checkout();
+        activeOpenTicketId = null;
+        if (sale.units > 0) {
+          const receiptSale = {
+            ...sale,
+            receiptNo: `R${Date.now().toString(36).toUpperCase()}`,
+            register: 'Register #1',
+            cashier: staff.displayName || staff.username,
+            staffUserId: staff.id,
+            paidAt: new Date(),
+          };
+          centralState.recordPosSale({
+            ...sale,
+            staffUserId: staff.id,
+            staffName: staff.displayName || staff.username,
+          });
+          dashboard.refresh();
+          showSaleComplete(root, receiptSale, els.toast);
+          await refreshOpenTicketBadge();
+        }
+      } catch (err) {
+        console.error('[pos] charge failed:', err);
+        window.alert(err?.message || 'Charge failed.');
+        els.checkout.disabled = cart.getSnapshot().items.length === 0;
       }
     }
 
@@ -301,6 +521,9 @@ function buildShell(categories, staff) {
           </svg>
           Scan
         </button>
+        <button type="button" class="pos__icon-btn" data-open-tickets aria-label="Open tickets">
+          🎫<span class="pos__badge" data-open-tickets-count hidden>0</span>
+        </button>
         <button type="button" class="pos__icon-btn" data-toggle-metrics aria-label="Toggle sales metrics">📊</button>
         <button type="button" class="pos__lock-btn" data-pos-lock>Lock</button>
       </div>
@@ -343,8 +566,11 @@ function buildShell(categories, staff) {
             <span>Total</span>
             <span data-grand-total>${formatLyd(0)}</span>
           </div>
-          <button type="button" class="pos__checkout-btn" data-checkout disabled>CHARGE</button>
-          <p class="pos__checkout-hint">After charge you can print the receipt</p>
+          <div class="pos__ticket-actions">
+            <button type="button" class="pos__park-btn" data-park-ticket disabled>Park ticket</button>
+            <button type="button" class="pos__checkout-btn" data-checkout disabled>CHARGE</button>
+          </div>
+          <p class="pos__checkout-hint">Park keeps the ticket open for Admin · Charge completes the sale</p>
         </footer>
       </aside>
     </div>

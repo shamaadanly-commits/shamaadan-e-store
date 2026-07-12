@@ -116,6 +116,50 @@ export function createCartState(initialCatalog) {
   }
 
   /**
+   * Replace the ticket with saved open-ticket lines (restores previous stock first).
+   * @param {Array<{ productId: string, name?: string, unitPrice: number, unitCost?: number, quantity: number }>} nextLines
+   * @returns {{ ok: boolean, missing?: string[] }}
+   */
+  function loadTicketLines(nextLines) {
+    clear();
+    const missing = [];
+
+    for (const row of nextLines || []) {
+      const product = inventory.get(row.productId);
+      const qty = Math.max(0, Number(row.quantity) || 0);
+      if (!product || qty <= 0) {
+        missing.push(row.name || row.productId);
+        continue;
+      }
+
+      const take = Math.min(qty, Math.max(0, product.stock));
+      if (take <= 0) {
+        missing.push(product.name);
+        continue;
+      }
+
+      product.stock -= take;
+      lines.set(product.id, {
+        productId: product.id,
+        name: row.name || product.name,
+        unitPrice: Number(row.unitPrice ?? product.price),
+        unitCost: Number(row.unitCost ?? product.cost),
+        quantity: take,
+      });
+    }
+
+    notify();
+    return { ok: lines.size > 0, missing };
+  }
+
+  /**
+   * Snapshot lines without clearing (for park).
+   */
+  function getLines() {
+    return Array.from(lines.values()).map((line) => ({ ...line }));
+  }
+
+  /**
    * Complete checkout — clears ticket and returns sale summary for dashboard.
    * @returns {{ revenue: number, cost: number, profit: number, units: number, lines: Array<{ productId: string, title: string, quantity: number, unitPrice: number, unit_cost_at_sale: number }> }}
    */
@@ -180,6 +224,8 @@ export function createCartState(initialCatalog) {
     adjustQuantity,
     clear,
     checkout,
+    loadTicketLines,
+    getLines,
     subscribe,
     getSnapshot,
   };

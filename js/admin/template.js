@@ -384,6 +384,45 @@ export function transactionFeedHtml(transactions) {
 }
 
 /**
+ * Open / parked POS tickets from Supabase (linked to register).
+ * @param {Array<object>} tickets
+ */
+export function openTicketsPanelHtml(tickets = []) {
+  if (!tickets.length) {
+    return '<p class="dash-empty">No open POS tickets. Park a ticket on the register to see it here.</p>';
+  }
+
+  return `
+    <ul class="dash-open-tickets">
+      ${tickets.map((t) => {
+        const lines = t.order_items || [];
+        const qty = lines.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
+        const when = t.parked_at || t.created_at;
+        return `
+          <li class="dash-open-tickets__item" data-open-ticket-id="${escapeAttr(t.id)}">
+            <div>
+              <p class="dash-open-tickets__title">${escapeHtml(t.ticket_label || `Ticket ${String(t.id).slice(0, 8)}`)}</p>
+              <p class="dash-open-tickets__meta">
+                ${qty} item${qty === 1 ? '' : 's'} · ${formatLyd(Number(t.total_amount || 0))}
+                · ${escapeHtml(t.staff_name || 'Staff')}
+                ${when ? ` · ${escapeHtml(new Date(when).toLocaleString('en-LY'))}` : ''}
+              </p>
+              <ul class="dash-open-tickets__lines">
+                ${lines.slice(0, 4).map((line) => `
+                  <li>${escapeHtml(line.product_name || 'Item')} × ${Number(line.quantity || 0)}</li>
+                `).join('')}
+                ${lines.length > 4 ? `<li>+${lines.length - 4} more</li>` : ''}
+              </ul>
+            </div>
+            <button type="button" class="dash-btn dash-btn--danger dash-btn--sm" data-void-open-ticket="${escapeAttr(t.id)}">Void</button>
+          </li>
+        `;
+      }).join('')}
+    </ul>
+  `;
+}
+
+/**
  * @param {import('../dashboard.js').ProductRecord | null} product
  * @param {Array<{ id: string, name: string }>} [collections]
  * @param {Array<{ id: string, name: string }>} [categories]
@@ -531,6 +570,17 @@ export function buildAdminShell() {
                 </header>
                 <div class="dash-panel__body" data-transaction-host></div>
               </article>
+              <article class="dash-panel">
+                <header class="dash-panel__header dash-panel__header--row">
+                  <h2>Open POS Tickets</h2>
+                  <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-refresh-open-tickets>Refresh</button>
+                </header>
+                <div class="dash-panel__body" data-open-tickets-host>
+                  <p class="dash-empty">Loading open tickets…</p>
+                </div>
+              </article>
+            </div>
+            <div class="dash-panels-row">
               <article class="dash-panel">
                 <header class="dash-panel__header">
                   <h2>Margin Summary</h2>

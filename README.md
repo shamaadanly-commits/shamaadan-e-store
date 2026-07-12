@@ -133,6 +133,8 @@ The apps run in **demo mode** with mock products when credentials are missing.
 
 That script creates `categories`, `collections`, ensures `products` has `category_id` / `collection_id` (FK `ON DELETE SET NULL`), enables RLS policies for the anon client, and seeds a **General** row in each taxonomy table.
 
+**Open POS tickets** (park / resume / admin visibility): also run [`sql/open_tickets.sql`](sql/open_tickets.sql).
+
 Also run [`sql/auth_users.sql`](sql/auth_users.sql) for the `users` table when enabling production auth.
 
 When ready, create a `products` table (also covered by `catalog_schema.sql`):

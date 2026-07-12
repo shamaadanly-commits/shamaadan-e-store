@@ -708,6 +708,112 @@
   touch-action: manipulation;
 }
 
+.pos__ticket-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 0.55rem;
+}
+
+.pos__park-btn {
+  min-height: 3.4rem;
+  padding: 0.75rem;
+  background: #fff;
+  color: var(--pos-text);
+  border: 1.5px solid #d1d5db;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border-radius: var(--pos-radius);
+  touch-action: manipulation;
+}
+
+.pos__park-btn:active:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.pos__park-btn:disabled {
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.pos__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  margin-inline-start: 0.15rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.pos-open-tickets {
+  max-width: 28rem;
+  width: min(92vw, 28rem);
+}
+
+.pos-open-tickets__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-height: 50vh;
+  overflow: auto;
+  margin: 1rem 0;
+  text-align: start;
+}
+
+.pos-open-tickets__item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.65rem;
+  background: #f9fafb;
+}
+
+.pos-open-tickets__label {
+  margin: 0;
+  font-weight: 700;
+}
+
+.pos-open-tickets__meta,
+.pos-open-tickets__time,
+.pos-open-tickets__empty {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.pos-open-tickets__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.pos-open-tickets__resume,
+.pos-open-tickets__void {
+  min-height: 2.2rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.45rem;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.pos-open-tickets__resume {
+  background: var(--pos-green);
+  color: #fff;
+}
+
+.pos-open-tickets__void {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  color: #b91c1c;
+}
+
 .pos__checkout-btn:active:not(:disabled) {
   background: var(--pos-green-hover);
   transform: scale(0.985);

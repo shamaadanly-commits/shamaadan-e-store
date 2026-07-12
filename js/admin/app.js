@@ -19,6 +19,10 @@ import {
   isSupabaseReady,
 } from './catalog-api.js';
 import {
+  getOpenTickets,
+  cancelOpenTicket,
+} from '../../shared/supabase.js';
+import {
   buildAdminShell,
   ledgerMatrixHtml,
   inventoryTableHtml,
@@ -29,6 +33,7 @@ import {
   collectionFormHtml,
   categoryFormHtml,
   transactionFeedHtml,
+  openTicketsPanelHtml,
   productFormHtml,
 } from './template.js';
 
@@ -58,6 +63,7 @@ export async function mount(root) {
     adminUser: root.querySelector('[data-admin-user]'),
     ledgerHost: root.querySelector('[data-ledger-host]'),
     transactionHost: root.querySelector('[data-transaction-host]'),
+    openTicketsHost: root.querySelector('[data-open-tickets-host]'),
     marginHost: root.querySelector('[data-margin-host]'),
     inventoryHost: root.querySelector('[data-inventory-host]'),
     formHost: root.querySelector('[data-form-host]'),
@@ -90,6 +96,26 @@ export async function mount(root) {
   }
 
   startSessionWatch();
+  refreshOpenTickets();
+
+  /**
+   * Load parked POS tickets from Supabase into the accounting panel.
+   */
+  async function refreshOpenTickets() {
+    if (!els.openTicketsHost) return;
+    if (!isSupabaseReady()) {
+      els.openTicketsHost.innerHTML = '<p class="dash-empty">Supabase not configured — open tickets unavailable.</p>';
+      return;
+    }
+
+    try {
+      const tickets = await getOpenTickets();
+      els.openTicketsHost.innerHTML = openTicketsPanelHtml(tickets);
+    } catch (err) {
+      console.error('[admin] open tickets failed:', err);
+      els.openTicketsHost.innerHTML = `<p class="dash-empty">${escapeHtml(err?.message || 'Failed to load open tickets.')}</p>`;
+    }
+  }
 
   /**
    * Await live Supabase catalog, replace local state, re-render.
@@ -181,6 +207,25 @@ export async function mount(root) {
 
     if (target.matches('[data-refresh]')) {
       await refreshFromSupabase();
+      await refreshOpenTickets();
+      return;
+    }
+
+    if (target.matches('[data-refresh-open-tickets]')) {
+      await refreshOpenTickets();
+      return;
+    }
+
+    const voidOpen = target.closest('[data-void-open-ticket]');
+    if (voidOpen) {
+      const id = voidOpen.dataset.voidOpenTicket;
+      if (!confirm('Void this open POS ticket?')) return;
+      try {
+        await cancelOpenTicket(id);
+        await refreshOpenTickets();
+      } catch (err) {
+        window.alert(err?.message || 'Failed to void open ticket.');
+      }
       return;
     }
 
@@ -612,6 +657,7 @@ export async function mount(root) {
     renderForm();
     renderCatalogForm();
     renderTaxonomyForms();
+    refreshOpenTickets();
     switchView('catalog');
   }
 
