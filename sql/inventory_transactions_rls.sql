@@ -21,3 +21,27 @@ create policy "inventory_transactions_select_all" on public.inventory_transactio
 create policy "inventory_transactions_insert_all" on public.inventory_transactions for insert with check (true);
 create policy "inventory_transactions_update_all" on public.inventory_transactions for update using (true) with check (true);
 create policy "inventory_transactions_delete_all" on public.inventory_transactions for delete using (true);
+
+-- ── Allowed transaction types ────────────────────────────────────────
+-- Keep this list in sync with the values the app writes:
+--   'sale'       — completed in-store sale        (shared/supabase.js createSale)
+--   'park'       — parked ticket reserves stock   (shared/supabase.js createSale)
+--   'park_void'  — void parked ticket, restore    (shared/supabase.js cancelOpenTicket)
+--   'restock'    — manual +1 stock in dashboard   (dashboard/dashboard.js)
+--   'adjustment' — default manual adjustment      (shared/supabase.js addInventoryTransaction)
+--
+-- Added as NOT VALID so pre-existing rows are never rejected; it is
+-- enforced for all new inserts/updates. Run the VALIDATE line afterwards
+-- once you've confirmed existing rows conform (optional).
+alter table public.inventory_transactions
+  drop constraint if exists inventory_transactions_type_check;
+
+alter table public.inventory_transactions
+  add constraint inventory_transactions_type_check
+  check (type in ('sale', 'park', 'park_void', 'restock', 'adjustment'))
+  not valid;
+
+-- Optional: enforce against existing rows too (will error if any row has
+-- a type outside the list above — fix those rows first, then run this).
+-- alter table public.inventory_transactions
+--   validate constraint inventory_transactions_type_check;
