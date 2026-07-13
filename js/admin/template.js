@@ -297,6 +297,147 @@ export function catalogFormHtml(product = null, collections = [], categories = [
 }
 
 /**
+ * Product <option> list for purchase line dropdowns.
+ * @param {Array<object>} products
+ */
+function purchaseProductOptionsHtml(products = []) {
+  return ['<option value="">Select product…</option>']
+    .concat((products || [])
+      .filter((p) => p?.id)
+      .map((p) => {
+        const label = escapeHtml(p.title || p.name || 'Untitled');
+        const code = p.barcode ? ` · ${escapeHtml(p.barcode)}` : '';
+        return `<option value="${escapeAttr(p.id)}">${label}${code}</option>`;
+      }))
+    .join('');
+}
+
+/**
+ * A single purchase line row (product, unit price, quantity).
+ * @param {string} optionsHtml Pre-rendered <option> markup.
+ */
+export function purchaseLineRowHtml(optionsHtml) {
+  return `
+    <tr class="dash-purchase-line">
+      <td><select name="product_id[]" data-purchase-product required>${optionsHtml}</select></td>
+      <td><input name="supplier_unit_price[]" type="number" min="0" step="0.0001" placeholder="0.00" inputmode="decimal"></td>
+      <td><input name="quantity[]" type="number" min="1" step="1" placeholder="0" inputmode="numeric"></td>
+      <td><button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-remove-purchase-line title="Remove line">✕</button></td>
+    </tr>`;
+}
+
+/**
+ * The full "New Purchase Invoice" form.
+ * @param {Array<object>} products
+ */
+export function purchaseFormHtml(products = []) {
+  const options = purchaseProductOptionsHtml(products);
+  const initialRows = [purchaseLineRowHtml(options), purchaseLineRowHtml(options), purchaseLineRowHtml(options)].join('');
+
+  return `
+    <form class="dash-form" data-purchase-form autocomplete="off">
+      <div class="dash-form__grid">
+        <div class="dash-field">
+          <label for="pi-supplier">Supplier name</label>
+          <input id="pi-supplier" name="supplier_name" type="text" required placeholder="Guangzhou Aroma Co.">
+        </div>
+        <div class="dash-field">
+          <label for="pi-number">Invoice number</label>
+          <input id="pi-number" name="invoice_number" type="text" placeholder="GZ-2026-0442">
+        </div>
+        <div class="dash-field">
+          <label for="pi-date">Invoice date</label>
+          <input id="pi-date" name="invoice_date" type="date" value="${escapeAttr(new Date().toISOString().slice(0, 10))}">
+        </div>
+        <div class="dash-field">
+          <label for="pi-currency">Currency</label>
+          <input id="pi-currency" name="currency" type="text" value="LYD" placeholder="USD">
+        </div>
+        <div class="dash-field">
+          <label for="pi-ship">Total shipping / transport</label>
+          <input id="pi-ship" name="total_shipping_transport_cost" type="number" min="0" step="0.01" placeholder="0.00" inputmode="decimal">
+        </div>
+        <div class="dash-field">
+          <label for="pi-customs">Total customs / duties</label>
+          <input id="pi-customs" name="total_customs_duties_cost" type="number" min="0" step="0.01" placeholder="0.00" inputmode="decimal">
+        </div>
+      </div>
+
+      <div class="dash-field">
+        <label>Product lines</label>
+        <div class="dash-table-wrap">
+          <table class="dash-table dash-purchase-table">
+            <thead>
+              <tr>
+                <th scope="col">Product</th>
+                <th scope="col">Unit price</th>
+                <th scope="col">Qty</th>
+                <th scope="col"><span class="sr-only">Remove</span></th>
+              </tr>
+            </thead>
+            <tbody data-purchase-lines>${initialRows}</tbody>
+          </table>
+        </div>
+        <div class="dash-form__actions" style="margin-top:0.6rem;">
+          <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-add-purchase-line>+ Add line</button>
+        </div>
+      </div>
+
+      <div class="dash-field">
+        <label for="pi-notes">Notes</label>
+        <textarea id="pi-notes" name="notes" rows="2" placeholder="Optional"></textarea>
+      </div>
+
+      <div class="dash-form__actions">
+        <button type="submit" class="dash-btn dash-btn--primary">Save invoice &amp; add stock</button>
+      </div>
+      <p class="dash-form__note">Shipping &amp; customs are allocated across items by cost weight to compute each product's landed unit cost.</p>
+
+      <template data-purchase-line-tpl>${purchaseLineRowHtml(options)}</template>
+    </form>`;
+}
+
+/**
+ * Recent supplier invoices table.
+ * @param {Array<object>} rows
+ */
+export function supplierInvoicesTableHtml(rows = []) {
+  if (!rows.length) {
+    return '<p class="dash-empty">No purchase invoices recorded yet.</p>';
+  }
+
+  const money = (n) => new Intl.NumberFormat('en-LY', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
+
+  return `
+    <div class="dash-table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">Supplier</th>
+            <th scope="col">Invoice #</th>
+            <th scope="col">Raw</th>
+            <th scope="col">Overhead</th>
+            <th scope="col">Landed</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((r) => `
+            <tr>
+              <td class="dash-table__num">${escapeHtml(r.invoice_date || (r.created_at ? String(r.created_at).slice(0, 10) : '—'))}</td>
+              <td><strong>${escapeHtml(r.supplier_name || '—')}</strong></td>
+              <td>${escapeHtml(r.invoice_number || '—')}</td>
+              <td class="dash-table__num">${escapeHtml(r.currency || '')} ${money(r.total_raw_cost)}</td>
+              <td class="dash-table__num">${money(r.total_overhead_cost)}</td>
+              <td class="dash-table__num">${money(r.total_landed_cost)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+/**
  * @param {Array<{ id: string, name: string }>} items
  * @param {string} selectedId
  * @param {string} emptyLabel
@@ -562,6 +703,9 @@ export function buildAdminShell() {
           <button type="button" class="dash-nav__link" data-view="inventory">
             <span aria-hidden="true">📦</span> Inventory Costs
           </button>
+          <button type="button" class="dash-nav__link" data-view="purchases">
+            <span aria-hidden="true">🧾</span> Purchases
+          </button>
           <a href="/?app=storefront" class="dash-nav__link dash-nav__link--external" target="_blank" rel="noopener">
             <span aria-hidden="true">🌐</span> View Website
           </a>
@@ -684,6 +828,29 @@ export function buildAdminShell() {
                   <h2 data-form-title>Add Product</h2>
                 </header>
                 <div class="dash-panel__body" data-form-host></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="dash-view" data-panel="purchases" aria-label="Supplier purchase invoices" hidden>
+            <div class="dash-catalog-intro">
+              <p>Record a supplier purchase invoice. Enter the shipping/transport and customs/duties once — they are split across the items by cost to compute each product's true landed cost, and stock is increased automatically.</p>
+            </div>
+            <div class="dash-inventory-layout">
+              <article class="dash-panel dash-panel--grow">
+                <header class="dash-panel__header dash-panel__header--row">
+                  <h2>Recent Purchase Invoices</h2>
+                  <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-refresh-purchases>Refresh</button>
+                </header>
+                <div class="dash-panel__body" data-purchases-host>
+                  <p class="dash-empty">Loading…</p>
+                </div>
+              </article>
+              <article class="dash-panel dash-panel--form">
+                <header class="dash-panel__header">
+                  <h2>New Purchase Invoice</h2>
+                </header>
+                <div class="dash-panel__body" data-purchase-form-host></div>
               </article>
             </div>
           </section>

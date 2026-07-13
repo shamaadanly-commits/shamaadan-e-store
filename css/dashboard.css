@@ -626,6 +626,29 @@
   color: rgb(196 92 92);
 }
 
+/* ── Purchase invoice line table ─────────────────────────────────── */
+.dash-purchase-table th,
+.dash-purchase-table td {
+  padding: 0.3rem 0.4rem;
+}
+
+.dash-purchase-table select,
+.dash-purchase-table input {
+  width: 100%;
+  padding: 0.5rem 0.55rem;
+  background: var(--dash-surface-2);
+  border: 1px solid var(--dash-border-soft);
+  border-radius: var(--dash-radius-sm);
+  color: var(--dash-text);
+  font: inherit;
+}
+
+.dash-purchase-table select:focus,
+.dash-purchase-table input:focus {
+  outline: none;
+  border-color: var(--dash-gold-dim);
+}
+
 .dash-table__actions {
   display: flex;
   gap: 0.35rem;

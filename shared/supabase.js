@@ -869,6 +869,90 @@ export async function cancelOpenTicket(orderId) {
   return data;
 }
 
+// ── Purchases / landed cost ─────────────────────────────────────────
+
+/**
+ * Record a supplier purchase invoice and allocate shipping/customs overhead
+ * across its lines (landed cost), then create FIFO inventory batches and bump
+ * product stock — all atomically via the process_supplier_invoice DB function.
+ *
+ * @param {{
+ *   supplier_name: string,
+ *   invoice_number?: string,
+ *   invoice_date?: string,
+ *   currency?: string,
+ *   total_shipping_transport_cost?: number,
+ *   total_customs_duties_cost?: number,
+ *   notes?: string,
+ * }} invoiceData
+ * @param {Array<{ product_id: string, supplier_unit_price: number, quantity: number }>} lineItems
+ * @returns {Promise<number>} The new invoice id.
+ */
+export async function createSupplierInvoice(invoiceData, lineItems) {
+  if (!invoiceData?.supplier_name || !String(invoiceData.supplier_name).trim()) {
+    throw new Error('Supplier name is required.');
+  }
+  const lines = (lineItems || [])
+    .map((l) => ({
+      product_id: String(l.product_id || '').trim(),
+      supplier_unit_price: Number(l.supplier_unit_price) || 0,
+      quantity: Math.trunc(Number(l.quantity) || 0),
+    }))
+    .filter((l) => l.product_id && l.quantity > 0);
+
+  if (!lines.length) {
+    throw new Error('Add at least one product line with a quantity.');
+  }
+
+  const payload = {
+    supplier_name: String(invoiceData.supplier_name).trim(),
+    invoice_number: invoiceData.invoice_number ? String(invoiceData.invoice_number).trim() : null,
+    invoice_date: invoiceData.invoice_date ? String(invoiceData.invoice_date) : null,
+    currency: invoiceData.currency ? String(invoiceData.currency).trim() : 'LYD',
+    total_shipping_transport_cost: Number(invoiceData.total_shipping_transport_cost) || 0,
+    total_customs_duties_cost: Number(invoiceData.total_customs_duties_cost) || 0,
+    notes: invoiceData.notes ? String(invoiceData.notes).trim() : null,
+  };
+
+  const { data, error } = await getSupabase().rpc('process_supplier_invoice', {
+    p_invoice: payload,
+    p_lines: lines,
+  });
+
+  if (error) {
+    if (/Could not find the function|process_supplier_invoice/i.test(error.message)) {
+      throw new Error(
+        'Purchase engine not installed. Run sql/accounting_fifo.sql, sql/supplier_invoices.sql, '
+          + 'then sql/process_supplier_invoice.sql in the Supabase SQL Editor.',
+      );
+    }
+    throw new Error(error.message);
+  }
+
+  return Number(data);
+}
+
+/**
+ * List recent supplier invoices for the dashboard.
+ * @param {number} [limit=25]
+ * @returns {Promise<object[]>}
+ */
+export async function getSupplierInvoices(limit = 25) {
+  const { data, error } = await getSupabase()
+    .from('supplier_invoices')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    if (/Could not find the table|schema cache/i.test(error.message)) {
+      return [];
+    }
+    throw new Error(error.message);
+  }
+  return data || [];
+}
+
 // ── Categories & collections (taxonomy) ─────────────────────────────
 
 const FK_BLOCKED_RE = /foreign key|violates foreign key|23503/i;

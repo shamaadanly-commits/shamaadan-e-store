@@ -21,6 +21,8 @@ import {
 import {
   getOpenTickets,
   cancelOpenTicket,
+  createSupplierInvoice,
+  getSupplierInvoices,
 } from '../../shared/supabase.js';
 import {
   generateBarcodeValue,
@@ -40,6 +42,9 @@ import {
   transactionFeedHtml,
   openTicketsPanelHtml,
   productFormHtml,
+  purchaseFormHtml,
+  purchaseLineRowHtml,
+  supplierInvoicesTableHtml,
 } from './template.js';
 
 /**
@@ -71,6 +76,8 @@ export async function mount(root) {
     openTicketsHost: root.querySelector('[data-open-tickets-host]'),
     marginHost: root.querySelector('[data-margin-host]'),
     inventoryHost: root.querySelector('[data-inventory-host]'),
+    purchasesHost: root.querySelector('[data-purchases-host]'),
+    purchaseFormHost: root.querySelector('[data-purchase-form-host]'),
     formHost: root.querySelector('[data-form-host]'),
     formTitle: root.querySelector('[data-form-title]'),
     productCount: root.querySelector('[data-product-count]'),
@@ -144,6 +151,7 @@ export async function mount(root) {
       renderTaxonomyForms();
       renderCatalogForm();
       renderForm();
+      renderPurchaseForm();
     } catch (err) {
       console.error('[admin] refreshFromSupabase failed:', err);
       window.alert(err?.message || 'Failed to sync catalog from Supabase.');
@@ -256,6 +264,34 @@ export async function mount(root) {
 
     if (target.matches('[data-refresh-open-tickets]')) {
       await refreshOpenTickets();
+      return;
+    }
+
+    if (target.matches('[data-refresh-purchases]')) {
+      await refreshPurchases();
+      return;
+    }
+
+    const addLine = target.closest('[data-add-purchase-line]');
+    if (addLine) {
+      const form = addLine.closest('form');
+      const body = form?.querySelector('[data-purchase-lines]');
+      const tpl = form?.querySelector('[data-purchase-line-tpl]');
+      if (body && tpl?.content) {
+        body.appendChild(tpl.content.cloneNode(true));
+      } else if (body) {
+        body.insertAdjacentHTML('beforeend', purchaseLineRowHtml('<option value="">Select product…</option>'));
+      }
+      return;
+    }
+
+    const removeLine = target.closest('[data-remove-purchase-line]');
+    if (removeLine) {
+      const body = removeLine.closest('[data-purchase-lines]');
+      const row = removeLine.closest('tr');
+      if (body && row && body.querySelectorAll('tr').length > 1) {
+        row.remove();
+      }
       return;
     }
 
@@ -544,6 +580,13 @@ export async function mount(root) {
       return;
     }
 
+    const purchaseForm = event.target.closest('[data-purchase-form]');
+    if (purchaseForm) {
+      event.preventDefault();
+      await savePurchaseFromForm(purchaseForm);
+      return;
+    }
+
     const form = event.target.closest('[data-product-form]');
     if (!form) return;
     event.preventDefault();
@@ -717,7 +760,9 @@ export async function mount(root) {
     renderForm();
     renderCatalogForm();
     renderTaxonomyForms();
+    renderPurchaseForm();
     refreshOpenTickets();
+    refreshPurchases();
     switchView('catalog');
   }
 
@@ -782,6 +827,7 @@ export async function mount(root) {
       catalog: 'Store Catalog — Website Products',
       taxonomy: 'Collections & Categories',
       inventory: 'Inventory Costs',
+      purchases: 'Purchases — Supplier Invoices',
     };
     if (els.pageTitle) els.pageTitle.textContent = titles[view] ?? 'Main Dashboard';
   }
@@ -829,6 +875,70 @@ export async function mount(root) {
         categoryId: editing?.category_id || '',
       });
       updateBarcodePreview(form);
+    }
+  }
+
+  function renderPurchaseForm() {
+    if (!els.purchaseFormHost) return;
+    const products = state.getSnapshot().products.filter((p) => isLiveDbId(p.id));
+    els.purchaseFormHost.innerHTML = purchaseFormHtml(products);
+  }
+
+  async function refreshPurchases() {
+    if (!els.purchasesHost) return;
+    if (!isSupabaseReady()) {
+      els.purchasesHost.innerHTML = '<p class="dash-empty">Supabase not configured — purchases unavailable.</p>';
+      return;
+    }
+    try {
+      const rows = await getSupplierInvoices();
+      els.purchasesHost.innerHTML = supplierInvoicesTableHtml(rows);
+    } catch (err) {
+      console.error('[admin] purchases load failed:', err);
+      els.purchasesHost.innerHTML = `<p class="dash-empty">${escapeHtml(err?.message || 'Failed to load purchases.')}</p>`;
+    }
+  }
+
+  async function savePurchaseFromForm(form) {
+    const data = new FormData(form);
+    const productIds = data.getAll('product_id[]');
+    const unitPrices = data.getAll('supplier_unit_price[]');
+    const quantities = data.getAll('quantity[]');
+
+    const lineItems = productIds.map((pid, i) => ({
+      product_id: String(pid || '').trim(),
+      supplier_unit_price: Number(unitPrices[i]) || 0,
+      quantity: Number(quantities[i]) || 0,
+    })).filter((l) => l.product_id && l.quantity > 0);
+
+    if (!lineItems.length) {
+      window.alert('Add at least one product line with a quantity.');
+      return;
+    }
+
+    const invoiceData = {
+      supplier_name: String(data.get('supplier_name') || '').trim(),
+      invoice_number: String(data.get('invoice_number') || '').trim(),
+      invoice_date: String(data.get('invoice_date') || '').trim(),
+      currency: String(data.get('currency') || 'LYD').trim(),
+      total_shipping_transport_cost: Number(data.get('total_shipping_transport_cost')) || 0,
+      total_customs_duties_cost: Number(data.get('total_customs_duties_cost')) || 0,
+      notes: String(data.get('notes') || '').trim(),
+    };
+
+    const submitBtn = form.querySelector('[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      await createSupplierInvoice(invoiceData, lineItems);
+      window.alert('Purchase invoice saved. Landed costs allocated and stock updated.');
+      await refreshFromSupabase();
+      await refreshPurchases();
+      renderPurchaseForm();
+    } catch (err) {
+      console.error('[admin] savePurchase failed:', err);
+      window.alert(err?.message || 'Failed to save purchase invoice.');
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
     }
   }
 
