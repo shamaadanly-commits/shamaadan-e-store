@@ -1210,3 +1210,120 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Clickable table rows ─────────────────────────────── */
+.dash-row-clickable {
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.dash-row-clickable:hover {
+  background: var(--dash-surface-2);
+}
+
+/* ── Invoice detail modal ─────────────────────────────── */
+.dash-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.dash-modal[hidden] {
+  display: none;
+}
+
+.dash-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 62%);
+  backdrop-filter: blur(2px);
+}
+
+.dash-modal__dialog {
+  position: relative;
+  z-index: 1;
+  width: min(760px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: calc(var(--dash-radius) + 4px);
+  padding: 1.5rem;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 55%);
+}
+
+.dash-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.dash-modal__title {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--dash-gold);
+}
+
+.dash-modal__sub {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--dash-text-muted);
+}
+
+.dash-modal__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.dash-modal__summary > div {
+  background: var(--dash-surface-2);
+  border: 1px solid var(--dash-border-soft);
+  border-radius: var(--dash-radius-sm);
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.dash-modal__summary span {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--dash-text-dim);
+}
+
+.dash-modal__summary strong {
+  font-size: 0.95rem;
+  color: var(--dash-text);
+}
+
+.dash-modal__notes {
+  margin: 0 0 1.25rem;
+  padding: 0.75rem;
+  background: var(--dash-surface-2);
+  border-radius: var(--dash-radius-sm);
+  font-size: 0.85rem;
+  color: var(--dash-text-muted);
+}
+
+@media (max-width: 600px) {
+  .dash-modal {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .dash-modal__dialog {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: calc(var(--dash-radius) + 4px) calc(var(--dash-radius) + 4px) 0 0;
+    padding: 1.25rem;
+  }
+}

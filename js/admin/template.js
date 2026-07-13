@@ -423,7 +423,7 @@ export function supplierInvoicesTableHtml(rows = []) {
         </thead>
         <tbody>
           ${rows.map((r) => `
-            <tr>
+            <tr class="dash-row-clickable" data-view-invoice="${escapeAttr(r.id)}" title="View invoice details">
               <td class="dash-table__num">${escapeHtml(r.invoice_date || (r.created_at ? String(r.created_at).slice(0, 10) : '—'))}</td>
               <td><strong>${escapeHtml(r.supplier_name || '—')}</strong></td>
               <td>${escapeHtml(r.invoice_number || '—')}</td>
@@ -434,6 +434,70 @@ export function supplierInvoicesTableHtml(rows = []) {
           `).join('')}
         </tbody>
       </table>
+    </div>`;
+}
+
+/**
+ * Detail modal for a single supplier invoice + its line items.
+ * @param {object} invoice
+ * @param {object[]} items
+ */
+export function supplierInvoiceDetailHtml(invoice, items = []) {
+  const money = (n) => new Intl.NumberFormat('en-LY', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
+  const cur = escapeHtml(invoice?.currency || '');
+  const date = escapeHtml(invoice?.invoice_date || (invoice?.created_at ? String(invoice.created_at).slice(0, 10) : '—'));
+
+  const rowsHtml = items.length
+    ? items.map((it) => `
+        <tr>
+          <td>
+            <strong>${escapeHtml(it.product_name || '—')}</strong>
+            ${it.product_barcode ? `<div class="dash-table__sub">${escapeHtml(it.product_barcode)}</div>` : ''}
+          </td>
+          <td class="dash-table__num">${money(it.supplier_unit_price)}</td>
+          <td class="dash-table__num">${escapeHtml(it.quantity_ordered)}</td>
+          <td class="dash-table__num">${money(it.raw_line_cost)}</td>
+          <td class="dash-table__num">${money(it.allocated_overhead)}</td>
+          <td class="dash-table__num"><strong>${money(it.final_landed_unit_cost)}</strong></td>
+        </tr>`).join('')
+    : '<tr><td colspan="6" class="dash-empty">No line items on this invoice.</td></tr>';
+
+  return `
+    <div class="dash-modal__backdrop" data-close-invoice-modal></div>
+    <div class="dash-modal__dialog" role="dialog" aria-modal="true" aria-label="Invoice details">
+      <header class="dash-modal__header">
+        <div>
+          <h2 class="dash-modal__title">${escapeHtml(invoice?.supplier_name || 'Invoice')}</h2>
+          <p class="dash-modal__sub">${escapeHtml(invoice?.invoice_number || 'No number')} · ${date}</p>
+        </div>
+        <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-close-invoice-modal aria-label="Close">✕</button>
+      </header>
+
+      <div class="dash-modal__summary">
+        <div><span>Raw cost</span><strong>${cur} ${money(invoice?.total_raw_cost)}</strong></div>
+        <div><span>Shipping</span><strong>${money(invoice?.total_shipping_transport_cost)}</strong></div>
+        <div><span>Customs</span><strong>${money(invoice?.total_customs_duties_cost)}</strong></div>
+        <div><span>Overhead</span><strong>${money(invoice?.total_overhead_cost)}</strong></div>
+        <div><span>Landed total</span><strong>${money(invoice?.total_landed_cost)}</strong></div>
+      </div>
+
+      ${invoice?.notes ? `<p class="dash-modal__notes">${escapeHtml(invoice.notes)}</p>` : ''}
+
+      <div class="dash-table-wrap">
+        <table class="dash-table">
+          <thead>
+            <tr>
+              <th scope="col">Product</th>
+              <th scope="col">Unit price</th>
+              <th scope="col">Qty</th>
+              <th scope="col">Raw</th>
+              <th scope="col">Overhead</th>
+              <th scope="col">Landed unit</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
     </div>`;
 }
 
@@ -856,6 +920,7 @@ export function buildAdminShell() {
           </section>
         </div>
       </div>
+      <div class="dash-modal" data-invoice-modal hidden></div>
     </div>
   `;
 }

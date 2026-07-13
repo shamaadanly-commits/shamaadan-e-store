@@ -953,6 +953,49 @@ export async function getSupplierInvoices(limit = 25) {
   return data || [];
 }
 
+/**
+ * Fetch one supplier invoice with its line items (and product names).
+ * @param {number|string} invoiceId
+ * @returns {Promise<{ invoice: object, items: object[] }>}
+ */
+export async function getSupplierInvoiceDetail(invoiceId) {
+  const id = Number(invoiceId);
+  const client = getSupabase();
+
+  const { data: invoice, error: invoiceError } = await client
+    .from('supplier_invoices')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (invoiceError) throw new Error(invoiceError.message);
+
+  const { data: items, error: itemsError } = await client
+    .from('supplier_invoice_items')
+    .select('*')
+    .eq('invoice_id', id)
+    .order('id', { ascending: true });
+  if (itemsError) throw new Error(itemsError.message);
+
+  const rows = items || [];
+  const productIds = [...new Set(rows.map((r) => r.product_id).filter(Boolean))];
+  let namesById = {};
+  if (productIds.length) {
+    const { data: products } = await client
+      .from('products')
+      .select('id, name, barcode')
+      .in('id', productIds);
+    namesById = Object.fromEntries((products || []).map((p) => [String(p.id), p]));
+  }
+
+  const enriched = rows.map((r) => ({
+    ...r,
+    product_name: namesById[String(r.product_id)]?.name || '—',
+    product_barcode: namesById[String(r.product_id)]?.barcode || '',
+  }));
+
+  return { invoice, items: enriched };
+}
+
 // ── Categories & collections (taxonomy) ─────────────────────────────
 
 const FK_BLOCKED_RE = /foreign key|violates foreign key|23503/i;

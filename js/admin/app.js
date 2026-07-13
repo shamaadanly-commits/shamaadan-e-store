@@ -23,6 +23,7 @@ import {
   cancelOpenTicket,
   createSupplierInvoice,
   getSupplierInvoices,
+  getSupplierInvoiceDetail,
 } from '../../shared/supabase.js';
 import {
   generateBarcodeValue,
@@ -45,6 +46,7 @@ import {
   purchaseFormHtml,
   purchaseLineRowHtml,
   supplierInvoicesTableHtml,
+  supplierInvoiceDetailHtml,
 } from './template.js';
 
 /**
@@ -78,6 +80,7 @@ export async function mount(root) {
     inventoryHost: root.querySelector('[data-inventory-host]'),
     purchasesHost: root.querySelector('[data-purchases-host]'),
     purchaseFormHost: root.querySelector('[data-purchase-form-host]'),
+    invoiceModal: root.querySelector('[data-invoice-modal]'),
     formHost: root.querySelector('[data-form-host]'),
     formTitle: root.querySelector('[data-form-title]'),
     productCount: root.querySelector('[data-product-count]'),
@@ -214,6 +217,12 @@ export async function mount(root) {
     }
   });
 
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && els.invoiceModal && !els.invoiceModal.hidden) {
+      closeInvoiceModal();
+    }
+  });
+
   root.addEventListener('click', async (event) => {
     const target = event.target;
 
@@ -269,6 +278,17 @@ export async function mount(root) {
 
     if (target.matches('[data-refresh-purchases]')) {
       await refreshPurchases();
+      return;
+    }
+
+    if (target.closest('[data-close-invoice-modal]')) {
+      closeInvoiceModal();
+      return;
+    }
+
+    const invoiceRow = target.closest('[data-view-invoice]');
+    if (invoiceRow) {
+      await openInvoiceModal(invoiceRow.getAttribute('data-view-invoice'));
       return;
     }
 
@@ -896,6 +916,28 @@ export async function mount(root) {
     } catch (err) {
       console.error('[admin] purchases load failed:', err);
       els.purchasesHost.innerHTML = `<p class="dash-empty">${escapeHtml(err?.message || 'Failed to load purchases.')}</p>`;
+    }
+  }
+
+  function closeInvoiceModal() {
+    if (!els.invoiceModal) return;
+    els.invoiceModal.hidden = true;
+    els.invoiceModal.innerHTML = '';
+  }
+
+  async function openInvoiceModal(invoiceId) {
+    if (!els.invoiceModal || !invoiceId) return;
+    els.invoiceModal.hidden = false;
+    els.invoiceModal.innerHTML = '<div class="dash-modal__backdrop" data-close-invoice-modal></div>'
+      + '<div class="dash-modal__dialog"><p class="dash-empty">Loading invoice…</p></div>';
+    try {
+      const { invoice, items } = await getSupplierInvoiceDetail(invoiceId);
+      els.invoiceModal.innerHTML = supplierInvoiceDetailHtml(invoice, items);
+    } catch (err) {
+      console.error('[admin] invoice detail failed:', err);
+      els.invoiceModal.innerHTML = '<div class="dash-modal__backdrop" data-close-invoice-modal></div>'
+        + `<div class="dash-modal__dialog"><p class="dash-empty">${escapeHtml(err?.message || 'Failed to load invoice.')}</p>`
+        + '<button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-close-invoice-modal>Close</button></div>';
     }
   }
 
