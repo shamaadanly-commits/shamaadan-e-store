@@ -1437,6 +1437,32 @@
   }
 }
 
+/* ── Waste summary bar ────────────────────────────────── */
+.dash-waste-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgb(196 92 92 / 8%);
+  border: 1px solid rgb(196 92 92 / 20%);
+  border-radius: var(--dash-radius-sm);
+}
+
+.dash-waste-summary span {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--dash-text-muted);
+}
+
+.dash-waste-summary strong {
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Clickable table rows ─────────────────────────────── */
 .dash-row-clickable {
   cursor: pointer;

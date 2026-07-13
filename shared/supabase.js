@@ -1041,6 +1041,78 @@ export async function getAccountingBackup() {
   return result;
 }
 
+// ── Inventory waste / spoilage ──────────────────────────────────────
+
+/**
+ * Record wasted / spoiled / damaged stock. Deducts FIFO from inventory batches,
+ * lowers product stock, and captures the cost — all atomically via the
+ * process_inventory_waste DB function.
+ *
+ * @param {string} productId
+ * @param {number} quantity
+ * @param {string} reason
+ * @returns {Promise<number>} Total cost of the wasted stock.
+ */
+export async function recordInventoryWaste(productId, quantity, reason) {
+  const pid = String(productId || '').trim();
+  const qty = Math.trunc(Number(quantity) || 0);
+  if (!pid) throw new Error('Select a product.');
+  if (qty <= 0) throw new Error('Enter a quantity greater than zero.');
+
+  const { data, error } = await getSupabase().rpc('process_inventory_waste', {
+    p_product_id: pid,
+    p_quantity: qty,
+    p_reason: reason ? String(reason).trim() : null,
+  });
+
+  if (error) {
+    if (/Could not find the function|process_inventory_waste/i.test(error.message)) {
+      throw new Error(
+        'Waste engine not installed. Run sql/accounting_fifo.sql then '
+          + 'sql/process_inventory_waste.sql in the Supabase SQL Editor.',
+      );
+    }
+    throw new Error(error.message);
+  }
+  return Number(data) || 0;
+}
+
+/**
+ * List recent waste records with product names and line cost.
+ * @param {number} [limit=25]
+ * @returns {Promise<object[]>}
+ */
+export async function getWasteRecords(limit = 25) {
+  const client = getSupabase();
+  const { data, error } = await client
+    .from('inventory_waste')
+    .select('*')
+    .order('recorded_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    if (/Could not find the table|schema cache/i.test(error.message)) return [];
+    throw new Error(error.message);
+  }
+
+  const rows = data || [];
+  const productIds = [...new Set(rows.map((r) => r.product_id).filter(Boolean))];
+  let namesById = {};
+  if (productIds.length) {
+    const { data: products } = await client
+      .from('products')
+      .select('id, name')
+      .in('id', productIds);
+    namesById = Object.fromEntries((products || []).map((p) => [String(p.id), p.name]));
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    product_name: namesById[String(r.product_id)] || '—',
+    line_cost: (Number(r.unit_cost) || 0) * (Number(r.quantity) || 0),
+  }));
+}
+
 // ── Categories & collections (taxonomy) ─────────────────────────────
 
 const FK_BLOCKED_RE = /foreign key|violates foreign key|23503/i;

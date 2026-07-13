@@ -502,6 +502,87 @@ export function supplierInvoiceDetailHtml(invoice, items = []) {
 }
 
 /**
+ * The "Record Waste" form (product, quantity, reason).
+ * @param {Array<object>} products
+ */
+export function wasteFormHtml(products = []) {
+  const options = purchaseProductOptionsHtml(products);
+  return `
+    <form class="dash-form" data-waste-form autocomplete="off">
+      <div class="dash-field">
+        <label for="waste-product">Product</label>
+        <select id="waste-product" name="product_id" data-waste-product required>${options}</select>
+      </div>
+      <div class="dash-form__grid">
+        <div class="dash-field">
+          <label for="waste-qty">Quantity wasted</label>
+          <input id="waste-qty" name="quantity" type="number" min="1" step="1" required placeholder="0" inputmode="numeric">
+        </div>
+        <div class="dash-field">
+          <label for="waste-reason">Reason</label>
+          <input id="waste-reason" name="reason" type="text" list="waste-reasons" placeholder="Damaged / expired / broken">
+          <datalist id="waste-reasons">
+            <option value="Damaged"></option>
+            <option value="Expired"></option>
+            <option value="Broken"></option>
+            <option value="Lost / stolen"></option>
+            <option value="Quality reject"></option>
+          </datalist>
+        </div>
+      </div>
+      <div class="dash-form__actions">
+        <button type="submit" class="dash-btn dash-btn--danger">Record waste &amp; deduct stock</button>
+      </div>
+      <p class="dash-form__note">Stock is removed FIFO from the oldest batches and the loss (at landed cost) is recorded in accounting.</p>
+    </form>`;
+}
+
+/**
+ * Recent waste records table.
+ * @param {Array<object>} rows
+ */
+export function wasteTableHtml(rows = []) {
+  if (!rows.length) {
+    return '<p class="dash-empty">No waste recorded yet.</p>';
+  }
+
+  const money = (n) => new Intl.NumberFormat('en-LY', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
+  const total = rows.reduce((acc, r) => acc + (Number(r.line_cost) || 0), 0);
+
+  return `
+    <div class="dash-waste-summary">
+      <span>Total waste loss</span>
+      <strong class="dash-summary__cost">${money(total)}</strong>
+    </div>
+    <div class="dash-table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">Product</th>
+            <th scope="col">Reason</th>
+            <th scope="col">Qty</th>
+            <th scope="col">Unit cost</th>
+            <th scope="col">Loss</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((r) => `
+            <tr>
+              <td class="dash-table__num">${escapeHtml(r.recorded_at ? String(r.recorded_at).slice(0, 10) : '—')}</td>
+              <td><strong>${escapeHtml(r.product_name || '—')}</strong></td>
+              <td>${escapeHtml(r.waste_reason || '—')}</td>
+              <td class="dash-table__num">${escapeHtml(r.quantity)}</td>
+              <td class="dash-table__num">${money(r.unit_cost)}</td>
+              <td class="dash-table__num dash-summary__cost">${money(r.line_cost)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+/**
  * @param {Array<{ id: string, name: string }>} items
  * @param {string} selectedId
  * @param {string} emptyLabel
@@ -770,6 +851,9 @@ export function buildAdminShell() {
           <button type="button" class="dash-nav__link" data-view="purchases">
             <span aria-hidden="true">🧾</span> Purchases
           </button>
+          <button type="button" class="dash-nav__link" data-view="waste">
+            <span aria-hidden="true">🗑</span> Waste
+          </button>
           <a href="/?app=storefront" class="dash-nav__link dash-nav__link--external" target="_blank" rel="noopener">
             <span aria-hidden="true">🌐</span> View Website
           </a>
@@ -918,6 +1002,29 @@ export function buildAdminShell() {
                   <h2>New Purchase Invoice</h2>
                 </header>
                 <div class="dash-panel__body" data-purchase-form-host></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="dash-view" data-panel="waste" aria-label="Inventory waste" hidden>
+            <div class="dash-catalog-intro">
+              <p>Record damaged, expired, or lost stock. The quantity is removed from inventory (FIFO from the oldest batches) and the loss is booked to accounting at landed cost.</p>
+            </div>
+            <div class="dash-inventory-layout">
+              <article class="dash-panel dash-panel--grow">
+                <header class="dash-panel__header dash-panel__header--row">
+                  <h2>Recent Waste</h2>
+                  <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-refresh-waste>Refresh</button>
+                </header>
+                <div class="dash-panel__body" data-waste-host>
+                  <p class="dash-empty">Loading…</p>
+                </div>
+              </article>
+              <article class="dash-panel dash-panel--form">
+                <header class="dash-panel__header">
+                  <h2>Record Waste</h2>
+                </header>
+                <div class="dash-panel__body" data-waste-form-host></div>
               </article>
             </div>
           </section>

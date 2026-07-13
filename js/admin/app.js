@@ -24,6 +24,8 @@ import {
   createSupplierInvoice,
   getSupplierInvoices,
   getSupplierInvoiceDetail,
+  recordInventoryWaste,
+  getWasteRecords,
 } from '../../shared/supabase.js';
 import { downloadAccountingBackupPdf } from './backup.js';
 import {
@@ -48,6 +50,8 @@ import {
   purchaseLineRowHtml,
   supplierInvoicesTableHtml,
   supplierInvoiceDetailHtml,
+  wasteFormHtml,
+  wasteTableHtml,
 } from './template.js';
 
 /**
@@ -81,6 +85,8 @@ export async function mount(root) {
     inventoryHost: root.querySelector('[data-inventory-host]'),
     purchasesHost: root.querySelector('[data-purchases-host]'),
     purchaseFormHost: root.querySelector('[data-purchase-form-host]'),
+    wasteHost: root.querySelector('[data-waste-host]'),
+    wasteFormHost: root.querySelector('[data-waste-form-host]'),
     invoiceModal: root.querySelector('[data-invoice-modal]'),
     formHost: root.querySelector('[data-form-host]'),
     formTitle: root.querySelector('[data-form-title]'),
@@ -156,6 +162,7 @@ export async function mount(root) {
       renderCatalogForm();
       renderForm();
       renderPurchaseForm();
+      renderWasteForm();
     } catch (err) {
       console.error('[admin] refreshFromSupabase failed:', err);
       window.alert(err?.message || 'Failed to sync catalog from Supabase.');
@@ -279,6 +286,11 @@ export async function mount(root) {
 
     if (target.matches('[data-refresh-purchases]')) {
       await refreshPurchases();
+      return;
+    }
+
+    if (target.matches('[data-refresh-waste]')) {
+      await refreshWaste();
       return;
     }
 
@@ -625,6 +637,13 @@ export async function mount(root) {
       return;
     }
 
+    const wasteForm = event.target.closest('[data-waste-form]');
+    if (wasteForm) {
+      event.preventDefault();
+      await saveWasteFromForm(wasteForm);
+      return;
+    }
+
     const form = event.target.closest('[data-product-form]');
     if (!form) return;
     event.preventDefault();
@@ -799,8 +818,10 @@ export async function mount(root) {
     renderCatalogForm();
     renderTaxonomyForms();
     renderPurchaseForm();
+    renderWasteForm();
     refreshOpenTickets();
     refreshPurchases();
+    refreshWaste();
     switchView('catalog');
   }
 
@@ -866,6 +887,7 @@ export async function mount(root) {
       taxonomy: 'Collections & Categories',
       inventory: 'Inventory Costs',
       purchases: 'Purchases — Supplier Invoices',
+      waste: 'Waste — Damaged & Lost Stock',
     };
     if (els.pageTitle) els.pageTitle.textContent = titles[view] ?? 'Main Dashboard';
   }
@@ -997,6 +1019,59 @@ export async function mount(root) {
     } catch (err) {
       console.error('[admin] savePurchase failed:', err);
       window.alert(err?.message || 'Failed to save purchase invoice.');
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  }
+
+  function renderWasteForm() {
+    if (!els.wasteFormHost) return;
+    const products = state.getSnapshot().products.filter((p) => isLiveDbId(p.id));
+    els.wasteFormHost.innerHTML = wasteFormHtml(products);
+  }
+
+  async function refreshWaste() {
+    if (!els.wasteHost) return;
+    if (!isSupabaseReady()) {
+      els.wasteHost.innerHTML = '<p class="dash-empty">Supabase not configured — waste tracking unavailable.</p>';
+      return;
+    }
+    try {
+      const rows = await getWasteRecords();
+      els.wasteHost.innerHTML = wasteTableHtml(rows);
+    } catch (err) {
+      console.error('[admin] waste load failed:', err);
+      els.wasteHost.innerHTML = `<p class="dash-empty">${escapeHtml(err?.message || 'Failed to load waste records.')}</p>`;
+    }
+  }
+
+  async function saveWasteFromForm(form) {
+    const data = new FormData(form);
+    const productId = String(data.get('product_id') || '').trim();
+    const quantity = Number(data.get('quantity')) || 0;
+    const reason = String(data.get('reason') || '').trim();
+
+    if (!productId) {
+      window.alert('Select a product to record waste.');
+      return;
+    }
+    if (quantity <= 0) {
+      window.alert('Enter a quantity greater than zero.');
+      return;
+    }
+
+    const submitBtn = form.querySelector('[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      const cost = await recordInventoryWaste(productId, quantity, reason);
+      const money = new Intl.NumberFormat('en-LY', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(cost);
+      window.alert(`Waste recorded. Stock deducted and ${money} booked as a loss.`);
+      await refreshFromSupabase();
+      await refreshWaste();
+      renderWasteForm();
+    } catch (err) {
+      console.error('[admin] saveWaste failed:', err);
+      window.alert(err?.message || 'Failed to record waste.');
     } finally {
       if (submitBtn) submitBtn.disabled = false;
     }
