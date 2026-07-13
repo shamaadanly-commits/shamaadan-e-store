@@ -25,6 +25,7 @@ import {
   getSupplierInvoices,
   getSupplierInvoiceDetail,
 } from '../../shared/supabase.js';
+import { downloadAccountingBackupPdf } from './backup.js';
 import {
   generateBarcodeValue,
   renderBarcodeInto,
@@ -278,6 +279,23 @@ export async function mount(root) {
 
     if (target.matches('[data-refresh-purchases]')) {
       await refreshPurchases();
+      return;
+    }
+
+    const backupBtn = target.closest('[data-backup-pdf]');
+    if (backupBtn) {
+      const original = backupBtn.textContent;
+      backupBtn.disabled = true;
+      backupBtn.textContent = 'Generating…';
+      try {
+        await downloadAccountingBackupPdf();
+      } catch (err) {
+        console.error('[admin] backup failed:', err);
+        window.alert(err?.message || 'Could not generate the backup PDF.');
+      } finally {
+        backupBtn.disabled = false;
+        backupBtn.textContent = original;
+      }
       return;
     }
 

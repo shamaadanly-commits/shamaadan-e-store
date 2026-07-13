@@ -996,6 +996,51 @@ export async function getSupplierInvoiceDetail(invoiceId) {
   return { invoice, items: enriched };
 }
 
+/**
+ * Fetch everything related to Accounting & Purchases for a daily backup.
+ * Tables that don't exist (partial installs) are skipped, not fatal.
+ * @returns {Promise<Record<string, object[]>>}
+ */
+export async function getAccountingBackup() {
+  const client = getSupabase();
+  const tables = [
+    'supplier_invoices',
+    'supplier_invoice_items',
+    'inventory_batches',
+    'inventory_transactions',
+    'sales_items',
+    'inventory_waste',
+    'operating_expenses',
+  ];
+
+  const result = {};
+  await Promise.all(
+    tables.map(async (name) => {
+      try {
+        const { data, error } = await client
+          .from(name)
+          .select('*')
+          .order('id', { ascending: true });
+        if (error) {
+          // Missing table / no id column — try a plain select, else skip.
+          if (/Could not find the table|schema cache|column .*id.* does not exist/i.test(error.message)) {
+            const retry = await client.from(name).select('*');
+            result[name] = retry.error ? [] : (retry.data || []);
+          } else {
+            result[name] = [];
+          }
+        } else {
+          result[name] = data || [];
+        }
+      } catch {
+        result[name] = [];
+      }
+    }),
+  );
+
+  return result;
+}
+
 // ── Categories & collections (taxonomy) ─────────────────────────────
 
 const FK_BLOCKED_RE = /foreign key|violates foreign key|23503/i;

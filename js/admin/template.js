@@ -904,7 +904,10 @@ export function buildAdminShell() {
               <article class="dash-panel dash-panel--grow">
                 <header class="dash-panel__header dash-panel__header--row">
                   <h2>Recent Purchase Invoices</h2>
-                  <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-refresh-purchases>Refresh</button>
+                  <div class="dash-panel__header-actions">
+                    <button type="button" class="dash-btn dash-btn--primary dash-btn--sm" data-backup-pdf>⬇ Daily Backup (PDF)</button>
+                    <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-refresh-purchases>Refresh</button>
+                  </div>
                 </header>
                 <div class="dash-panel__body" data-purchases-host>
                   <p class="dash-empty">Loading…</p>
