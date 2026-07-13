@@ -46,6 +46,7 @@ export async function mount(root) {
   }
 
   const cart = createCart();
+  cart.reconcile(products);
   const checkout = initCheckout(root, cart, i18n);
 
   let activeFilter = 'All';

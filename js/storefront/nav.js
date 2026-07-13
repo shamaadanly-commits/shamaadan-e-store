@@ -31,6 +31,11 @@ export function initNav(root, i18n) {
     }
 
     navLinks.forEach((link) => {
+      if (link.hasAttribute('data-tab-home')) {
+        // Home tab is active only at the very top (before any tracked section).
+        link.classList.toggle('is-active', current === '');
+        return;
+      }
       const href = link.getAttribute('href')?.replace('#', '') ?? '';
       link.classList.toggle('is-active', href === current);
     });

@@ -328,6 +328,28 @@ export function buildStorefrontHtml({ products, categories, collections = [], i1
       <span class="shop-toast__icon" aria-hidden="true">✦</span>
       <span data-toast-message></span>
     </div>
+
+    <nav class="shop-tabbar" aria-label="${t('nav.primary')}" data-tabbar>
+      <a href="#main-content" class="shop-tabbar__item" data-nav-link data-tab-home>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+        <span>${t('nav.tabHome')}</span>
+      </a>
+      <a href="#shop" class="shop-tabbar__item" data-nav-link>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        <span>${t('nav.shop')}</span>
+      </a>
+      <a href="#collections" class="shop-tabbar__item" data-nav-link>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 3 7.5l9 4.5 9-4.5L12 3Z"/><path d="M3 12l9 4.5L21 12"/><path d="M3 16.5 12 21l9-4.5"/></svg>
+        <span>${t('nav.collections')}</span>
+      </a>
+      <button type="button" class="shop-tabbar__item" data-cart-toggle aria-label="${t('nav.cart')}">
+        <span class="shop-tabbar__bag">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H2"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
+          <span class="shop-tabbar__count" data-cart-count aria-live="polite">0</span>
+        </span>
+        <span>${t('nav.tabBag')}</span>
+      </button>
+    </nav>
   `;
 }
 

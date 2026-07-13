@@ -7,6 +7,13 @@
   <meta name="theme-color" content="#181510">
   <title>Shamaadan</title>
 
+  <!-- PWA / installable app -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Shamaadan">
+
   <link rel="icon" href="/assets/images/logo.png" type="image/png">
   <link rel="apple-touch-icon" href="/assets/images/logo.png">
   <link rel="preload" href="/assets/images/logo.png" as="image" type="image/png">
@@ -32,5 +39,12 @@
   <script>window.__ENV__ = window.__ENV__ || {};</script>
   <script src="/api/env.js"></script>
   <script type="module" src="/js/router.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>

@@ -1,18 +1,78 @@
 /**
  * Shopping bag state with quantity controls.
+ * The bag is persisted to localStorage so it survives closing/reopening the site.
  */
 
 const FREE_SHIPPING_THRESHOLD = 75;
 const SHIPPING_FLAT = 12;
+const STORAGE_KEY = 'shamaadan_cart_v1';
+
+/** @returns {Array<{ product: object, qty: number }>} */
+function loadPersisted() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (entry) => entry && entry.product && entry.product.id && Number(entry.qty) > 0,
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** @param {Map<string, { product: object, qty: number }>} items */
+function persist(items) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(items.values())));
+  } catch {
+    // Storage unavailable (private mode / quota) — cart simply won't persist.
+  }
+}
 
 export function createCart() {
   /** @type {Map<string, { product: object, qty: number }>} */
   const items = new Map();
   const listeners = new Set();
 
+  // Restore any previously saved bag.
+  loadPersisted().forEach(({ product, qty }) => {
+    items.set(product.id, { product, qty: Number(qty) });
+  });
+
   function notify() {
+    persist(items);
     const snapshot = getSnapshot();
     listeners.forEach((fn) => fn(snapshot));
+  }
+
+  /**
+   * Refresh persisted lines against the freshly loaded catalog: update price /
+   * name / stock, clamp quantities to available stock, and drop items that no
+   * longer exist or are out of stock. Call once after the catalog loads.
+   * @param {Array<object>} products
+   */
+  function reconcile(products) {
+    if (!Array.isArray(products)) return;
+    const byId = new Map(products.map((p) => [String(p.id), p]));
+
+    for (const [id, line] of items) {
+      const fresh = byId.get(String(id));
+      if (!fresh) {
+        items.delete(id);
+        continue;
+      }
+      const stock = Number(fresh.stockQuantity ?? fresh.stock ?? fresh.stock_quantity ?? Infinity);
+      if (stock <= 0) {
+        items.delete(id);
+        continue;
+      }
+      line.product = fresh;
+      if (line.qty > stock) line.qty = stock;
+    }
+
+    notify();
   }
 
   function getSnapshot() {
@@ -82,7 +142,7 @@ export function createCart() {
     return () => listeners.delete(fn);
   }
 
-  return { add, updateQty, remove, clear, subscribe, getSnapshot };
+  return { add, updateQty, remove, clear, subscribe, getSnapshot, reconcile };
 }
 
 /**
@@ -90,12 +150,13 @@ export function createCart() {
  * @param {ReturnType<typeof createCart>} cart
  */
 export function bindCartUI(root, cart) {
-  const countEl = root.querySelector('[data-cart-count]');
+  const countEls = root.querySelectorAll('[data-cart-count]');
 
   cart.subscribe(({ count }) => {
-    if (!countEl) return;
-    countEl.textContent = String(count);
-    countEl.classList.toggle('is-visible', count > 0);
+    countEls.forEach((countEl) => {
+      countEl.textContent = String(count);
+      countEl.classList.toggle('is-visible', count > 0);
+    });
   });
 }
 

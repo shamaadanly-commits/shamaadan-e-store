@@ -392,6 +392,36 @@
   background: var(--color-glow);
 }
 
+/* App-style category scroller on mobile: sticky, horizontal, edge-to-edge */
+@media (max-width: 768px) {
+  .shop-products__filters {
+    position: sticky;
+    top: calc(var(--header-height) + env(safe-area-inset-top));
+    z-index: 40;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin-inline: calc(-1 * var(--space-container));
+    padding: 0.75rem var(--space-container);
+    background: rgb(var(--rgb-bg-deep) / 90%);
+    backdrop-filter: blur(14px) saturate(1.2);
+    border-block: 1px solid var(--color-border-soft);
+  }
+
+  .shop-products__filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filter-chip {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    padding: 0.55rem 1.05rem;
+    min-height: 2.4rem;
+  }
+}
+
 /* ── Ritual feature ──────────────────────────────────────────────── */
 .ritual {
   position: relative;
