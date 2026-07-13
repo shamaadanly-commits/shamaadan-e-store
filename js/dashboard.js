@@ -505,9 +505,9 @@ export function createDashboardState(options = {}) {
         };
       }
 
-      const reassignTo = String(options.reassignTo || 'General').trim() || 'General';
+      const reassignTo = String(options.reassignTo || '').trim();
       const { persistDeleteCollection } = await import('./admin/catalog-api.js');
-      const catalog = await persistDeleteCollection(target.id, mode === 'null' ? 'General' : reassignTo);
+      const catalog = await persistDeleteCollection(target.id, mode === 'null' ? '' : reassignTo);
       hydrateCatalog(catalog);
       return { ok: true, reassigned: linked.length };
     } catch (err) {
@@ -573,9 +573,9 @@ export function createDashboardState(options = {}) {
         };
       }
 
-      const reassignTo = String(options.reassignTo || 'General').trim() || 'General';
+      const reassignTo = String(options.reassignTo || '').trim();
       const { persistDeleteCategory } = await import('./admin/catalog-api.js');
-      const catalog = await persistDeleteCategory(target.id, mode === 'null' ? 'General' : reassignTo);
+      const catalog = await persistDeleteCategory(target.id, mode === 'null' ? '' : reassignTo);
       hydrateCatalog(catalog);
       return { ok: true, reassigned: linked.length };
     } catch (err) {

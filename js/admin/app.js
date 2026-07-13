@@ -323,13 +323,13 @@ export async function mount(root) {
         || state.getSnapshot().collections.find((c) => c.id === id);
       if (!item) return;
       const reassignTo = window.prompt(
-        `Delete collection "${item.name}"?\nProducts will move to this collection (leave blank to use General):`,
-        'General',
+        `Delete collection "${item.name}"?\nType another collection name to move its products there, or leave blank to leave them uncategorized:`,
+        '',
       );
       if (reassignTo === null) return;
 
       try {
-        await persistDeleteCollection(id, reassignTo.trim() || 'General');
+        await persistDeleteCollection(id, reassignTo.trim());
         await refreshFromSupabase();
       } catch (err) {
         console.error('[admin] deleteCollection failed:', err);
@@ -374,13 +374,13 @@ export async function mount(root) {
         || state.getSnapshot().categories.find((c) => c.id === id);
       if (!item) return;
       const reassignTo = window.prompt(
-        `Delete category "${item.name}"?\nProducts will move to this category (leave blank to use General):`,
-        'General',
+        `Delete category "${item.name}"?\nType another category name to move its products there, or leave blank to leave them uncategorized:`,
+        '',
       );
       if (reassignTo === null) return;
 
       try {
-        await persistDeleteCategory(id, reassignTo.trim() || 'General');
+        await persistDeleteCategory(id, reassignTo.trim());
         await refreshFromSupabase();
       } catch (err) {
         console.error('[admin] deleteCategory failed:', err);

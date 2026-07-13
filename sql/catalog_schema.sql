@@ -120,13 +120,8 @@ create policy "products_insert_all" on public.products for insert with check (tr
 create policy "products_update_all" on public.products for update using (true) with check (true);
 create policy "products_delete_all" on public.products for delete using (true);
 
--- Seed a default General row so product forms can be used immediately
-insert into public.categories (name, description)
-select 'General', 'Default category'
-where not exists (select 1 from public.categories where lower(name) = 'general');
-
-insert into public.collections (name, description)
-select 'General', 'Default collection'
-where not exists (select 1 from public.collections where lower(name) = 'general');
+-- Note: no default "General" category/collection is seeded. Create your own
+-- collections and categories from the admin dashboard. (To remove a "General"
+-- row left over from an earlier schema version, run sql/remove_general.sql.)
 
 notify pgrst, 'reload schema';

@@ -987,37 +987,35 @@ export async function deleteCategory(id, options = {}) {
     }
 
     if (mode !== 'block') {
-      let targetId = options.reassignTo ? String(options.reassignTo).trim() : '';
-      const targetName = String(options.reassignToName || options.reassignTo || 'General').trim() || 'General';
+      // Resolve an explicit reassignment target. Only reassign when the caller
+      // actually asks for it — never silently create a "General" bucket.
+      let targetId = isLiveDbId(options.reassignTo) ? String(options.reassignTo).trim() : '';
+      const targetName = String(options.reassignToName || '').trim();
 
-      if (mode === 'reassign' || !targetId) {
-        const general = await ensureNamedCategory(
-          targetId && targetId.toLowerCase() !== 'general' && targetId.includes('-')
-            ? targetName
-            : targetName,
-        );
-        // If reassignTo was already a UUID, prefer it; otherwise use ensured row
-        if (!(targetId && targetId.includes('-') && targetId.length > 20)) {
-          targetId = general.id;
-        }
+      if (mode === 'reassign' && !targetId && targetName) {
+        const dest = await ensureNamedCategory(targetName);
+        targetId = dest.id;
       }
 
-      if (mode === 'null') {
-        const { error: clearError } = await supabase
-          .from('products')
-          .update({ category_id: null, updated_at: new Date().toISOString() })
-          .eq('category_id', categoryId);
-        if (clearError) console.warn('[shared/supabase] category_id clear:', clearError.message);
-      } else {
+      const reassigning = mode === 'reassign' && isLiveDbId(targetId);
+
+      if (reassigning) {
         const { error: moveError } = await supabase
           .from('products')
           .update({ category_id: targetId, updated_at: new Date().toISOString() })
           .eq('category_id', categoryId);
         if (moveError) console.warn('[shared/supabase] category_id migrate:', moveError.message);
+      } else {
+        // No target → leave products uncategorized (FK is ON DELETE SET NULL).
+        const { error: clearError } = await supabase
+          .from('products')
+          .update({ category_id: null, updated_at: new Date().toISOString() })
+          .eq('category_id', categoryId);
+        if (clearError) console.warn('[shared/supabase] category_id clear:', clearError.message);
       }
 
       if (oldName) {
-        const destName = mode === 'null' ? 'General' : targetName;
+        const destName = reassigning ? targetName : null;
         const { error: textError } = await supabase
           .from('products')
           .update({ category: destName, updated_at: new Date().toISOString() })
@@ -1093,30 +1091,35 @@ export async function deleteCollection(id, options = {}) {
     }
 
     if (mode !== 'block') {
-      let targetId = options.reassignTo ? String(options.reassignTo).trim() : '';
-      const targetName = String(options.reassignToName || options.reassignTo || 'General').trim() || 'General';
+      // Resolve an explicit reassignment target. Only reassign when the caller
+      // actually asks for it — never silently create a "General" bucket.
+      let targetId = isLiveDbId(options.reassignTo) ? String(options.reassignTo).trim() : '';
+      const targetName = String(options.reassignToName || '').trim();
 
-      const general = await ensureNamedCollection(targetName);
-      if (!(targetId && targetId.includes('-') && targetId.length > 20)) {
-        targetId = general.id;
+      if (mode === 'reassign' && !targetId && targetName) {
+        const dest = await ensureNamedCollection(targetName);
+        targetId = dest.id;
       }
 
-      if (mode === 'null') {
-        const { error: clearError } = await supabase
-          .from('products')
-          .update({ collection_id: null, updated_at: new Date().toISOString() })
-          .eq('collection_id', collectionId);
-        if (clearError) console.warn('[shared/supabase] collection_id clear:', clearError.message);
-      } else {
+      const reassigning = mode === 'reassign' && isLiveDbId(targetId);
+
+      if (reassigning) {
         const { error: moveError } = await supabase
           .from('products')
           .update({ collection_id: targetId, updated_at: new Date().toISOString() })
           .eq('collection_id', collectionId);
         if (moveError) console.warn('[shared/supabase] collection_id migrate:', moveError.message);
+      } else {
+        // No target → leave products uncategorized (FK is ON DELETE SET NULL).
+        const { error: clearError } = await supabase
+          .from('products')
+          .update({ collection_id: null, updated_at: new Date().toISOString() })
+          .eq('collection_id', collectionId);
+        if (clearError) console.warn('[shared/supabase] collection_id clear:', clearError.message);
       }
 
       if (oldName) {
-        const destName = mode === 'null' ? 'General' : targetName;
+        const destName = reassigning ? targetName : null;
         for (const col of ['collection', 'collection_name', 'category']) {
           const { error: textError } = await supabase
             .from('products')

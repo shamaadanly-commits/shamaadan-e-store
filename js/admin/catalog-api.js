@@ -87,18 +87,23 @@ export async function fetchAdminCatalog() {
  * @param {string} id
  * @param {string} [reassignToName='General']
  */
-export async function persistDeleteCollection(id, reassignToName = 'General') {
+export async function persistDeleteCollection(id, reassignToName = '') {
   assertLiveSupabase();
-  const targetName = String(reassignToName || 'General').trim() || 'General';
-  console.info('[catalog-api] deleteCollection', { id, reassignToName: targetName });
+  const targetName = String(reassignToName || '').trim();
+  console.info('[catalog-api] deleteCollection', { id, reassignToName: targetName || '(uncategorized)' });
 
   try {
-    const general = await ensureNamedCollection(targetName);
-    await sbDeleteCollection(id, {
-      mode: 'reassign',
-      reassignTo: general.id,
-      reassignToName: targetName,
-    });
+    if (targetName) {
+      const dest = await ensureNamedCollection(targetName);
+      await sbDeleteCollection(id, {
+        mode: 'reassign',
+        reassignTo: dest.id,
+        reassignToName: targetName,
+      });
+    } else {
+      // No target name → leave products uncategorized instead of creating "General".
+      await sbDeleteCollection(id, { mode: 'null' });
+    }
     return fetchAdminCatalog();
   } catch (err) {
     throw mapSupabaseNetworkError(err, 'deleting collection');
@@ -110,18 +115,23 @@ export async function persistDeleteCollection(id, reassignToName = 'General') {
  * @param {string} id
  * @param {string} [reassignToName='General']
  */
-export async function persistDeleteCategory(id, reassignToName = 'General') {
+export async function persistDeleteCategory(id, reassignToName = '') {
   assertLiveSupabase();
-  const targetName = String(reassignToName || 'General').trim() || 'General';
-  console.info('[catalog-api] deleteCategory', { id, reassignToName: targetName });
+  const targetName = String(reassignToName || '').trim();
+  console.info('[catalog-api] deleteCategory', { id, reassignToName: targetName || '(uncategorized)' });
 
   try {
-    const general = await ensureNamedCategory(targetName);
-    await sbDeleteCategory(id, {
-      mode: 'reassign',
-      reassignTo: general.id,
-      reassignToName: targetName,
-    });
+    if (targetName) {
+      const dest = await ensureNamedCategory(targetName);
+      await sbDeleteCategory(id, {
+        mode: 'reassign',
+        reassignTo: dest.id,
+        reassignToName: targetName,
+      });
+    } else {
+      // No target name → leave products uncategorized instead of creating "General".
+      await sbDeleteCategory(id, { mode: 'null' });
+    }
     return fetchAdminCatalog();
   } catch (err) {
     throw mapSupabaseNetworkError(err, 'deleting category');
