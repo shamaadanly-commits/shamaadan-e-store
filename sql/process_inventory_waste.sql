@@ -43,7 +43,10 @@ begin
   end if;
 
   -- Make sure the product exists and has enough stock overall.
-  select coalesce(current_stock, coalesce(stock_quantity, 0)), coalesce(wholesale_cost, 0)
+  -- Catalog-created products carry stock in stock_quantity while current_stock
+  -- stays 0 (only purchase invoices bump current_stock), so use whichever is
+  -- higher as the true on-hand quantity.
+  select greatest(coalesce(current_stock, 0), coalesce(stock_quantity, 0)), coalesce(wholesale_cost, 0)
     into v_available, v_fallback
     from products
    where id = p_product_id
