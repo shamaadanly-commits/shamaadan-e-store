@@ -18,6 +18,7 @@ function barcodeFieldHtml(inputId, barcode = '', label = 'Barcode') {
       <label for="${inputId}">${label}</label>
       <div class="dash-barcode-row">
         <input id="${inputId}" name="barcode" type="text" required
+          class="dash-input--bidi"
           value="${escapeAttr(barcode)}" placeholder="Scan, type, or generate"
           data-barcode-input autocomplete="off">
         <button type="button" class="dash-btn dash-btn--ghost" data-barcode-generate>Generate</button>
@@ -108,7 +109,7 @@ export function catalogTableHtml(products, filterCollection = 'All') {
             <th scope="col">Product</th>
             <th scope="col">Collection</th>
             <th scope="col">Category</th>
-            <th scope="col">Retail (سعر البيع)</th>
+            <th scope="col"><span class="dash-field__label-en">Retail</span> <span class="dash-field__label-ar" lang="ar">سعر البيع</span></th>
             <th scope="col">Stock</th>
             <th scope="col">Barcode</th>
             <th scope="col">On Website</th>
@@ -283,28 +284,28 @@ export function catalogFormHtml(product = null, collections = [], categories = [
 
       <div class="dash-form__grid">
         <div class="dash-field dash-field--full">
-          <label for="cat-title">Product Title</label>
-          <input id="cat-title" name="title" type="text" required value="${escapeAttr(product?.title ?? '')}" placeholder="Oud Noir Candle">
+          <label for="cat-title"><span class="dash-field__label-en">Product Title</span> <span class="dash-field__label-ar" lang="ar">اسم المنتج</span></label>
+          <input id="cat-title" name="title" type="text" class="dash-input--bidi" required value="${escapeAttr(product?.title ?? '')}" placeholder="Oud Noir Candle">
         </div>
         <div class="dash-field">
-          <label for="cat-collection">Collection</label>
+          <label for="cat-collection"><span class="dash-field__label-en">Collection</span></label>
           <select id="cat-collection" name="collection_id" data-collection-select required ${liveCollections.length ? '' : 'disabled'}>
             ${taxonomySelectOptionsHtml(liveCollections, selectedCollectionId, 'Please create a Collection first')}
           </select>
         </div>
         <div class="dash-field">
-          <label for="cat-category">Category</label>
+          <label for="cat-category"><span class="dash-field__label-en">Category</span></label>
           <select id="cat-category" name="category_id" data-category-select required ${liveCategories.length ? '' : 'disabled'}>
             ${taxonomySelectOptionsHtml(liveCategories, selectedCategoryId, 'Please create a Category first')}
           </select>
         </div>
         ${barcodeFieldHtml('cat-barcode', product?.barcode ?? '', 'Barcode / SKU')}
         <div class="dash-field">
-          <label for="cat-retail">Retail Price <span lang="ar">سعر البيع</span></label>
+          <label for="cat-retail"><span class="dash-field__label-en">Retail Price</span> <span class="dash-field__label-ar" lang="ar">سعر البيع</span></label>
           <input id="cat-retail" name="retailPrice" type="number" min="0" step="0.01" required value="${product?.retailPrice ?? ''}" placeholder="48.00">
         </div>
         <div class="dash-field">
-          <label for="cat-cost">Cost Price <span lang="ar">سعر التكلفة</span></label>
+          <label for="cat-cost"><span class="dash-field__label-en">Cost Price</span> <span class="dash-field__label-ar" lang="ar">سعر التكلفة</span></label>
           <input id="cat-cost" name="costPrice" type="number" min="0" step="0.01" required value="${product?.costPrice ?? ''}" placeholder="18.00">
         </div>
         <div class="dash-field">
@@ -459,8 +460,8 @@ export function inventoryTableHtml(products) {
           <tr>
             <th scope="col">Product</th>
             <th scope="col">Collection</th>
-            <th scope="col">Cost (سعر التكلفة)</th>
-            <th scope="col">Retail (سعر البيع)</th>
+            <th scope="col"><span class="dash-field__label-en">Cost</span> <span class="dash-field__label-ar" lang="ar">سعر التكلفة</span></th>
+            <th scope="col"><span class="dash-field__label-en">Retail</span> <span class="dash-field__label-ar" lang="ar">سعر البيع</span></th>
             <th scope="col">Stock</th>
             <th scope="col">Barcode</th>
             <th scope="col">Images</th>
@@ -718,27 +719,27 @@ export function productFormHtml(product = null, collections = [], categories = [
 
       <div class="dash-form__grid">
         <div class="dash-field">
-          <label for="product-title">Product Title</label>
-          <input id="product-title" name="title" type="text" required value="${escapeAttr(product?.title ?? '')}" placeholder="Oud Noir Candle">
+          <label for="product-title"><span class="dash-field__label-en">Product Title</span> <span class="dash-field__label-ar" lang="ar">اسم المنتج</span></label>
+          <input id="product-title" name="title" type="text" class="dash-input--bidi" required value="${escapeAttr(product?.title ?? '')}" placeholder="Oud Noir Candle">
         </div>
         <div class="dash-field">
-          <label for="product-collection">Collection</label>
+          <label for="product-collection"><span class="dash-field__label-en">Collection</span></label>
           <select id="product-collection" name="collection_id" data-collection-select required ${liveCollections.length ? '' : 'disabled'}>
             ${taxonomySelectOptionsHtml(liveCollections, selectedCollectionId, 'Please create a Collection first')}
           </select>
         </div>
         <div class="dash-field">
-          <label for="product-category">Category</label>
+          <label for="product-category"><span class="dash-field__label-en">Category</span></label>
           <select id="product-category" name="category_id" data-category-select required ${liveCategories.length ? '' : 'disabled'}>
             ${taxonomySelectOptionsHtml(liveCategories, selectedCategoryId, 'Please create a Category first')}
           </select>
         </div>
         <div class="dash-field">
-          <label for="product-cost">Cost Price <span lang="ar">سعر التكلفة</span></label>
+          <label for="product-cost"><span class="dash-field__label-en">Cost Price</span> <span class="dash-field__label-ar" lang="ar">سعر التكلفة</span></label>
           <input id="product-cost" name="costPrice" type="number" min="0" step="0.01" required value="${product?.costPrice ?? ''}" placeholder="18.00">
         </div>
         <div class="dash-field">
-          <label for="product-retail">Retail Price <span lang="ar">سعر البيع</span></label>
+          <label for="product-retail"><span class="dash-field__label-en">Retail Price</span> <span class="dash-field__label-ar" lang="ar">سعر البيع</span></label>
           <input id="product-retail" name="retailPrice" type="number" min="0" step="0.01" required value="${product?.retailPrice ?? ''}" placeholder="48.00">
         </div>
         <div class="dash-field">
