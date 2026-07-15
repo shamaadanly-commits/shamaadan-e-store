@@ -28,6 +28,34 @@ function barcodeFieldHtml(inputId, barcode = '', label = 'Barcode') {
 }
 
 /**
+ * Checkbox: publish product on the online storefront (inventory/POS always includes it).
+ * @param {import('../dashboard.js').ProductRecord | null} product
+ * @param {string} inputId
+ */
+function pushToWebsiteFieldHtml(product = null, inputId = 'push-website') {
+  const isEdit = Boolean(product);
+  const checked = isEdit
+    ? (product.showOnWebsite !== false && product.show_on_website !== false)
+    : false;
+
+  return `
+    <div class="dash-field dash-field--full">
+      <label class="dash-check" for="${escapeAttr(inputId)}">
+        <input
+          type="checkbox"
+          id="${escapeAttr(inputId)}"
+          name="pushToWebsite"
+          value="1"
+          ${checked ? 'checked' : ''}
+        >
+        <span class="dash-check__box" aria-hidden="true"></span>
+        <span class="dash-check__label">Push to Website</span>
+      </label>
+      <p class="dash-field__hint">When unchecked, the product is added to inventory and POS only — it will not appear on the online store.</p>
+    </div>`;
+}
+
+/**
  * @param {{ online: object, pos: object }} ledgers
  * @param {Array} metrics
  */
@@ -69,7 +97,7 @@ export function catalogTableHtml(products, filterCollection = 'All') {
     : products;
 
   if (!filtered.length) {
-    return '<p class="dash-empty">No products yet. Add a product to publish it on the website.</p>';
+    return '<p class="dash-empty">No products yet. Add a product to inventory using the form.</p>';
   }
 
   return `
@@ -116,7 +144,9 @@ function catalogRowHtml(product) {
       <td class="dash-table__num">${formatNum(product.retailPrice)} LYD</td>
       <td class="dash-table__num">${stockStatusCellHtml(product.stockQuantity, product.minStockAlert)}</td>
       <td><code class="dash-barcode">${escapeHtml(product.barcode)}</code></td>
-      <td><span class="dash-status dash-status--live">Live</span></td>
+      <td>${product.showOnWebsite !== false && product.show_on_website !== false
+    ? '<span class="dash-status dash-status--live">Live</span>'
+    : '<span class="dash-status dash-status--off">Inventory only</span>'}</td>
       <td>
         <div class="dash-table__actions">
           <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-edit-catalog="${escapeAttr(product.id)}">Edit</button>
@@ -285,22 +315,24 @@ export function catalogFormHtml(product = null, collections = [], categories = [
 
       ${imageUploaderHtml(product?.imageUrls ?? [], 'cat-images')}
 
+      ${pushToWebsiteFieldHtml(product, 'cat-push-website')}
+
       <div class="dash-form__actions">
-        <button type="submit" class="dash-btn dash-btn--primary" ${liveCollections.length && liveCategories.length ? '' : 'disabled'}>${isEdit ? 'Save & Publish' : 'Add to Website'}</button>
+        <button type="submit" class="dash-btn dash-btn--primary" ${liveCollections.length && liveCategories.length ? '' : 'disabled'}>${isEdit ? 'Save to Inventory' : 'Add to Inventory'}</button>
         ${isEdit ? '<button type="button" class="dash-btn dash-btn--ghost" data-cancel-catalog-edit>Cancel</button>' : ''}
       </div>
       <p class="dash-form__note">${liveCollections.length && liveCategories.length
-    ? 'Saving publishes this product to the online store and POS catalog.'
+    ? 'Products are always saved to inventory and POS. Check “Push to Website” to also show them in the online store.'
     : 'Create at least one Collection and one Category under “Collections &amp; Categories” before adding products.'}</p>
     </form>
   `;
 }
 
 /**
- * Product <option> list for purchase line dropdowns.
+ * Product <option> list for form dropdowns.
  * @param {Array<object>} products
  */
-function purchaseProductOptionsHtml(products = []) {
+function productOptionsHtml(products = []) {
   return ['<option value="">Select product…</option>']
     .concat((products || [])
       .filter((p) => p?.id)
@@ -313,200 +345,11 @@ function purchaseProductOptionsHtml(products = []) {
 }
 
 /**
- * A single purchase line row (product, unit price, quantity).
- * @param {string} optionsHtml Pre-rendered <option> markup.
- */
-export function purchaseLineRowHtml(optionsHtml) {
-  return `
-    <tr class="dash-purchase-line">
-      <td><select name="product_id[]" data-purchase-product required>${optionsHtml}</select></td>
-      <td><input name="supplier_unit_price[]" type="number" min="0" step="0.0001" placeholder="0.00" inputmode="decimal"></td>
-      <td><input name="quantity[]" type="number" min="1" step="1" placeholder="0" inputmode="numeric"></td>
-      <td><button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-remove-purchase-line title="Remove line">✕</button></td>
-    </tr>`;
-}
-
-/**
- * The full "New Purchase Invoice" form.
- * @param {Array<object>} products
- */
-export function purchaseFormHtml(products = []) {
-  const options = purchaseProductOptionsHtml(products);
-  const initialRows = [purchaseLineRowHtml(options), purchaseLineRowHtml(options), purchaseLineRowHtml(options)].join('');
-
-  return `
-    <form class="dash-form" data-purchase-form autocomplete="off">
-      <div class="dash-form__grid">
-        <div class="dash-field">
-          <label for="pi-supplier">Supplier name</label>
-          <input id="pi-supplier" name="supplier_name" type="text" required placeholder="Guangzhou Aroma Co.">
-        </div>
-        <div class="dash-field">
-          <label for="pi-number">Invoice number</label>
-          <input id="pi-number" name="invoice_number" type="text" placeholder="GZ-2026-0442">
-        </div>
-        <div class="dash-field">
-          <label for="pi-date">Invoice date</label>
-          <input id="pi-date" name="invoice_date" type="date" value="${escapeAttr(new Date().toISOString().slice(0, 10))}">
-        </div>
-        <div class="dash-field">
-          <label for="pi-currency">Currency</label>
-          <input id="pi-currency" name="currency" type="text" value="LYD" placeholder="USD">
-        </div>
-        <div class="dash-field">
-          <label for="pi-ship">Total shipping / transport</label>
-          <input id="pi-ship" name="total_shipping_transport_cost" type="number" min="0" step="0.01" placeholder="0.00" inputmode="decimal">
-        </div>
-        <div class="dash-field">
-          <label for="pi-customs">Total customs / duties</label>
-          <input id="pi-customs" name="total_customs_duties_cost" type="number" min="0" step="0.01" placeholder="0.00" inputmode="decimal">
-        </div>
-      </div>
-
-      <div class="dash-field">
-        <label>Product lines</label>
-        <div class="dash-table-wrap">
-          <table class="dash-table dash-purchase-table">
-            <thead>
-              <tr>
-                <th scope="col">Product</th>
-                <th scope="col">Unit price</th>
-                <th scope="col">Qty</th>
-                <th scope="col"><span class="sr-only">Remove</span></th>
-              </tr>
-            </thead>
-            <tbody data-purchase-lines>${initialRows}</tbody>
-          </table>
-        </div>
-        <div class="dash-form__actions" style="margin-top:0.6rem;">
-          <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-add-purchase-line>+ Add line</button>
-        </div>
-      </div>
-
-      <div class="dash-field">
-        <label for="pi-notes">Notes</label>
-        <textarea id="pi-notes" name="notes" rows="2" placeholder="Optional"></textarea>
-      </div>
-
-      <div class="dash-form__actions">
-        <button type="submit" class="dash-btn dash-btn--primary">Save invoice &amp; add stock</button>
-      </div>
-      <p class="dash-form__note">Shipping &amp; customs are allocated across items by cost weight to compute each product's landed unit cost.</p>
-
-      <template data-purchase-line-tpl>${purchaseLineRowHtml(options)}</template>
-    </form>`;
-}
-
-/**
- * Recent supplier invoices table.
- * @param {Array<object>} rows
- */
-export function supplierInvoicesTableHtml(rows = []) {
-  if (!rows.length) {
-    return '<p class="dash-empty">No purchase invoices recorded yet.</p>';
-  }
-
-  const money = (n) => new Intl.NumberFormat('en-LY', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
-
-  return `
-    <div class="dash-table-wrap">
-      <table class="dash-table">
-        <thead>
-          <tr>
-            <th scope="col">Date</th>
-            <th scope="col">Supplier</th>
-            <th scope="col">Invoice #</th>
-            <th scope="col">Raw</th>
-            <th scope="col">Overhead</th>
-            <th scope="col">Landed</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows.map((r) => `
-            <tr class="dash-row-clickable" data-view-invoice="${escapeAttr(r.id)}" title="View invoice details">
-              <td class="dash-table__num">${escapeHtml(r.invoice_date || (r.created_at ? String(r.created_at).slice(0, 10) : '—'))}</td>
-              <td><strong>${escapeHtml(r.supplier_name || '—')}</strong></td>
-              <td>${escapeHtml(r.invoice_number || '—')}</td>
-              <td class="dash-table__num">${escapeHtml(r.currency || '')} ${money(r.total_raw_cost)}</td>
-              <td class="dash-table__num">${money(r.total_overhead_cost)}</td>
-              <td class="dash-table__num">${money(r.total_landed_cost)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>`;
-}
-
-/**
- * Detail modal for a single supplier invoice + its line items.
- * @param {object} invoice
- * @param {object[]} items
- */
-export function supplierInvoiceDetailHtml(invoice, items = []) {
-  const money = (n) => new Intl.NumberFormat('en-LY', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
-  const cur = escapeHtml(invoice?.currency || '');
-  const date = escapeHtml(invoice?.invoice_date || (invoice?.created_at ? String(invoice.created_at).slice(0, 10) : '—'));
-
-  const rowsHtml = items.length
-    ? items.map((it) => `
-        <tr>
-          <td>
-            <strong>${escapeHtml(it.product_name || '—')}</strong>
-            ${it.product_barcode ? `<div class="dash-table__sub">${escapeHtml(it.product_barcode)}</div>` : ''}
-          </td>
-          <td class="dash-table__num">${money(it.supplier_unit_price)}</td>
-          <td class="dash-table__num">${escapeHtml(it.quantity_ordered)}</td>
-          <td class="dash-table__num">${money(it.raw_line_cost)}</td>
-          <td class="dash-table__num">${money(it.allocated_overhead)}</td>
-          <td class="dash-table__num"><strong>${money(it.final_landed_unit_cost)}</strong></td>
-        </tr>`).join('')
-    : '<tr><td colspan="6" class="dash-empty">No line items on this invoice.</td></tr>';
-
-  return `
-    <div class="dash-modal__backdrop" data-close-invoice-modal></div>
-    <div class="dash-modal__dialog" role="dialog" aria-modal="true" aria-label="Invoice details">
-      <header class="dash-modal__header">
-        <div>
-          <h2 class="dash-modal__title">${escapeHtml(invoice?.supplier_name || 'Invoice')}</h2>
-          <p class="dash-modal__sub">${escapeHtml(invoice?.invoice_number || 'No number')} · ${date}</p>
-        </div>
-        <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-close-invoice-modal aria-label="Close">✕</button>
-      </header>
-
-      <div class="dash-modal__summary">
-        <div><span>Raw cost</span><strong>${cur} ${money(invoice?.total_raw_cost)}</strong></div>
-        <div><span>Shipping</span><strong>${money(invoice?.total_shipping_transport_cost)}</strong></div>
-        <div><span>Customs</span><strong>${money(invoice?.total_customs_duties_cost)}</strong></div>
-        <div><span>Overhead</span><strong>${money(invoice?.total_overhead_cost)}</strong></div>
-        <div><span>Landed total</span><strong>${money(invoice?.total_landed_cost)}</strong></div>
-      </div>
-
-      ${invoice?.notes ? `<p class="dash-modal__notes">${escapeHtml(invoice.notes)}</p>` : ''}
-
-      <div class="dash-table-wrap">
-        <table class="dash-table">
-          <thead>
-            <tr>
-              <th scope="col">Product</th>
-              <th scope="col">Unit price</th>
-              <th scope="col">Qty</th>
-              <th scope="col">Raw</th>
-              <th scope="col">Overhead</th>
-              <th scope="col">Landed unit</th>
-            </tr>
-          </thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
-      </div>
-    </div>`;
-}
-
-/**
  * The "Record Waste" form (product, quantity, reason).
  * @param {Array<object>} products
  */
 export function wasteFormHtml(products = []) {
-  const options = purchaseProductOptionsHtml(products);
+  const options = productOptionsHtml(products);
   return `
     <form class="dash-form" data-waste-form autocomplete="off">
       <div class="dash-field">
@@ -690,6 +533,125 @@ export function transactionFeedHtml(transactions) {
   `;
 }
 
+function orderStatusBadge(status) {
+  const s = String(status || 'pending').toLowerCase();
+  const map = {
+    pending: ['dash-status--pending', 'Pending'],
+    paid: ['dash-status--live', 'Paid'],
+    completed: ['dash-status--live', 'Completed'],
+    cancelled: ['dash-status--off', 'Cancelled'],
+    parked: ['dash-status--pending', 'Parked'],
+  };
+  const [cls, label] = map[s] || ['dash-status--pending', String(status || '—')];
+  return `<span class="dash-status ${cls}">${escapeHtml(label)}</span>`;
+}
+
+/**
+ * Website orders table (online storefront).
+ * @param {Array<object>} rows
+ */
+export function websiteOrdersTableHtml(rows = []) {
+  if (!rows.length) {
+    return '<p class="dash-empty">No website orders yet. Orders appear here when customers checkout on the online store.</p>';
+  }
+
+  return `
+    <div class="dash-table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th scope="col">Invoice</th>
+            <th scope="col">Date</th>
+            <th scope="col">Customer</th>
+            <th scope="col">Payment</th>
+            <th scope="col">Status</th>
+            <th scope="col">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((r) => `
+            <tr class="dash-row-clickable" data-view-web-order="${escapeAttr(r.id)}" title="View order details">
+              <td><code class="dash-barcode">${escapeHtml(r.invoice_number || '—')}</code></td>
+              <td class="dash-table__num">${escapeHtml(r.created_at ? String(r.created_at).slice(0, 16).replace('T', ' ') : '—')}</td>
+              <td>
+                <strong>${escapeHtml(r.customer_name || '—')}</strong>
+                ${r.customer_phone ? `<div class="dash-table__sub">${escapeHtml(r.customer_phone)}</div>` : ''}
+              </td>
+              <td>${escapeHtml(String(r.payment_method || '—').toUpperCase())}</td>
+              <td>${orderStatusBadge(r.status)}</td>
+              <td class="dash-table__num">${formatLyd(Number(r.total_amount || 0))}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+/**
+ * Detail modal for a website order.
+ * @param {object} order
+ * @param {object[]} items
+ */
+export function websiteOrderDetailHtml(order, items = []) {
+  const rowsHtml = items.length
+    ? items.map((it) => `
+        <tr>
+          <td><strong>${escapeHtml(it.product_name || '—')}</strong></td>
+          <td class="dash-table__num">${formatLyd(Number(it.unit_price || 0))}</td>
+          <td class="dash-table__num">${escapeHtml(it.quantity)}</td>
+          <td class="dash-table__num">${formatLyd(Number(it.unit_price || 0) * Number(it.quantity || 0))}</td>
+        </tr>`).join('')
+    : '<tr><td colspan="4" class="dash-empty">No line items.</td></tr>';
+
+  const canComplete = ['pending', 'paid'].includes(String(order?.status || ''));
+  const canCancel = ['pending', 'paid'].includes(String(order?.status || ''));
+
+  return `
+    <div class="dash-modal__backdrop" data-close-order-modal></div>
+    <div class="dash-modal__dialog" role="dialog" aria-modal="true" aria-label="Website order details">
+      <header class="dash-modal__header">
+        <div>
+          <h2 class="dash-modal__title">${escapeHtml(order?.invoice_number || 'Order')}</h2>
+          <p class="dash-modal__sub">${escapeHtml(order?.customer_name || '')} · ${orderStatusBadge(order?.status)}</p>
+        </div>
+        <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-close-order-modal aria-label="Close">✕</button>
+      </header>
+
+      <div class="dash-modal__summary">
+        <div><span>Payment</span><strong>${escapeHtml(String(order?.payment_method || '—').toUpperCase())}</strong></div>
+        <div><span>Subtotal</span><strong>${formatLyd(Number(order?.subtotal_amount || order?.total_amount || 0))}</strong></div>
+        <div><span>Shipping</span><strong>${formatLyd(Number(order?.shipping_amount || 0))}</strong></div>
+        <div><span>Total</span><strong>${formatLyd(Number(order?.total_amount || 0))}</strong></div>
+      </div>
+
+      <div class="dash-order-contact">
+        <p><span>Phone</span> ${escapeHtml(order?.customer_phone || '—')}</p>
+        <p><span>Email</span> ${escapeHtml(order?.customer_email || '—')}</p>
+        <p><span>Address</span> ${escapeHtml([order?.customer_address, order?.customer_city].filter(Boolean).join(', ') || '—')}</p>
+      </div>
+
+      <div class="dash-table-wrap">
+        <table class="dash-table">
+          <thead>
+            <tr>
+              <th scope="col">Product</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Qty</th>
+              <th scope="col">Line</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+
+      <div class="dash-modal__actions">
+        ${canComplete ? `<button type="button" class="dash-btn dash-btn--primary dash-btn--sm" data-complete-web-order="${escapeAttr(order.id)}">Mark completed</button>` : ''}
+        ${canCancel ? `<button type="button" class="dash-btn dash-btn--danger dash-btn--sm" data-cancel-web-order="${escapeAttr(order.id)}">Cancel order</button>` : ''}
+        <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-close-order-modal>Close</button>
+      </div>
+    </div>`;
+}
+
 /**
  * Open / parked POS tickets from Supabase (linked to register).
  * @param {Array<object>} tickets
@@ -712,7 +674,7 @@ export function openTicketsPanelHtml(tickets = []) {
         return `
           <li class="dash-open-tickets__item" data-open-ticket-id="${escapeAttr(t.id)}">
             <div>
-              <p class="dash-open-tickets__title">${escapeHtml(title)}</p>
+              <p class="dash-open-tickets__title">${escapeHtml(title)}${t.invoice_number ? ` <code class="dash-barcode">${escapeHtml(t.invoice_number)}</code>` : ''}</p>
               <p class="dash-open-tickets__meta">
                 ${t.customer_phone ? `${escapeHtml(t.customer_phone)} · ` : ''}
                 ${t.customer_location ? `${escapeHtml(t.customer_location)} · ` : ''}
@@ -788,8 +750,10 @@ export function productFormHtml(product = null, collections = [], categories = [
 
       ${imageUploaderHtml(product?.imageUrls ?? [], 'product-images')}
 
+      ${pushToWebsiteFieldHtml(product, 'product-push-website')}
+
       <div class="dash-form__actions">
-        <button type="submit" class="dash-btn dash-btn--primary" ${liveCollections.length && liveCategories.length ? '' : 'disabled'}>${isEdit ? 'Save Changes' : 'Add Product'}</button>
+        <button type="submit" class="dash-btn dash-btn--primary" ${liveCollections.length && liveCategories.length ? '' : 'disabled'}>${isEdit ? 'Save to Inventory' : 'Add to Inventory'}</button>
         ${isEdit ? '<button type="button" class="dash-btn dash-btn--ghost" data-cancel-edit>Cancel</button>' : ''}
       </div>
     </form>
@@ -842,14 +806,14 @@ export function buildAdminShell() {
           <button type="button" class="dash-nav__link" data-view="catalog">
             <span aria-hidden="true">🛍</span> Store Catalog
           </button>
+          <button type="button" class="dash-nav__link" data-view="website-orders">
+            <span aria-hidden="true">📬</span> Website Orders
+          </button>
           <button type="button" class="dash-nav__link" data-view="taxonomy">
             <span aria-hidden="true">🏷</span> Collections &amp; Categories
           </button>
           <button type="button" class="dash-nav__link" data-view="inventory">
             <span aria-hidden="true">📦</span> Inventory Costs
-          </button>
-          <button type="button" class="dash-nav__link" data-view="purchases">
-            <span aria-hidden="true">🧾</span> Purchases
           </button>
           <button type="button" class="dash-nav__link" data-view="waste">
             <span aria-hidden="true">🗑</span> Waste
@@ -867,13 +831,23 @@ export function buildAdminShell() {
         </footer>
       </aside>
 
+      <div class="dash-drawer-backdrop" data-drawer-backdrop hidden></div>
+
       <div class="dash-main">
         <header class="dash-topbar">
-          <div>
-            <h1 class="dash-topbar__title" data-page-title>Accounting Dashboard</h1>
-            <p class="dash-topbar__subtitle" data-last-updated>Last updated —</p>
+          <div class="dash-topbar__lead">
+            <button type="button" class="dash-menu-btn" data-drawer-toggle aria-label="Open menu" aria-expanded="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M4 6h16M4 12h16M4 18h16"/>
+              </svg>
+            </button>
+            <div>
+              <h1 class="dash-topbar__title" data-page-title>Accounting Dashboard</h1>
+              <p class="dash-topbar__subtitle" data-last-updated>Last updated —</p>
+            </div>
           </div>
           <div class="dash-topbar__actions">
+            <button type="button" class="dash-btn dash-btn--primary dash-btn--sm" data-backup-pdf>⬇ Daily Backup (PDF)</button>
             <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-refresh>Refresh</button>
             <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-seed-mock>Reset Mock Data</button>
           </div>
@@ -911,7 +885,7 @@ export function buildAdminShell() {
 
           <section class="dash-view" data-panel="catalog" aria-label="Store catalog management" hidden>
             <div class="dash-catalog-intro">
-              <p>Manage products that appear on the website storefront. Add, edit, or remove items — changes sync to the shop immediately.</p>
+              <p>Manage inventory products for POS and the online store. Use “Push to Website” when adding a product to also show it on the storefront.</p>
             </div>
             <div class="dash-inventory-layout">
               <article class="dash-panel dash-panel--grow">
@@ -936,6 +910,24 @@ export function buildAdminShell() {
                 <div class="dash-panel__body" data-catalog-form-host></div>
               </article>
             </div>
+          </section>
+
+          <section class="dash-view" data-panel="website-orders" aria-label="Website orders" hidden>
+            <div class="dash-catalog-intro">
+              <p>Orders placed on the online storefront. Each order gets a <strong>WEB-</strong> invoice number automatically.</p>
+            </div>
+            <article class="dash-panel">
+              <header class="dash-panel__header dash-panel__header--row">
+                <div>
+                  <h2>Website Orders</h2>
+                  <p class="dash-panel__sub">Cash on delivery and UPAY card payments</p>
+                </div>
+                <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-refresh-website-orders>Refresh</button>
+              </header>
+              <div class="dash-panel__body" data-website-orders-host>
+                <p class="dash-empty">Loading website orders…</p>
+              </div>
+            </article>
           </section>
 
           <section class="dash-view" data-panel="taxonomy" aria-label="Collections and categories" hidden>
@@ -980,32 +972,6 @@ export function buildAdminShell() {
             </div>
           </section>
 
-          <section class="dash-view" data-panel="purchases" aria-label="Supplier purchase invoices" hidden>
-            <div class="dash-catalog-intro">
-              <p>Record a supplier purchase invoice. Enter the shipping/transport and customs/duties once — they are split across the items by cost to compute each product's true landed cost, and stock is increased automatically.</p>
-            </div>
-            <div class="dash-inventory-layout">
-              <article class="dash-panel dash-panel--grow">
-                <header class="dash-panel__header dash-panel__header--row">
-                  <h2>Recent Purchase Invoices</h2>
-                  <div class="dash-panel__header-actions">
-                    <button type="button" class="dash-btn dash-btn--primary dash-btn--sm" data-backup-pdf>⬇ Daily Backup (PDF)</button>
-                    <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-refresh-purchases>Refresh</button>
-                  </div>
-                </header>
-                <div class="dash-panel__body" data-purchases-host>
-                  <p class="dash-empty">Loading…</p>
-                </div>
-              </article>
-              <article class="dash-panel dash-panel--form">
-                <header class="dash-panel__header">
-                  <h2>New Purchase Invoice</h2>
-                </header>
-                <div class="dash-panel__body" data-purchase-form-host></div>
-              </article>
-            </div>
-          </section>
-
           <section class="dash-view" data-panel="waste" aria-label="Inventory waste" hidden>
             <div class="dash-catalog-intro">
               <p>Record damaged, expired, or lost stock. The quantity is removed from inventory (FIFO from the oldest batches) and the loss is booked to accounting at landed cost.</p>
@@ -1030,7 +996,7 @@ export function buildAdminShell() {
           </section>
         </div>
       </div>
-      <div class="dash-modal" data-invoice-modal hidden></div>
+      <div class="dash-modal" data-order-modal hidden></div>
     </div>
   `;
 }

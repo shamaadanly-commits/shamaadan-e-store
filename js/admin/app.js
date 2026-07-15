@@ -21,11 +21,11 @@ import {
 import {
   getOpenTickets,
   cancelOpenTicket,
-  createSupplierInvoice,
-  getSupplierInvoices,
-  getSupplierInvoiceDetail,
   recordInventoryWaste,
   getWasteRecords,
+  getWebsiteOrders,
+  getWebsiteOrderDetail,
+  updateWebsiteOrderStatus,
 } from '../../shared/supabase.js';
 import { downloadAccountingBackupPdf } from './backup.js';
 import {
@@ -46,12 +46,10 @@ import {
   transactionFeedHtml,
   openTicketsPanelHtml,
   productFormHtml,
-  purchaseFormHtml,
-  purchaseLineRowHtml,
-  supplierInvoicesTableHtml,
-  supplierInvoiceDetailHtml,
   wasteFormHtml,
   wasteTableHtml,
+  websiteOrdersTableHtml,
+  websiteOrderDetailHtml,
 } from './template.js';
 
 /**
@@ -67,6 +65,8 @@ export async function mount(root) {
   /** @type {{ id: string, username: string, displayName: string, role: string } | null} */
   let currentUser = null;
   let sessionTimer = 0;
+  let autoRefreshTimer = 0;
+  const AUTO_REFRESH_MS = 25_000;
 
   root.className = 'dashboard-app';
   root.innerHTML = buildAdminShell();
@@ -83,11 +83,10 @@ export async function mount(root) {
     openTicketsHost: root.querySelector('[data-open-tickets-host]'),
     marginHost: root.querySelector('[data-margin-host]'),
     inventoryHost: root.querySelector('[data-inventory-host]'),
-    purchasesHost: root.querySelector('[data-purchases-host]'),
-    purchaseFormHost: root.querySelector('[data-purchase-form-host]'),
     wasteHost: root.querySelector('[data-waste-host]'),
     wasteFormHost: root.querySelector('[data-waste-form-host]'),
-    invoiceModal: root.querySelector('[data-invoice-modal]'),
+    websiteOrdersHost: root.querySelector('[data-website-orders-host]'),
+    orderModal: root.querySelector('[data-order-modal]'),
     formHost: root.querySelector('[data-form-host]'),
     formTitle: root.querySelector('[data-form-title]'),
     productCount: root.querySelector('[data-product-count]'),
@@ -161,8 +160,8 @@ export async function mount(root) {
       renderTaxonomyForms();
       renderCatalogForm();
       renderForm();
-      renderPurchaseForm();
       renderWasteForm();
+      refreshWebsiteOrders();
     } catch (err) {
       console.error('[admin] refreshFromSupabase failed:', err);
       window.alert(err?.message || 'Failed to sync catalog from Supabase.');
@@ -226,13 +225,26 @@ export async function mount(root) {
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && els.invoiceModal && !els.invoiceModal.hidden) {
-      closeInvoiceModal();
+    if (event.key !== 'Escape') return;
+    if (els.orderModal && !els.orderModal.hidden) {
+      closeOrderModal();
+    } else if (els.dashApp?.classList.contains('is-drawer-open')) {
+      setDrawer(false);
     }
   });
 
   root.addEventListener('click', async (event) => {
     const target = event.target;
+
+    if (target.closest('[data-drawer-toggle]')) {
+      setDrawer(!els.dashApp?.classList.contains('is-drawer-open'));
+      return;
+    }
+
+    if (target.closest('[data-drawer-backdrop]')) {
+      setDrawer(false);
+      return;
+    }
 
     const generateBarcode = target.closest('[data-barcode-generate]');
     if (generateBarcode) {
@@ -284,13 +296,50 @@ export async function mount(root) {
       return;
     }
 
-    if (target.matches('[data-refresh-purchases]')) {
-      await refreshPurchases();
+    if (target.matches('[data-refresh-waste]')) {
+      await refreshWaste();
       return;
     }
 
-    if (target.matches('[data-refresh-waste]')) {
-      await refreshWaste();
+    if (target.matches('[data-refresh-website-orders]')) {
+      await refreshWebsiteOrders();
+      return;
+    }
+
+    if (target.closest('[data-close-order-modal]')) {
+      closeOrderModal();
+      return;
+    }
+
+    const webOrderRow = target.closest('[data-view-web-order]');
+    if (webOrderRow) {
+      await openOrderModal(webOrderRow.getAttribute('data-view-web-order'));
+      return;
+    }
+
+    if (target.closest('[data-complete-web-order]')) {
+      const id = target.closest('[data-complete-web-order]').getAttribute('data-complete-web-order');
+      if (!id || !confirm('Mark this order as completed / fulfilled?')) return;
+      try {
+        await updateWebsiteOrderStatus(id, 'completed');
+        closeOrderModal();
+        await refreshWebsiteOrders();
+      } catch (err) {
+        window.alert(err?.message || 'Could not update order.');
+      }
+      return;
+    }
+
+    if (target.closest('[data-cancel-web-order]')) {
+      const id = target.closest('[data-cancel-web-order]').getAttribute('data-cancel-web-order');
+      if (!id || !confirm('Cancel this website order?')) return;
+      try {
+        await updateWebsiteOrderStatus(id, 'cancelled');
+        closeOrderModal();
+        await refreshWebsiteOrders();
+      } catch (err) {
+        window.alert(err?.message || 'Could not cancel order.');
+      }
       return;
     }
 
@@ -307,40 +356,6 @@ export async function mount(root) {
       } finally {
         backupBtn.disabled = false;
         backupBtn.textContent = original;
-      }
-      return;
-    }
-
-    if (target.closest('[data-close-invoice-modal]')) {
-      closeInvoiceModal();
-      return;
-    }
-
-    const invoiceRow = target.closest('[data-view-invoice]');
-    if (invoiceRow) {
-      await openInvoiceModal(invoiceRow.getAttribute('data-view-invoice'));
-      return;
-    }
-
-    const addLine = target.closest('[data-add-purchase-line]');
-    if (addLine) {
-      const form = addLine.closest('form');
-      const body = form?.querySelector('[data-purchase-lines]');
-      const tpl = form?.querySelector('[data-purchase-line-tpl]');
-      if (body && tpl?.content) {
-        body.appendChild(tpl.content.cloneNode(true));
-      } else if (body) {
-        body.insertAdjacentHTML('beforeend', purchaseLineRowHtml('<option value="">Select product…</option>'));
-      }
-      return;
-    }
-
-    const removeLine = target.closest('[data-remove-purchase-line]');
-    if (removeLine) {
-      const body = removeLine.closest('[data-purchase-lines]');
-      const row = removeLine.closest('tr');
-      if (body && row && body.querySelectorAll('tr').length > 1) {
-        row.remove();
       }
       return;
     }
@@ -375,6 +390,10 @@ export async function mount(root) {
     if (navBtn?.matches('button[data-view]')) {
       switchView(navBtn.dataset.view);
       return;
+    }
+
+    if (target.closest('.dash-nav__link--external')) {
+      setDrawer(false);
     }
 
     const filterCollection = target.closest('[data-filter-collection]');
@@ -507,7 +526,7 @@ export async function mount(root) {
         return;
       }
 
-      if (confirm('Remove this product from the website store?')) {
+      if (confirm('Remove this product from inventory? It will also disappear from the website if it was published there.')) {
         try {
           await persistDeleteProduct(id);
           await refreshFromSupabase();
@@ -630,13 +649,6 @@ export async function mount(root) {
       return;
     }
 
-    const purchaseForm = event.target.closest('[data-purchase-form]');
-    if (purchaseForm) {
-      event.preventDefault();
-      await savePurchaseFromForm(purchaseForm);
-      return;
-    }
-
     const wasteForm = event.target.closest('[data-waste-form]');
     if (wasteForm) {
       event.preventDefault();
@@ -693,6 +705,7 @@ export async function mount(root) {
       stockQuantity: Number(data.get('stockQuantity')),
       barcode: String(data.get('barcode')),
       imageUrls,
+      showOnWebsite: data.has('pushToWebsite'),
     };
 
     try {
@@ -817,15 +830,16 @@ export async function mount(root) {
     renderForm();
     renderCatalogForm();
     renderTaxonomyForms();
-    renderPurchaseForm();
     renderWasteForm();
     refreshOpenTickets();
-    refreshPurchases();
     refreshWaste();
+    refreshWebsiteOrders();
     switchView('catalog');
+    startAutoRefresh();
   }
 
   function lock() {
+    stopAutoRefresh();
     els.authGate?.removeAttribute('hidden');
     els.dashApp?.setAttribute('hidden', '');
     if (els.adminUser) {
@@ -866,7 +880,61 @@ export async function mount(root) {
     }, 60_000);
   }
 
+  /**
+   * True when the user is actively editing — so auto-refresh should hold off and
+   * not wipe in-progress input or an open modal.
+   */
+  function isBusyEditing() {
+    const ae = document.activeElement;
+    if (ae && typeof ae.closest === 'function' && ae.closest('input, textarea, select')) return true;
+    if (els.orderModal && !els.orderModal.hidden) return true;
+    return Boolean(editingProductId || editingCatalogId || editingCollectionId || editingCategoryId);
+  }
+
+  /** Silently pull fresh data and update the read-only views (never the forms). */
+  async function autoRefreshData() {
+    if (!currentUser || document.hidden || isBusyEditing() || !isSupabaseReady()) return;
+    try {
+      const catalog = await fetchAdminCatalog();
+      if (typeof state.hydrateCatalog === 'function') {
+        state.hydrateCatalog(catalog);
+      } else if (typeof state.replaceProducts === 'function') {
+        state.replaceProducts(catalog.products || []);
+      }
+      renderAll(state.getSnapshot(), { withForms: false });
+      await refreshOpenTickets();
+      await refreshWaste();
+      await refreshWebsiteOrders();
+    } catch (err) {
+      console.warn('[admin] auto-refresh skipped:', err?.message || err);
+    }
+  }
+
+  function startAutoRefresh() {
+    window.clearInterval(autoRefreshTimer);
+    autoRefreshTimer = window.setInterval(autoRefreshData, AUTO_REFRESH_MS);
+  }
+
+  function stopAutoRefresh() {
+    window.clearInterval(autoRefreshTimer);
+    autoRefreshTimer = 0;
+  }
+
+  /**
+   * Open/close the mobile navigation drawer.
+   * @param {boolean} open
+   */
+  function setDrawer(open) {
+    if (!els.dashApp) return;
+    els.dashApp.classList.toggle('is-drawer-open', open);
+    const toggle = root.querySelector('[data-drawer-toggle]');
+    if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    const backdrop = root.querySelector('[data-drawer-backdrop]');
+    if (backdrop) backdrop.hidden = !open;
+  }
+
   function switchView(view) {
+    setDrawer(false);
     els.navLinks.forEach((link) => {
       const active = link.dataset.view === view;
       link.classList.toggle('is-active', active);
@@ -884,12 +952,13 @@ export async function mount(root) {
     const titles = {
       dashboard: 'Accounting Dashboard',
       catalog: 'Store Catalog — Website Products',
+      'website-orders': 'Website Orders',
       taxonomy: 'Collections & Categories',
       inventory: 'Inventory Costs',
-      purchases: 'Purchases — Supplier Invoices',
       waste: 'Waste — Damaged & Lost Stock',
     };
     if (els.pageTitle) els.pageTitle.textContent = titles[view] ?? 'Main Dashboard';
+    if (view === 'website-orders') refreshWebsiteOrders();
   }
 
   function renderForm(product = null) {
@@ -938,89 +1007,40 @@ export async function mount(root) {
     }
   }
 
-  function renderPurchaseForm() {
-    if (!els.purchaseFormHost) return;
-    const products = state.getSnapshot().products.filter((p) => isLiveDbId(p.id));
-    els.purchaseFormHost.innerHTML = purchaseFormHtml(products);
-  }
-
-  async function refreshPurchases() {
-    if (!els.purchasesHost) return;
+  async function refreshWebsiteOrders() {
+    if (!els.websiteOrdersHost) return;
     if (!isSupabaseReady()) {
-      els.purchasesHost.innerHTML = '<p class="dash-empty">Supabase not configured — purchases unavailable.</p>';
+      els.websiteOrdersHost.innerHTML = '<p class="dash-empty">Supabase not configured — website orders unavailable.</p>';
       return;
     }
     try {
-      const rows = await getSupplierInvoices();
-      els.purchasesHost.innerHTML = supplierInvoicesTableHtml(rows);
+      const rows = await getWebsiteOrders();
+      els.websiteOrdersHost.innerHTML = websiteOrdersTableHtml(rows);
     } catch (err) {
-      console.error('[admin] purchases load failed:', err);
-      els.purchasesHost.innerHTML = `<p class="dash-empty">${escapeHtml(err?.message || 'Failed to load purchases.')}</p>`;
+      console.error('[admin] website orders load failed:', err);
+      els.websiteOrdersHost.innerHTML = `<p class="dash-empty">${escapeHtml(err?.message || 'Failed to load website orders.')}</p>`;
     }
   }
 
-  function closeInvoiceModal() {
-    if (!els.invoiceModal) return;
-    els.invoiceModal.hidden = true;
-    els.invoiceModal.innerHTML = '';
+  function closeOrderModal() {
+    if (!els.orderModal) return;
+    els.orderModal.hidden = true;
+    els.orderModal.innerHTML = '';
   }
 
-  async function openInvoiceModal(invoiceId) {
-    if (!els.invoiceModal || !invoiceId) return;
-    els.invoiceModal.hidden = false;
-    els.invoiceModal.innerHTML = '<div class="dash-modal__backdrop" data-close-invoice-modal></div>'
-      + '<div class="dash-modal__dialog"><p class="dash-empty">Loading invoice…</p></div>';
+  async function openOrderModal(orderId) {
+    if (!els.orderModal || !orderId) return;
+    els.orderModal.hidden = false;
+    els.orderModal.innerHTML = '<div class="dash-modal__backdrop" data-close-order-modal></div>'
+      + '<div class="dash-modal__dialog"><p class="dash-empty">Loading order…</p></div>';
     try {
-      const { invoice, items } = await getSupplierInvoiceDetail(invoiceId);
-      els.invoiceModal.innerHTML = supplierInvoiceDetailHtml(invoice, items);
+      const { order, items } = await getWebsiteOrderDetail(orderId);
+      els.orderModal.innerHTML = websiteOrderDetailHtml(order, items);
     } catch (err) {
-      console.error('[admin] invoice detail failed:', err);
-      els.invoiceModal.innerHTML = '<div class="dash-modal__backdrop" data-close-invoice-modal></div>'
-        + `<div class="dash-modal__dialog"><p class="dash-empty">${escapeHtml(err?.message || 'Failed to load invoice.')}</p>`
-        + '<button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-close-invoice-modal>Close</button></div>';
-    }
-  }
-
-  async function savePurchaseFromForm(form) {
-    const data = new FormData(form);
-    const productIds = data.getAll('product_id[]');
-    const unitPrices = data.getAll('supplier_unit_price[]');
-    const quantities = data.getAll('quantity[]');
-
-    const lineItems = productIds.map((pid, i) => ({
-      product_id: String(pid || '').trim(),
-      supplier_unit_price: Number(unitPrices[i]) || 0,
-      quantity: Number(quantities[i]) || 0,
-    })).filter((l) => l.product_id && l.quantity > 0);
-
-    if (!lineItems.length) {
-      window.alert('Add at least one product line with a quantity.');
-      return;
-    }
-
-    const invoiceData = {
-      supplier_name: String(data.get('supplier_name') || '').trim(),
-      invoice_number: String(data.get('invoice_number') || '').trim(),
-      invoice_date: String(data.get('invoice_date') || '').trim(),
-      currency: String(data.get('currency') || 'LYD').trim(),
-      total_shipping_transport_cost: Number(data.get('total_shipping_transport_cost')) || 0,
-      total_customs_duties_cost: Number(data.get('total_customs_duties_cost')) || 0,
-      notes: String(data.get('notes') || '').trim(),
-    };
-
-    const submitBtn = form.querySelector('[type="submit"]');
-    if (submitBtn) submitBtn.disabled = true;
-    try {
-      await createSupplierInvoice(invoiceData, lineItems);
-      window.alert('Purchase invoice saved. Landed costs allocated and stock updated.');
-      await refreshFromSupabase();
-      await refreshPurchases();
-      renderPurchaseForm();
-    } catch (err) {
-      console.error('[admin] savePurchase failed:', err);
-      window.alert(err?.message || 'Failed to save purchase invoice.');
-    } finally {
-      if (submitBtn) submitBtn.disabled = false;
+      console.error('[admin] website order detail failed:', err);
+      els.orderModal.innerHTML = '<div class="dash-modal__backdrop" data-close-order-modal></div>'
+        + `<div class="dash-modal__dialog"><p class="dash-empty">${escapeHtml(err?.message || 'Failed to load order.')}</p>`
+        + '<button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-close-order-modal>Close</button></div>';
     }
   }
 
@@ -1179,7 +1199,7 @@ export async function mount(root) {
     renderTaxonomyForms();
   }
 
-  function renderAll(snapshot) {
+  function renderAll(snapshot, options = {}) {
     const { ledgers, transactions, products, updatedAt } = snapshot;
 
     if (els.ledgerHost) {
@@ -1204,7 +1224,8 @@ export async function mount(root) {
     }
 
     renderCatalog(snapshot);
-    renderCatalogForm();
+    // Skip form re-render during silent auto-refresh so in-progress edits survive.
+    if (options.withForms !== false) renderCatalogForm();
 
     if (els.lastUpdated) {
       els.lastUpdated.textContent = `Last updated ${new Date(updatedAt).toLocaleString('en-LY')}`;

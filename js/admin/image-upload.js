@@ -214,19 +214,18 @@ export function imageUploaderHtml(imageUrls = [], fieldId = 'product-images') {
       <div class="dash-upload__header">
         <label for="${escapeAttr(fieldId)}">Product Images</label>
         <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-image-pick>
-          📷 Upload from device
+          🖼 Choose from gallery
         </button>
       </div>
-      <p class="dash-field__hint">Works on PC and mobile (camera or gallery). Stored in Cloudflare R2 when configured.</p>
+      <p class="dash-field__hint">Pick from your phone gallery or take a new photo. Stored in Cloudflare R2 when configured.</p>
 
       <input
         type="file"
         accept="image/*"
         multiple
-        capture="environment"
         class="dash-upload__file"
         data-image-file
-        aria-label="Upload product images"
+        aria-label="Choose product images from gallery or camera"
       >
 
       <div class="dash-upload__preview" data-image-preview></div>

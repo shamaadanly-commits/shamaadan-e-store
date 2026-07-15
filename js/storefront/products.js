@@ -81,13 +81,26 @@ export async function loadProducts() {
         .from('products')
         .select('*')
         .eq('is_active', true)
+        .eq('show_on_website', true)
         .order('name', { ascending: true }),
       supabase.from('categories').select('*').order('name', { ascending: true }),
       supabase.from('collections').select('*').order('name', { ascending: true }),
     ]);
 
     if (productsRes.error) {
-      throw new Error(productsRes.error.message);
+      // show_on_website column may not exist until sql/show_on_website.sql is applied.
+      if (/show_on_website|column.*does not exist/i.test(productsRes.error.message)) {
+        const fallback = await supabase
+          .from('products')
+          .select('*')
+          .eq('is_active', true)
+          .order('name', { ascending: true });
+        if (fallback.error) throw new Error(fallback.error.message);
+        productsRes.data = fallback.data;
+        productsRes.error = null;
+      } else {
+        throw new Error(productsRes.error.message);
+      }
     }
 
     const categoryRows = categoriesRes.error ? [] : (categoriesRes.data || []);
@@ -103,7 +116,9 @@ export async function loadProducts() {
     const categoryById = new Map(categoryRows.map((c) => [String(c.id), String(c.name || 'General')]));
     const collectionById = new Map(collectionRows.map((c) => [String(c.id), String(c.name || 'General')]));
 
-    const products = (productsRes.data || []).map((row) => {
+    const products = (productsRes.data || [])
+      .filter((row) => row.show_on_website !== false)
+      .map((row) => {
       const product = toStorefrontProduct(row);
       if (row.category_id && categoryById.has(String(row.category_id))) {
         product.category = categoryById.get(String(row.category_id));
@@ -163,11 +178,16 @@ export function filterProducts(products, filter) {
  * @param {HTMLElement} gridEl
  * @param {Array} products
  * @param {ReturnType<import('./i18n.js').createI18n>} i18n
+ * @param {Map<string, number>|Record<string, number>} [qtyById]
  */
-export function renderProductGrid(gridEl, products, i18n) {
+export function renderProductGrid(gridEl, products, i18n, qtyById = {}) {
   if (!products.length) {
     gridEl.innerHTML = `<p class="shop__lead">${i18n.t('shop.empty')}</p>`;
     return;
   }
-  gridEl.innerHTML = products.map((p) => productCardHtml(p, i18n)).join('');
+  const getQty = (id) => {
+    if (qtyById instanceof Map) return Number(qtyById.get(String(id)) || 0);
+    return Number(qtyById[id] || qtyById[String(id)] || 0);
+  };
+  gridEl.innerHTML = products.map((p) => productCardHtml({ ...p, _cartQty: getQty(p.id) }, i18n)).join('');
 }

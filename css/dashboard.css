@@ -268,6 +268,7 @@
 }
 
 .dash-sidebar__footer {
+  margin-top: auto;
   padding-top: 1rem;
   border-top: 1px solid var(--dash-border-soft);
 }
@@ -313,6 +314,56 @@
   display: flex;
   gap: 0.5rem;
   flex-shrink: 0;
+}
+
+.dash-topbar__lead {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.dash-menu-btn {
+  display: none;
+  flex-shrink: 0;
+  width: 2.6rem;
+  height: 2.6rem;
+  place-items: center;
+  border-radius: var(--dash-radius-sm);
+  border: 1px solid var(--dash-border);
+  background: var(--dash-surface-2, rgb(255 255 255 / 4%));
+  color: var(--dash-text);
+  transition: background 0.16s var(--dash-ease), border-color 0.16s var(--dash-ease), transform 0.12s var(--dash-ease);
+}
+
+.dash-menu-btn svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.dash-menu-btn:active {
+  transform: scale(0.94);
+  border-color: var(--dash-gold, #c9a84c);
+}
+
+.dash-drawer-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgb(8 6 4 / 62%);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: dash-fade-in 0.2s var(--dash-ease) both;
+}
+
+.dash-drawer-backdrop[hidden] {
+  display: none;
+}
+
+@keyframes dash-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .dash-views {
@@ -772,30 +823,6 @@
   color: rgb(196 92 92);
 }
 
-/* ── Purchase invoice line table ─────────────────────────────────── */
-.dash-purchase-table th,
-.dash-purchase-table td {
-  padding: 0.3rem 0.4rem;
-}
-
-.dash-purchase-table select,
-.dash-purchase-table input {
-  width: 100%;
-  padding: 0.5rem 0.55rem;
-  background: var(--dash-surface-2);
-  border: 1px solid var(--dash-border-soft);
-  border-radius: var(--dash-radius-sm);
-  color: var(--dash-text);
-  font: inherit;
-}
-
-.dash-purchase-table select:focus,
-.dash-purchase-table input:focus {
-  outline: none;
-  border-color: var(--dash-gold);
-  box-shadow: var(--dash-ring);
-}
-
 .dash-table__actions {
   display: flex;
   gap: 0.35rem;
@@ -1130,6 +1157,79 @@
   color: var(--dash-profit);
 }
 
+.dash-status--off {
+  background: rgb(235 230 220 / 8%);
+  color: var(--dash-text-muted);
+}
+
+/* Checkbox — Push to Website */
+.dash-check {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  cursor: pointer;
+  user-select: none;
+  min-height: 44px;
+}
+
+.dash-check input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.dash-check__box {
+  flex-shrink: 0;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 0.35rem;
+  border: 1.5px solid var(--dash-border-strong, rgb(235 230 220 / 20%));
+  background: var(--dash-surface-2, rgb(255 255 255 / 4%));
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+  position: relative;
+}
+
+.dash-check__box::after {
+  content: '';
+  position: absolute;
+  inset: 0.2rem;
+  border-radius: 0.15rem;
+  background: var(--dash-gold, #c9a84c);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.16s ease, transform 0.16s var(--dash-ease);
+}
+
+.dash-check input:checked + .dash-check__box {
+  border-color: var(--dash-gold, #c9a84c);
+  box-shadow: 0 0 0 3px rgb(201 168 76 / 14%);
+}
+
+.dash-check input:checked + .dash-check__box::after {
+  content: '✓';
+  display: grid;
+  place-items: center;
+  inset: 0;
+  background: var(--dash-gold, #c9a84c);
+  color: #16130f;
+  font-size: 0.85rem;
+  font-weight: 800;
+  opacity: 1;
+  transform: scale(1);
+}
+
+.dash-check input:focus-visible + .dash-check__box {
+  box-shadow: var(--dash-focus-ring, 0 0 0 3px rgb(201 168 76 / 22%));
+}
+
+.dash-check__label {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--dash-text);
+}
+
 .dash-table__title {
   display: block;
   font-weight: 600;
@@ -1335,36 +1435,42 @@
     grid-template-columns: 1fr;
   }
 
+  /* Sidebar becomes an off-canvas slide-in drawer (app pattern). */
   .dash-sidebar {
-    position: static;
-    height: auto;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    padding: 0.75rem 1rem;
-    border-inline-end: none;
-    border-bottom: 1px solid var(--dash-border);
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 60;
+    width: min(82vw, 18rem);
+    height: 100dvh;
+    padding-top: calc(1.25rem + env(safe-area-inset-top));
+    transform: translateX(-100%);
+    transition: transform 0.3s var(--dash-ease);
+    box-shadow: var(--dash-shadow-lg, 0 24px 60px rgb(0 0 0 / 45%));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    will-change: transform;
   }
 
-  .dash-nav__link.is-active::before {
-    display: none;
+  [dir='rtl'] .dash-sidebar {
+    inset: 0 0 0 auto;
+    transform: translateX(100%);
   }
 
-  .dash-sidebar__brand {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
+  .dash-app.is-drawer-open .dash-sidebar {
+    transform: none;
   }
 
-  .dash-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-    flex: 1;
-    justify-content: flex-end;
+  .dash-app.is-drawer-open .dash-drawer-backdrop {
+    display: block;
   }
 
-  .dash-sidebar__footer {
-    display: none;
+  .dash-menu-btn {
+    display: grid;
+  }
+
+  /* Larger, comfortable nav rows in the drawer. */
+  .dash-nav__link {
+    min-height: 46px;
   }
 
   .dash-form__grid {
@@ -1463,7 +1569,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Clickable table rows ─────────────────────────────── */
+.dash-status--pending {
+  background: rgb(212 180 92 / 14%);
+  color: var(--dash-gold, #c9a84c);
+}
+
 .dash-row-clickable {
   cursor: pointer;
   transition: background 0.12s ease;
@@ -1473,7 +1583,6 @@
   background: var(--dash-surface-2);
 }
 
-/* ── Invoice detail modal ─────────────────────────────── */
 .dash-modal {
   position: fixed;
   inset: 0;
@@ -1557,13 +1666,35 @@
   color: var(--dash-text);
 }
 
-.dash-modal__notes {
+.dash-order-contact {
   margin: 0 0 1.25rem;
-  padding: 0.75rem;
+  padding: 0.85rem 1rem;
   background: var(--dash-surface-2);
+  border: 1px solid var(--dash-border-soft);
   border-radius: var(--dash-radius-sm);
-  font-size: 0.85rem;
-  color: var(--dash-text-muted);
+  font-size: 0.88rem;
+}
+
+.dash-order-contact p {
+  margin: 0.35rem 0;
+}
+
+.dash-order-contact span {
+  display: inline-block;
+  min-width: 4.5rem;
+  color: var(--dash-text-dim);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dash-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--dash-border-soft);
 }
 
 @media (max-width: 600px) {

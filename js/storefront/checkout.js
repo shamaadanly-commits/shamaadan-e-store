@@ -339,7 +339,8 @@ async function submitOrder(overlay, cart, i18n, form) {
     }
 
     cart.clear();
-    showSuccess(overlay, i18n, data.orderRef, paymentMethod);
+    const ref = data.invoiceNumber || data.orderRef || '—';
+    showSuccess(overlay, i18n, ref, paymentMethod);
   } catch (err) {
     // Demo completion when API unavailable (local static preview)
     if (err.message === 'network' || err.message === 'Failed to fetch') {

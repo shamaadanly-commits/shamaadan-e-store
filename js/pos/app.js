@@ -9,6 +9,8 @@ import {
   getOpenTickets,
   cancelOpenTicket,
   completeOpenTicket,
+  getRecentPosSales,
+  refundPosOrder,
   isSupabaseConfigured,
 } from '../../shared/supabase.js';
 import { getSharedDashboardState, toPosCatalogRow } from '../dashboard.js';
@@ -137,6 +139,16 @@ async function mountRegister(root, staff) {
   /** @type {'register' | 'tickets'} */
   let activeView = 'register';
 
+  /**
+   * Highlight the active mobile bottom-tab.
+   * @param {'products' | 'ticket' | 'tickets' | 'scan'} name
+   */
+  function setActiveMTab(name) {
+    root.querySelectorAll('[data-mtab]').forEach((btn) => {
+      btn.classList.toggle('is-active', btn.dataset.mtab === name);
+    });
+  }
+
   async function fetchLiveCatalogRows() {
     if (!supabase) return [];
     try {
@@ -200,14 +212,17 @@ async function mountRegister(root, staff) {
   }
 
   async function refreshOpenTicketBadge() {
-    if (!els.openTicketsBadge || !isSupabaseConfigured()) return;
+    const badges = root.querySelectorAll('[data-open-tickets-count]');
+    if (!badges.length || !isSupabaseConfigured()) return;
     try {
       const tickets = await getOpenTickets();
       const count = tickets.length;
-      els.openTicketsBadge.hidden = count === 0;
-      els.openTicketsBadge.textContent = String(count);
+      badges.forEach((badge) => {
+        badge.hidden = count === 0;
+        badge.textContent = String(count);
+      });
     } catch {
-      els.openTicketsBadge.hidden = true;
+      badges.forEach((badge) => { badge.hidden = true; });
     }
   }
 
@@ -225,6 +240,70 @@ async function mountRegister(root, staff) {
     showParkTicketForm(snapshot.subtotal);
   }
 
+  async function showRefundModal() {
+    if (!isSupabaseConfigured()) {
+      showToast(els.toast, 'Supabase not configured');
+      return;
+    }
+
+    root.querySelector('[data-refund-modal]')?.remove();
+
+    const modal = document.createElement('div');
+    modal.className = 'pos-sale-modal';
+    modal.dataset.refundModal = '';
+    modal.innerHTML = `
+      <div class="pos-sale-modal__backdrop" data-refund-backdrop></div>
+      <div class="pos-sale-modal__card pos-refund-modal" role="dialog" aria-modal="true" aria-labelledby="pos-refund-title">
+        <p class="pos-sale-modal__badge">Refund</p>
+        <h2 id="pos-refund-title">Recent POS sales</h2>
+        <p class="pos-refund-modal__hint">Pick a completed sale to refund — stock is restored to inventory.</p>
+        <div class="pos-refund-modal__list" data-refund-list>
+          <p class="pos-refund-modal__loading">Loading…</p>
+        </div>
+        <button type="button" class="pos-sale-modal__skip" data-refund-close>Close</button>
+      </div>
+    `;
+    root.appendChild(modal);
+
+    const list = modal.querySelector('[data-refund-list]');
+    try {
+      const sales = await getRecentPosSales(30);
+      const refundable = sales.filter((s) => s.status === 'completed');
+      if (!refundable.length) {
+        list.innerHTML = '<p class="pos-refund-modal__empty">No completed sales to refund.</p>';
+        return;
+      }
+
+      list.innerHTML = refundable.map((sale) => {
+        const lines = sale.order_items || [];
+        const qty = lines.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
+        const when = sale.completed_at || sale.created_at;
+        const invoice = sale.invoice_number || String(sale.id).slice(0, 8);
+        return `
+          <div class="pos-refund-modal__item">
+            <div>
+              <p class="pos-refund-modal__invoice">${escapeHtml(invoice)}</p>
+              <p class="pos-refund-modal__meta">
+                ${formatLyd(Number(sale.total_amount || 0))}
+                · ${qty} item${qty === 1 ? '' : 's'}
+                · ${escapeHtml(sale.staff_name || 'Staff')}
+                ${when ? ` · ${escapeHtml(new Date(when).toLocaleString('en-LY'))}` : ''}
+              </p>
+            </div>
+            <button
+              type="button"
+              class="pos-refund-modal__btn"
+              data-refund-sale="${escapeAttr(sale.id)}"
+              data-refund-invoice="${escapeAttr(invoice)}"
+            >Refund</button>
+          </div>`;
+      }).join('');
+    } catch (err) {
+      console.error('[pos] refund list failed:', err);
+      list.innerHTML = `<p class="pos-refund-modal__empty">${escapeHtml(err?.message || 'Could not load sales.')}</p>`;
+    }
+  }
+
   /**
    * @param {number} ticketTotal
    */
@@ -238,24 +317,25 @@ async function mountRegister(root, staff) {
       <div class="pos-sale-modal__backdrop" data-park-backdrop></div>
       <div class="pos-sale-modal__card pos-park-form" role="dialog" aria-modal="true" aria-labelledby="pos-park-title">
         <p class="pos-sale-modal__badge">Park ticket</p>
-        <h2 id="pos-park-title">Customer details</h2>
+        <h2 id="pos-park-title">Park ticket</h2>
         <p class="pos-park-form__total">Ticket total · ${formatLyd(ticketTotal)}</p>
+        <p class="pos-park-form__hint">Customer details are optional — leave blank to park as Walk-in.</p>
         <form class="pos-park-form__fields" data-park-form>
           <label class="pos-park-form__field">
-            <span>Customer name</span>
-            <input type="text" name="customer_name" data-park-name required autocomplete="name" placeholder="Full name">
+            <span>Customer name <em>(optional)</em></span>
+            <input type="text" name="customer_name" data-park-name autocomplete="name" placeholder="Walk-in / Full name">
           </label>
           <label class="pos-park-form__field">
-            <span>Phone number</span>
-            <input type="tel" name="customer_phone" data-park-phone required autocomplete="tel" inputmode="tel" placeholder="09xxxxxxx">
+            <span>Phone number <em>(optional)</em></span>
+            <input type="tel" name="customer_phone" data-park-phone autocomplete="tel" inputmode="tel" placeholder="09xxxxxxx">
           </label>
           <label class="pos-park-form__field">
-            <span>Location</span>
-            <input type="text" name="customer_location" data-park-location required autocomplete="street-address" placeholder="City / area / address">
+            <span>Location <em>(optional)</em></span>
+            <input type="text" name="customer_location" data-park-location autocomplete="street-address" placeholder="City / area / address">
           </label>
           <label class="pos-park-form__field">
             <span>Downpayment (LYD)</span>
-            <input type="number" name="downpayment" data-park-downpayment required min="0" step="0.01" max="${ticketTotal}" value="0" inputmode="decimal">
+            <input type="number" name="downpayment" data-park-downpayment min="0" step="0.01" max="${ticketTotal}" value="0" inputmode="decimal">
           </label>
           <p class="pos-park-form__balance" data-park-balance>Balance due · ${formatLyd(ticketTotal)}</p>
           <p class="pos-park-form__error" data-park-error hidden></p>
@@ -285,18 +365,10 @@ async function mountRegister(root, staff) {
 
     form?.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const customerName = String(modal.querySelector('[data-park-name]')?.value || '').trim();
+      const customerName = String(modal.querySelector('[data-park-name]')?.value || '').trim() || 'Walk-in';
       const customerPhone = String(modal.querySelector('[data-park-phone]')?.value || '').trim();
       const customerLocation = String(modal.querySelector('[data-park-location]')?.value || '').trim();
       const downpayment = Math.max(0, Number(modal.querySelector('[data-park-downpayment]')?.value) || 0);
-
-      if (!customerName || !customerPhone || !customerLocation) {
-        if (errorEl) {
-          errorEl.hidden = false;
-          errorEl.textContent = 'Name, phone, and location are required.';
-        }
-        return;
-      }
 
       if (downpayment > ticketTotal) {
         if (errorEl) {
@@ -319,13 +391,13 @@ async function mountRegister(root, staff) {
       try {
         els.park && (els.park.disabled = true);
         const snapshot = cart.getSnapshot();
-        await saveOpenTicket({
+        const parked = await saveOpenTicket({
           staff_user_id: staff.id,
           staff_name: staff.displayName || staff.username,
           ticket_label: customerName,
           customer_name: customerName,
-          customer_phone: customerPhone,
-          customer_location: customerLocation,
+          customer_phone: customerPhone || null,
+          customer_location: customerLocation || null,
           downpayment,
           total_amount: snapshot.subtotal,
         }, ticketItemsPayload(snapshot.items));
@@ -334,7 +406,10 @@ async function mountRegister(root, staff) {
         cart.clear({ restoreStock: false });
         activeOpenTicketId = null;
         await syncCartStockFromServer();
-        showToast(els.toast, `Parked for ${customerName} · stock reserved`);
+        const ticketNo = parked?.order?.invoice_number || '';
+        showToast(els.toast, ticketNo
+          ? `Parked ${ticketNo} · ${customerName}`
+          : `Parked · ${customerName} · stock reserved`);
         await refreshOpenTicketBadge();
         await showTicketsPage();
       } catch (err) {
@@ -374,10 +449,14 @@ async function mountRegister(root, staff) {
       els.ticketsView.innerHTML = ticketsPageHtml(tickets);
     }
     root.classList.add('pos--tickets');
+    setActiveMTab('tickets');
     await refreshOpenTicketBadge();
   }
 
-  async function showRegisterView() {
+  /**
+   * @param {'products' | 'ticket'} [subview]
+   */
+  async function showRegisterView(subview) {
     activeView = 'register';
     if (els.ticketsView) {
       els.ticketsView.hidden = true;
@@ -385,6 +464,15 @@ async function mountRegister(root, staff) {
     }
     if (els.registerView) els.registerView.hidden = false;
     root.classList.remove('pos--tickets');
+    if (subview === 'ticket') {
+      root.classList.add('pos--m-ticket');
+      setActiveMTab('ticket');
+    } else if (subview === 'products') {
+      root.classList.remove('pos--m-ticket');
+      setActiveMTab('products');
+    } else {
+      setActiveMTab(root.classList.contains('pos--m-ticket') ? 'ticket' : 'products');
+    }
   }
 
   async function refreshTicketsList() {
@@ -479,7 +567,7 @@ async function mountRegister(root, staff) {
         profit: total - cost,
         units,
         lines,
-        receiptNo: `R${Date.now().toString(36).toUpperCase()}`,
+        receiptNo: ticket.invoice_number || `TKT-${String(ticket.id).slice(0, 8).toUpperCase()}`,
         register: 'Register #1',
         cashier: staff.displayName || staff.username,
         staffUserId: staff.id,
@@ -508,6 +596,12 @@ async function mountRegister(root, staff) {
     const empty = snapshot.items.length === 0;
     els.checkout.disabled = empty;
     if (els.park) els.park.disabled = empty || !isSupabaseConfigured();
+
+    const cartBadge = root.querySelector('[data-mtab-cart-count]');
+    if (cartBadge) {
+      cartBadge.hidden = snapshot.itemCount === 0;
+      cartBadge.textContent = String(snapshot.itemCount);
+    }
   });
 
   dashboard.subscribe((state) => {
@@ -517,8 +611,41 @@ async function mountRegister(root, staff) {
   startClock(els.clock);
   refreshOpenTicketBadge();
 
+  // Keep catalog stock & open-ticket count current without a manual refresh.
+  async function autoRefreshPos() {
+    if (document.hidden) return;
+    try {
+      await refreshOpenTicketBadge();
+
+      if (activeView === 'tickets') {
+        await refreshTicketsList();
+        return;
+      }
+
+      // Only refresh the register catalog when idle — never mid-sale or mid-modal.
+      if (cart.getSnapshot().items.length) return;
+      if (root.querySelector('[data-park-modal], [data-sale-modal], [data-refund-modal]')) return;
+
+      const rows = await fetchLiveCatalogRows();
+      if (rows.length) cart.resetCatalog(rows);
+    } catch (err) {
+      console.warn('[pos] auto-refresh skipped:', err?.message || err);
+    }
+  }
+  window.setInterval(autoRefreshPos, 30_000);
+
   root.addEventListener('click', async (event) => {
     const target = event.target;
+
+    const mtab = target.closest('[data-mtab]');
+    if (mtab) {
+      const which = mtab.dataset.mtab;
+      if (which === 'products') await showRegisterView('products');
+      else if (which === 'ticket') await showRegisterView('ticket');
+      else if (which === 'tickets') await showTicketsPage();
+      else if (which === 'scan') scanner.start();
+      return;
+    }
 
     if (target.closest('[data-pos-lock]')) {
       await logout('pos');
@@ -554,25 +681,61 @@ async function mountRegister(root, staff) {
       return;
     }
 
-    if (target.matches('[data-qty-minus]')) {
-      cart.adjustQuantity(target.dataset.productId, -1);
+    if (target.closest('[data-qty-minus]')) {
+      const btn = target.closest('[data-qty-minus]');
+      cart.adjustQuantity(btn.dataset.productId, -1);
       return;
     }
 
-    if (target.matches('[data-qty-plus]')) {
-      cart.adjustQuantity(target.dataset.productId, 1);
+    if (target.closest('[data-qty-plus]')) {
+      const btn = target.closest('[data-qty-plus]');
+      cart.adjustQuantity(btn.dataset.productId, 1);
       return;
     }
 
-    if (target.matches('[data-remove-line]')) {
-      const line = cart.getSnapshot().items.find((i) => i.productId === target.dataset.productId);
-      if (line) cart.adjustQuantity(target.dataset.productId, -line.quantity);
+    if (target.closest('[data-remove-line]')) {
+      const btn = target.closest('[data-remove-line]');
+      const line = cart.getSnapshot().items.find((i) => i.productId === btn.dataset.productId);
+      if (line) cart.adjustQuantity(btn.dataset.productId, -line.quantity);
+      showToast(els.toast, 'Item removed');
       return;
     }
 
-    if (target.matches('[data-clear-ticket]')) {
+    if (target.closest('[data-clear-ticket]')) {
       cart.clear();
       activeOpenTicketId = null;
+      return;
+    }
+
+    if (target.closest('[data-open-refund]')) {
+      await showRefundModal();
+      return;
+    }
+
+    if (target.closest('[data-refund-close]') || target.matches('[data-refund-backdrop]')) {
+      root.querySelector('[data-refund-modal]')?.remove();
+      return;
+    }
+
+    if (target.closest('[data-refund-sale]')) {
+      const btn = target.closest('[data-refund-sale]');
+      const orderId = btn.dataset.refundSale;
+      const invoice = btn.dataset.refundInvoice || orderId;
+      if (!confirm(`Refund sale ${invoice}? Stock will be restored.`)) return;
+      btn.disabled = true;
+      btn.textContent = 'Refunding…';
+      try {
+        await refundPosOrder(orderId);
+        await syncCartStockFromServer();
+        root.querySelector('[data-refund-modal]')?.remove();
+        showToast(els.toast, `Refunded ${invoice} · stock restored`);
+        refreshCatalog();
+      } catch (err) {
+        console.error('[pos] refund failed:', err);
+        window.alert(err?.message || 'Refund failed.');
+        btn.disabled = false;
+        btn.textContent = 'Refund';
+      }
       return;
     }
 
@@ -641,14 +804,16 @@ async function mountRegister(root, staff) {
 
       els.checkout.disabled = true;
       try {
+        let invoiceNo = '';
         if (isSupabaseConfigured()) {
-          await createOrder({
+          const result = await createOrder({
             source: 'pos',
             status: 'completed',
             total_amount: snapshot.subtotal,
             staff_user_id: staff.id,
             staff_name: staff.displayName || staff.username,
           }, ticketItemsPayload(snapshot.items));
+          invoiceNo = result?.order?.invoice_number || '';
         }
 
         const sale = cart.checkout();
@@ -656,7 +821,7 @@ async function mountRegister(root, staff) {
         if (sale.units > 0) {
           const receiptSale = {
             ...sale,
-            receiptNo: `R${Date.now().toString(36).toUpperCase()}`,
+            receiptNo: invoiceNo || `POS-${Date.now().toString(36).toUpperCase()}`,
             register: 'Register #1',
             cashier: staff.displayName || staff.username,
             staffUserId: staff.id,
@@ -669,6 +834,8 @@ async function mountRegister(root, staff) {
           });
           dashboard.refresh();
           showSaleComplete(root, receiptSale, els.toast);
+          root.classList.remove('pos--m-ticket');
+          setActiveMTab('products');
           await refreshOpenTicketBadge();
         }
       } catch (err) {
@@ -760,6 +927,9 @@ function buildShell(categories, staff) {
           Tickets
           <span class="pos__badge" data-open-tickets-count hidden>0</span>
         </button>
+        <button type="button" class="pos__refund-btn" data-open-refund aria-label="Refund a sale">
+          Refund
+        </button>
         <button type="button" class="pos__icon-btn" data-toggle-metrics aria-label="Toggle sales metrics">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
             <path d="M4 19V5M10 19V9M16 19v-6M22 19H2"/>
@@ -821,6 +991,46 @@ function buildShell(categories, staff) {
     </div>
 
     <div class="pos__tickets-host" data-tickets-view hidden></div>
+
+    <nav class="pos__mobile-tabbar" aria-label="Register navigation">
+      <button type="button" class="pos__mtab is-active" data-mtab="products">
+        <span class="pos__mtab-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+          </svg>
+        </span>
+        <span>Products</span>
+      </button>
+      <button type="button" class="pos__mtab" data-mtab="ticket">
+        <span class="pos__mtab-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M6 2h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/>
+            <path d="M14 2v5h5M8 12h8M8 16h5"/>
+          </svg>
+          <span class="pos__mtab-badge" data-mtab-cart-count hidden>0</span>
+        </span>
+        <span>Ticket</span>
+      </button>
+      <button type="button" class="pos__mtab" data-mtab="tickets">
+        <span class="pos__mtab-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4V8z"/>
+            <path d="M9 8v8M15 8v8"/>
+          </svg>
+          <span class="pos__mtab-badge" data-open-tickets-count hidden>0</span>
+        </span>
+        <span>Parked</span>
+      </button>
+      <button type="button" class="pos__mtab" data-mtab="scan">
+        <span class="pos__mtab-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3"/><path d="M7 12h10"/>
+          </svg>
+        </span>
+        <span>Scan</span>
+      </button>
+    </nav>
 
     <section class="pos__dashboard" data-dashboard aria-label="Sales metrics" hidden></section>
     <div class="pos__toast" data-pos-toast hidden></div>
@@ -962,7 +1172,9 @@ function renderLineItems(container, items) {
       </div>
       <div class="pos__line-item-end">
         <span class="pos__line-total">${formatLyd(line.unitPrice * line.quantity)}</span>
-        <button type="button" class="pos__line-remove" data-remove-line data-product-id="${line.productId}" aria-label="Remove item">×</button>
+        <button type="button" class="pos__line-remove" data-remove-line data-product-id="${line.productId}" aria-label="Remove item from ticket">
+          Remove
+        </button>
       </div>
     </div>
   `).join('');

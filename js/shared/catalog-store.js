@@ -140,6 +140,8 @@ export function normalizeStoreProduct(raw) {
     imageUrls,
     active: isActive,
     is_active: isActive,
+    showOnWebsite: raw.showOnWebsite !== false && raw.show_on_website !== false,
+    show_on_website: raw.showOnWebsite !== false && raw.show_on_website !== false,
   };
 }
 

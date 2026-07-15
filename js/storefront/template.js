@@ -380,17 +380,7 @@ export function productCardHtml(product, i18n) {
     ? `<img class="product-card__image" src="${escapeAttr(imageUrl)}" alt="${escapeAttr(display.displayName)}" loading="lazy" decoding="async">`
     : `<span class="product-card__monogram" aria-hidden="true">${escapeHtml(initial)}</span>`;
 
-  const addButtons = outOfStock
-    ? `
-        <button type="button" class="btn btn--copper btn--sm add-to-cart-btn" disabled aria-disabled="true">${t('shop.outOfStock')}</button>
-      `
-    : `
-        <button type="button" class="btn btn--copper btn--sm add-to-cart-btn" data-action="add-to-cart" data-product-id="${product.id}">${t('shop.add')}</button>
-      `;
-
-  const bagButton = outOfStock
-    ? `<button type="button" class="btn btn--ghost btn--sm add-to-cart-btn" disabled aria-disabled="true">${t('shop.outOfStock')}</button>`
-    : `<button type="button" class="btn btn--ghost btn--sm add-to-cart-btn" data-action="add-to-cart" data-product-id="${product.id}">${t('shop.bag')}</button>`;
+  const cartQty = Number(product._cartQty || 0);
 
   return `
     <article
@@ -406,9 +396,6 @@ export function productCardHtml(product, i18n) {
         </div>
         <div class="product-card__shine" aria-hidden="true"></div>
         ${badge}
-        <div class="product-card__quick-add">
-          ${addButtons}
-        </div>
       </div>
       <div class="product-card__body">
         <p class="product-card__category">${escapeHtml(display.displayCategory)}</p>
@@ -417,11 +404,39 @@ export function productCardHtml(product, i18n) {
         ${lowStock && !outOfStock ? `<p class="product-card__stock-note">${stock === 1 ? t('shop.onlyOneLeft') : t('shop.lowStock', { count: stock })}</p>` : ''}
         <div class="product-card__footer">
           <span class="product-card__price" data-price="${product.price}">${i18n.formatPrice(product.price)}</span>
-          ${bagButton}
+          <div class="product-card__cart" data-card-cart="${escapeAttr(product.id)}">
+            ${productCardCartControlHtml(product.id, cartQty, outOfStock, i18n)}
+          </div>
         </div>
       </div>
     </article>
   `;
+}
+
+/**
+ * Cart control for a product card: "+ Bag" or "− qty +" stepper.
+ * @param {string} productId
+ * @param {number} qty
+ * @param {boolean} outOfStock
+ * @param {ReturnType<import('./i18n.js').createI18n>} i18n
+ */
+export function productCardCartControlHtml(productId, qty, outOfStock, i18n) {
+  const t = i18n.t.bind(i18n);
+  if (outOfStock) {
+    return `<button type="button" class="btn btn--ghost btn--sm product-card__bag" disabled aria-disabled="true">${t('shop.outOfStock')}</button>`;
+  }
+  if (qty > 0) {
+    return `
+      <div class="product-card__qty" role="group" aria-label="${t('checkout.qty') || 'Quantity'}">
+        <button type="button" class="product-card__qty-btn" data-action="card-qty-minus" data-product-id="${escapeAttr(productId)}" aria-label="−">−</button>
+        <span class="product-card__qty-val" data-card-qty>${qty}</span>
+        <button type="button" class="product-card__qty-btn" data-action="card-qty-plus" data-product-id="${escapeAttr(productId)}" aria-label="+">+</button>
+      </div>`;
+  }
+  return `
+    <button type="button" class="btn btn--ghost btn--sm product-card__bag" data-action="add-to-cart" data-product-id="${escapeAttr(productId)}">
+      ${t('shop.bag')}
+    </button>`;
 }
 
 function collectionCardHtml(collection, i18n) {

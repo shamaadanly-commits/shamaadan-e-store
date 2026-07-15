@@ -1,13 +1,8 @@
 /**
- * Order API — processes checkout with CAD or UPAY payment methods.
+ * Order API — processes website checkout with CAD or UPAY payment methods.
+ * Persists to orders + order_items; invoice_number assigned by DB trigger.
  */
 import { createClient } from '@supabase/supabase-js';
-
-function generateOrderRef() {
-  const ts = Date.now().toString(36).toUpperCase();
-  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `SHM-${ts}-${rand}`;
-}
 
 async function processUpayPayment(card, amount, orderRef) {
   const merchantId = process.env.UPAY_MERCHANT_ID;
@@ -15,7 +10,6 @@ async function processUpayPayment(card, amount, orderRef) {
   const apiUrl = process.env.UPAY_API_URL || 'https://api.upay.ae/v1/charges';
 
   if (!merchantId || !apiKey) {
-    // Demo mode — simulate successful UPAY when credentials not configured
     return {
       ok: true,
       transactionId: `UPAY-DEMO-${orderRef}`,
@@ -52,6 +46,23 @@ async function processUpayPayment(card, amount, orderRef) {
   return { ok: true, transactionId: data.transaction_id || data.id };
 }
 
+/**
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string[]} productIds
+ */
+async function loadProductsById(supabase, productIds) {
+  const ids = [...new Set(productIds.filter(Boolean))];
+  if (!ids.length) return new Map();
+
+  const { data, error } = await supabase
+    .from('products')
+    .select('id, name, wholesale_cost, retail_price, stock_quantity')
+    .in('id', ids);
+
+  if (error) throw new Error(error.message);
+  return new Map((data || []).map((p) => [String(p.id), p]));
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -71,51 +82,145 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'Invalid payment method' });
     }
 
-    const orderRef = generateOrderRef();
-    let paymentStatus = 'pending';
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceKey) {
+      return res.status(503).json({ ok: false, error: 'Order storage is not configured.' });
+    }
+
+    const supabase = createClient(supabaseUrl, serviceKey);
+
+    const productMap = await loadProductsById(
+      supabase,
+      items.map((line) => line.productId),
+    );
+
+    const lineItems = items.map((line) => {
+      const product = productMap.get(String(line.productId));
+      if (!product) {
+        throw new Error(`Product not found: ${line.name || line.productId}`);
+      }
+      const qty = Math.trunc(Number(line.qty) || 0);
+      if (qty <= 0) throw new Error('Each item needs a positive quantity.');
+      const stock = Number(product.stock_quantity ?? 0);
+      if (stock < qty) {
+        throw new Error(`${product.name || line.name} is out of stock.`);
+      }
+      return {
+        product_id: String(product.id),
+        quantity: qty,
+        unit_price: Number(line.price ?? product.retail_price ?? 0),
+        wholesale_cost: Number(product.wholesale_cost ?? 0),
+        product_name: String(line.name || product.name || 'Item'),
+      };
+    });
+
+    let paymentStatus = paymentMethod === 'upay' ? 'paid' : 'cod_pending';
+    let orderStatus = paymentMethod === 'upay' ? 'paid' : 'pending';
     let transactionId = null;
+
+    const now = new Date().toISOString();
+    const orderPayload = {
+      source: 'online',
+      status: orderStatus,
+      total_amount: Number(total) || 0,
+      subtotal_amount: Number(subtotal) || 0,
+      shipping_amount: Number(shipping) || 0,
+      customer_name: String(customer.fullName || '').trim(),
+      customer_phone: String(customer.phone || '').trim(),
+      customer_email: String(customer.email || '').trim(),
+      customer_address: String(customer.address || '').trim(),
+      customer_city: String(customer.city || '').trim(),
+      customer_location: [customer.address, customer.city].filter(Boolean).join(', '),
+      payment_method: paymentMethod,
+      payment_status: paymentStatus,
+      notes: locale ? `Locale: ${locale}` : null,
+      updated_at: now,
+    };
+
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert(orderPayload)
+      .select('*')
+      .single();
+
+    if (orderError) {
+      console.error('[orders] insert failed:', orderError.message);
+      return res.status(500).json({ ok: false, error: orderError.message });
+    }
+
+    const invoiceNumber = order.invoice_number || order.id;
 
     if (paymentMethod === 'upay') {
       if (!card?.number || !card?.expiry || !card?.cvc) {
+        await supabase.from('orders').delete().eq('id', order.id);
         return res.status(400).json({ ok: false, error: 'Card details required for UPAY' });
       }
-      const payment = await processUpayPayment(card, total, orderRef);
-      paymentStatus = 'paid';
-      transactionId = payment.transactionId;
-    } else {
-      paymentStatus = 'cod_pending';
+      try {
+        const payment = await processUpayPayment(card, total, invoiceNumber);
+        transactionId = payment.transactionId;
+        paymentStatus = 'paid';
+      } catch (payErr) {
+        await supabase.from('orders').delete().eq('id', order.id);
+        throw payErr;
+      }
     }
 
-    const order = {
-      order_ref: orderRef,
-      payment_method: paymentMethod,
-      payment_status: paymentStatus,
-      transaction_id: transactionId,
-      customer_name: customer.fullName,
-      customer_phone: customer.phone,
-      customer_email: customer.email,
-      customer_address: customer.address,
-      customer_city: customer.city,
-      items,
-      subtotal,
-      shipping,
-      total,
-      locale: locale || 'en',
-      created_at: new Date().toISOString(),
-    };
+    const orderItemRows = lineItems.map((item) => ({
+      order_id: order.id,
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      wholesale_cost: item.wholesale_cost,
+      product_name: item.product_name,
+    }));
 
-    const supabaseUrl = process.env.VITE_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .insert(orderItemRows);
 
-    if (supabaseUrl && serviceKey) {
-      const supabase = createClient(supabaseUrl, serviceKey);
-      const { error } = await supabase.from('orders').insert(order);
-      if (error) console.error('[orders] Supabase insert failed:', error.message);
+    if (itemsError) {
+      await supabase.from('orders').delete().eq('id', order.id);
+      return res.status(500).json({ ok: false, error: itemsError.message });
+    }
+
+    const inventoryRows = lineItems.map((item) => ({
+      product_id: item.product_id,
+      quantity_changed: -Math.abs(item.quantity),
+      type: 'sale',
+      source: 'online',
+      notes: `Website order ${invoiceNumber}`,
+    }));
+
+    const { error: inventoryError } = await supabase
+      .from('inventory_transactions')
+      .insert(inventoryRows);
+
+    if (inventoryError) {
+      console.error('[orders] inventory failed:', inventoryError.message);
+      return res.status(500).json({
+        ok: false,
+        error: `Order ${invoiceNumber} saved but stock could not be updated: ${inventoryError.message}`,
+      });
+    }
+
+    if (transactionId) {
+      await supabase
+        .from('orders')
+        .update({
+          payment_status: paymentStatus,
+          notes: `${order.notes || ''} · UPAY ${transactionId}`.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', order.id);
     }
 
     return res.status(200).json({
       ok: true,
-      orderRef,
+      orderRef: invoiceNumber,
+      invoiceNumber,
+      orderId: order.id,
       paymentMethod,
       paymentStatus,
       transactionId,

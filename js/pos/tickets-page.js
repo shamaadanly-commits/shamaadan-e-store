@@ -57,6 +57,7 @@ function ticketCardHtml(t) {
           <h2 class="pos-tickets__name">${escapeHtml(title)}</h2>
           <span class="pos-tickets__due">${formatLyd(balance)} due</span>
         </div>
+        ${t.invoice_number ? `<p class="pos-tickets__invoice"><code>${escapeHtml(t.invoice_number)}</code></p>` : ''}
         <p class="pos-tickets__meta">
           ${t.customer_phone ? `<span>${escapeHtml(t.customer_phone)}</span>` : ''}
           ${t.customer_location ? `<span>${escapeHtml(t.customer_location)}</span>` : ''}

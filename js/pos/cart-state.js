@@ -119,6 +119,23 @@ export function createCartState(initialCatalog) {
   }
 
   /**
+   * Rebuild the whole catalog from fresh server rows — picks up new products,
+   * removed products, and stock/price changes. Only runs when the ticket is
+   * empty so an in-progress sale is never disturbed.
+   * @param {Array<CatalogProduct>} rows
+   * @returns {boolean} true if the catalog was replaced
+   */
+  function resetCatalog(rows) {
+    if (lines.size) return false; // never disturb an active ticket
+    inventory.clear();
+    for (const p of rows || []) {
+      if (p && p.id) inventory.set(p.id, { ...p });
+    }
+    notify();
+    return true;
+  }
+
+  /**
    * Sync local catalog stock from server rows (after park / void / charge).
    * @param {Array<{ id: string, stock?: number, stockQuantity?: number }>} rows
    */
@@ -241,6 +258,7 @@ export function createCartState(initialCatalog) {
     adjustQuantity,
     clear,
     syncCatalogStock,
+    resetCatalog,
     checkout,
     loadTicketLines,
     getLines,

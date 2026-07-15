@@ -181,6 +181,8 @@ export function mapProductFromDb(row) {
     imageUrls,
     active: row.is_active !== false,
     is_active: row.is_active !== false,
+    showOnWebsite: row.show_on_website !== false,
+    show_on_website: row.show_on_website !== false,
     category_id: row.category_id ?? null,
     collection_id: row.collection_id ?? null,
   };
@@ -417,6 +419,7 @@ export async function upsertProductRow(product) {
     category: categoryName,
     collection: collectionName,
     collection_name: collectionName,
+    show_on_website: product.showOnWebsite === true || product.show_on_website === true,
   };
 
   const id = isLiveDbId(product.id) ? String(product.id).trim() : '';
@@ -632,7 +635,8 @@ export async function createOrder(orderData, itemsArray) {
   }
 
   const status = String(orderData?.status || 'completed').trim() || 'completed';
-  const isOpen = status === 'open' || status === 'parked';
+  const isParked = status === 'open' || status === 'parked';
+  const reservesOrSells = isParked || ['completed', 'pending', 'paid'].includes(status);
 
   const total_amount = Number.isFinite(Number(orderData?.total_amount))
     ? Number(orderData.total_amount)
@@ -640,6 +644,10 @@ export async function createOrder(orderData, itemsArray) {
       (sum, item) => sum + Number(item.unit_price) * Number(item.quantity),
       0,
     );
+
+  const subtotal_amount = Number.isFinite(Number(orderData?.subtotal_amount))
+    ? Number(orderData.subtotal_amount)
+    : total_amount;
 
   const customerName = String(orderData?.customer_name || '').trim() || null;
   const downpayment = Math.max(0, Number(orderData?.downpayment) || 0);
@@ -649,18 +657,25 @@ export async function createOrder(orderData, itemsArray) {
     source: orderData?.source || 'pos',
     status,
     total_amount,
+    subtotal_amount,
+    shipping_amount: Math.max(0, Number(orderData?.shipping_amount) || 0),
     notes: orderData?.notes || null,
     staff_user_id: orderData?.staff_user_id || null,
     staff_name: orderData?.staff_name || null,
     ticket_label: orderData?.ticket_label || customerName || null,
     customer_name: customerName,
     customer_phone: String(orderData?.customer_phone || '').trim() || null,
-    customer_location: String(orderData?.customer_location || '').trim() || null,
+    customer_email: String(orderData?.customer_email || '').trim() || null,
+    customer_address: String(orderData?.customer_address || '').trim() || null,
+    customer_city: String(orderData?.customer_city || '').trim() || null,
+    customer_location: String(orderData?.customer_location || orderData?.customer_address || '').trim() || null,
     downpayment,
+    payment_method: orderData?.payment_method ? String(orderData.payment_method) : null,
+    payment_status: orderData?.payment_status ? String(orderData.payment_status) : null,
     updated_at: now,
   };
 
-  if (isOpen) orderPayload.parked_at = now;
+  if (isParked) orderPayload.parked_at = now;
   if (status === 'completed') orderPayload.completed_at = now;
 
   // 1) Insert order
@@ -692,30 +707,38 @@ export async function createOrder(orderData, itemsArray) {
     throw new Error(`Order items failed: ${itemsError.message}`);
   }
 
-  // 3) Inventory: completed sales AND parked tickets both reserve stock
-  const inventoryRows = items.map((item) => ({
-    product_id: item.product_id,
-    quantity_changed: -Math.abs(Number(item.quantity)),
-    type: isOpen ? 'park' : 'sale',
-    source: orderData?.source || 'pos',
-    notes: isOpen ? `Parked ticket ${order.id}` : `Order ${order.id}`,
-  }));
+  // 3) Inventory: parked tickets reserve stock; completed / web orders deduct stock
+  const inventoryRows = reservesOrSells
+    ? items.map((item) => ({
+      product_id: item.product_id,
+      quantity_changed: -Math.abs(Number(item.quantity)),
+      type: isParked ? 'park' : 'sale',
+      source: orderData?.source || 'pos',
+      notes: isParked
+        ? `Parked ticket ${order.id}`
+        : `Order ${order.invoice_number || order.id}`,
+    }))
+    : [];
 
-  const { data: inventory, error: inventoryError } = await getSupabase()
-    .from('inventory_transactions')
-    .insert(inventoryRows)
-    .select('*');
+  let inventory = [];
+  if (inventoryRows.length) {
+    const { data: inventoryData, error: inventoryError } = await getSupabase()
+      .from('inventory_transactions')
+      .insert(inventoryRows)
+      .select('*');
 
-  if (inventoryError) {
-    throw new Error(
-      `Order saved but inventory log failed: ${inventoryError.message}. Check stock manually for order ${order.id}.`,
-    );
+    if (inventoryError) {
+      throw new Error(
+        `Order saved but inventory log failed: ${inventoryError.message}. Check stock manually for order ${order.invoice_number || order.id}.`,
+      );
+    }
+    inventory = inventoryData ?? [];
   }
 
   return {
     order,
     items: insertedItems ?? [],
-    inventory: inventory ?? [],
+    inventory,
   };
 }
 
@@ -866,6 +889,159 @@ export async function cancelOpenTicket(orderId) {
     .single();
 
   if (error) throw new Error(error.message);
+  return data;
+}
+
+/**
+ * Recent completed POS sales (for refunds).
+ * @param {number} [limit]
+ * @returns {Promise<object[]>}
+ */
+export async function getRecentPosSales(limit = 25) {
+  const { data, error } = await getSupabase()
+    .from('orders')
+    .select('*, order_items(*)')
+    .eq('source', 'pos')
+    .in('status', ['completed', 'refunded'])
+    .order('completed_at', { ascending: false })
+    .limit(Math.max(1, Math.min(limit, 100)));
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+/**
+ * Refund a completed POS sale — restores stock and marks the order refunded.
+ * @param {string} orderId
+ * @returns {Promise<object>}
+ */
+export async function refundPosOrder(orderId) {
+  const id = String(orderId || '').trim();
+  if (!id) throw new Error('Order id is required.');
+
+  const order = await getOpenTicket(id);
+  if (order.source !== 'pos') throw new Error('Only POS sales can be refunded here.');
+  if (order.status === 'refunded') throw new Error('This sale was already refunded.');
+  if (order.status !== 'completed') throw new Error('Only completed sales can be refunded.');
+
+  const items = (order.order_items || []).filter(
+    (item) => item.product_id && Number(item.quantity) > 0,
+  );
+  if (!items.length) throw new Error('Sale has no line items to refund.');
+
+  const invoice = order.invoice_number || order.id;
+  const restoreRows = items.map((item) => ({
+    product_id: item.product_id,
+    quantity_changed: Math.abs(Number(item.quantity)),
+    type: 'refund',
+    source: 'pos',
+    notes: `Refund ${invoice}`,
+  }));
+
+  const { error: inventoryError } = await getSupabase()
+    .from('inventory_transactions')
+    .insert(restoreRows);
+
+  if (inventoryError) {
+    if (/refund|inventory_transactions_type_check/i.test(inventoryError.message)) {
+      throw new Error(
+        'Refund blocked by database rules. Run sql/pos_refund.sql in the Supabase SQL Editor.',
+      );
+    }
+    throw new Error(`Could not restore stock: ${inventoryError.message}`);
+  }
+
+  const now = new Date().toISOString();
+  const { data, error } = await getSupabase()
+    .from('orders')
+    .update({
+      status: 'refunded',
+      updated_at: now,
+      notes: [order.notes, `Refunded ${now.slice(0, 10)}`].filter(Boolean).join(' · '),
+    })
+    .eq('id', id)
+    .eq('status', 'completed')
+    .select('*')
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('Sale could not be marked refunded (already refunded?).');
+  return data;
+}
+
+// ── Website orders (online storefront) ──────────────────────────────
+
+/**
+ * List website orders newest first.
+ * @param {number} [limit]
+ * @returns {Promise<object[]>}
+ */
+export async function getWebsiteOrders(limit = 50) {
+  const { data, error } = await getSupabase()
+    .from('orders')
+    .select('*, order_items(*)')
+    .eq('source', 'online')
+    .order('created_at', { ascending: false })
+    .limit(Math.max(1, Math.min(limit, 200)));
+
+  if (error) {
+    if (/Could not find the table|schema cache|column/i.test(error.message)) {
+      throw new Error('Orders table not ready. Run sql/open_tickets.sql and sql/invoice_numbers.sql.');
+    }
+    throw mapSupabaseNetworkError(error, 'loading website orders');
+  }
+  return data ?? [];
+}
+
+/**
+ * Fetch one website order with line items.
+ * @param {string} orderId
+ * @returns {Promise<{ order: object, items: object[] }>}
+ */
+export async function getWebsiteOrderDetail(orderId) {
+  const id = String(orderId || '').trim();
+  if (!id) throw new Error('Order id is required.');
+
+  const { data: order, error } = await getSupabase()
+    .from('orders')
+    .select('*, order_items(*)')
+    .eq('id', id)
+    .eq('source', 'online')
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!order) throw new Error('Order not found.');
+
+  return { order, items: order.order_items || [] };
+}
+
+/**
+ * Update status on a website order (pending → completed / cancelled).
+ * @param {string} orderId
+ * @param {'pending'|'paid'|'completed'|'cancelled'} status
+ */
+export async function updateWebsiteOrderStatus(orderId, status) {
+  const id = String(orderId || '').trim();
+  const next = String(status || '').trim();
+  if (!id) throw new Error('Order id is required.');
+  if (!['pending', 'paid', 'completed', 'cancelled'].includes(next)) {
+    throw new Error('Invalid order status.');
+  }
+
+  const now = new Date().toISOString();
+  const patch = { status: next, updated_at: now };
+  if (next === 'completed') patch.completed_at = now;
+
+  const { data, error } = await getSupabase()
+    .from('orders')
+    .update(patch)
+    .eq('id', id)
+    .eq('source', 'online')
+    .select('*')
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('Order not found or could not be updated.');
   return data;
 }
 

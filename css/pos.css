@@ -243,6 +243,29 @@
   transform: scale(0.97);
 }
 
+.pos__refund-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.5rem;
+  padding: 0.4rem 1rem;
+  border-radius: var(--pos-radius-sm);
+  background: var(--pos-danger-soft);
+  color: var(--pos-danger);
+  border: 1px solid rgb(196 92 74 / 35%);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: background 160ms ease, border-color 160ms ease, transform 120ms var(--pos-ease);
+}
+
+.pos__refund-btn:active {
+  background: rgb(196 92 74 / 22%);
+  border-color: var(--pos-danger);
+  transform: scale(0.97);
+}
+
 .pos__tickets-btn svg {
   width: 1.1rem;
   height: 1.1rem;
@@ -915,19 +938,27 @@
 }
 
 .pos__line-remove {
-  width: 1.55rem;
-  height: 1.55rem;
-  border-radius: 50%;
-  color: var(--pos-muted);
-  font-size: 1.05rem;
+  min-height: 2rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 8px;
+  color: var(--pos-danger);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   line-height: 1;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(196 92 74 / 30%);
+  background: var(--pos-danger-soft);
+  touch-action: manipulation;
 }
 
 .pos__line-remove:active {
-  background: var(--pos-danger-soft);
-  color: var(--pos-danger);
+  background: rgb(196 92 74 / 28%);
+  color: #fff;
+  border-color: var(--pos-danger);
 }
 
 .pos__empty-ticket {
@@ -1277,6 +1308,18 @@
   letter-spacing: 0.03em;
 }
 
+.pos-tickets__invoice {
+  margin: 0.2rem 0 0.45rem;
+  font-size: 0.78rem;
+  color: var(--pos-gold);
+}
+
+.pos-tickets__invoice code {
+  font-family: inherit;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
 .pos-tickets__meta,
 .pos-tickets__money,
 .pos-tickets__time {
@@ -1377,10 +1420,99 @@
 }
 
 .pos-park-form__total {
-  margin: 0.35rem 0 1.1rem;
+  margin: 0.35rem 0 0.55rem;
   color: var(--pos-gold);
   font-size: 0.9rem;
   font-weight: 650;
+}
+
+.pos-park-form__hint {
+  margin: 0 0 1rem;
+  font-size: 0.82rem;
+  color: var(--pos-muted);
+  line-height: 1.4;
+}
+
+.pos-park-form__field span em {
+  font-style: normal;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--pos-muted);
+  opacity: 0.85;
+}
+
+.pos-refund-modal {
+  max-width: 28rem;
+  width: min(94vw, 28rem);
+  text-align: start;
+}
+
+.pos-refund-modal h2 {
+  text-align: start;
+  font-family: var(--pos-display);
+  font-weight: 400;
+  font-size: 1.45rem !important;
+  color: var(--pos-text) !important;
+}
+
+.pos-refund-modal__hint {
+  margin: 0.35rem 0 1rem;
+  color: var(--pos-muted);
+  font-size: 0.85rem;
+}
+
+.pos-refund-modal__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  max-height: 50vh;
+  overflow: auto;
+  margin: 0 0 1rem;
+}
+
+.pos-refund-modal__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid var(--pos-border);
+  border-radius: 0.85rem;
+  background: var(--pos-bg-elevated);
+}
+
+.pos-refund-modal__invoice {
+  margin: 0;
+  font-weight: 700;
+  color: var(--pos-gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.pos-refund-modal__meta,
+.pos-refund-modal__loading,
+.pos-refund-modal__empty {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--pos-muted);
+}
+
+.pos-refund-modal__btn {
+  flex-shrink: 0;
+  min-height: 2.5rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 0.65rem;
+  background: var(--pos-danger);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pos-refund-modal__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .pos-park-form__fields {
@@ -1873,5 +2005,134 @@
 @media (max-width: 380px) {
   .pos__product-grid {
     grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  }
+}
+
+/* ── Mobile bottom tab bar (app chrome) ──────────────────────────── */
+.pos__mobile-tabbar {
+  display: none;
+}
+
+.pos__mtab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.22rem;
+  min-height: 3.4rem;
+  padding: 0.45rem 0.25rem;
+  color: var(--pos-muted);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: color 160ms var(--pos-ease), transform 120ms var(--pos-ease);
+}
+
+.pos__mtab:active {
+  transform: scale(0.93);
+}
+
+.pos__mtab.is-active {
+  color: var(--pos-gold);
+}
+
+.pos__mtab-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.pos__mtab-icon svg {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+
+.pos__mtab-badge {
+  position: absolute;
+  top: -0.4rem;
+  right: -0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: var(--pos-danger);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 800;
+  border: 2px solid var(--pos-topbar);
+  letter-spacing: 0;
+}
+
+.pos__mtab-badge[hidden] {
+  display: none !important;
+}
+
+/* App-style single-view register with a bottom tab bar */
+@media (max-width: 640px) {
+  .pos {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .pos__mobile-tabbar {
+    display: grid;
+    grid-row: 3;
+    grid-column: 1;
+    grid-template-columns: repeat(4, 1fr);
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 3%) 0%, transparent 60%),
+      var(--pos-topbar);
+    border-top: 1px solid var(--pos-border-strong);
+    padding-bottom: env(safe-area-inset-bottom);
+    z-index: 25;
+    box-shadow: 0 -8px 28px rgb(0 0 0 / 30%);
+  }
+
+  /* Show one pane at a time — catalog OR ticket */
+  .pos__workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .pos__catalog {
+    border-inline-end: none;
+    border-bottom: none;
+  }
+
+  .pos__ticket {
+    display: none;
+    border-inline-start: none;
+    box-shadow: none;
+  }
+
+  .pos--m-ticket .pos__catalog {
+    display: none;
+  }
+
+  .pos--m-ticket .pos__ticket {
+    display: flex;
+  }
+
+  /* The tab bar now owns the tickets/scan actions — declutter the topbar */
+  .pos__topbar .pos__tickets-btn,
+  .pos__topbar .pos__scan-btn {
+    display: none;
+  }
+
+  /* Tab bar clears the home indicator, so the footer needn't add its own */
+  .pos__ticket-footer {
+    padding-bottom: 0.9rem;
+  }
+
+  /* Metrics drawer & toast should sit above the tab bar */
+  .pos__dashboard {
+    inset: auto 0 calc(3.4rem + env(safe-area-inset-bottom)) 0;
+  }
+
+  .pos__toast {
+    bottom: calc(4rem + env(safe-area-inset-bottom));
   }
 }

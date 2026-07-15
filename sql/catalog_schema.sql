@@ -40,6 +40,7 @@ create table if not exists public.products (
   stock_quantity integer not null default 0,
   min_stock_alert integer not null default 5,
   is_active boolean not null default true,
+  show_on_website boolean not null default true,
   category text,
   collection text,
   collection_name text,
@@ -58,6 +59,7 @@ alter table public.products add column if not exists retail_price numeric(12, 2)
 alter table public.products add column if not exists stock_quantity integer default 0;
 alter table public.products add column if not exists min_stock_alert integer default 5;
 alter table public.products add column if not exists is_active boolean default true;
+alter table public.products add column if not exists show_on_website boolean default true;
 alter table public.products add column if not exists category text;
 alter table public.products add column if not exists collection text;
 alter table public.products add column if not exists collection_name text;
@@ -83,6 +85,7 @@ alter table public.products
 create index if not exists products_category_id_idx on public.products (category_id);
 create index if not exists products_collection_id_idx on public.products (collection_id);
 create index if not exists products_is_active_idx on public.products (is_active);
+create index if not exists products_show_on_website_idx on public.products (show_on_website);
 create index if not exists products_barcode_idx on public.products (barcode);
 
 -- ── Row Level Security (anon/authenticated read+write for storefront/admin client) ──
