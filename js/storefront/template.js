@@ -423,7 +423,10 @@ export function productCardHtml(product, i18n) {
 export function productCardCartControlHtml(productId, qty, outOfStock, i18n) {
   const t = i18n.t.bind(i18n);
   if (outOfStock) {
-    return `<button type="button" class="btn btn--ghost btn--sm product-card__bag" disabled aria-disabled="true">${t('shop.outOfStock')}</button>`;
+    return `<button type="button" class="btn btn--ghost btn--sm product-card__bag product-card__bag--oos" disabled aria-disabled="true">
+      <span class="product-card__bag-full">${t('shop.outOfStock')}</span>
+      <span class="product-card__bag-short" aria-hidden="true">—</span>
+    </button>`;
   }
   if (qty > 0) {
     return `
@@ -434,8 +437,9 @@ export function productCardCartControlHtml(productId, qty, outOfStock, i18n) {
       </div>`;
   }
   return `
-    <button type="button" class="btn btn--ghost btn--sm product-card__bag" data-action="add-to-cart" data-product-id="${escapeAttr(productId)}">
-      ${t('shop.bag')}
+    <button type="button" class="btn btn--ghost btn--sm product-card__bag" data-action="add-to-cart" data-product-id="${escapeAttr(productId)}" aria-label="${escapeAttr(t('shop.bag'))}">
+      <span class="product-card__bag-full">${t('shop.bag')}</span>
+      <span class="product-card__bag-short" aria-hidden="true">+</span>
     </button>`;
 }
 
