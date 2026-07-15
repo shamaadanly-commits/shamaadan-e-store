@@ -4,6 +4,36 @@
  */
 import { createClient } from '@supabase/supabase-js';
 
+function pickEnv(...keys) {
+  for (const key of keys) {
+    const value = process.env[key];
+    if (value && String(value).trim()) return String(value).trim();
+  }
+  return '';
+}
+
+function getSupabaseAdmin() {
+  const supabaseUrl = pickEnv(
+    'VITE_SUPABASE_URL',
+    'SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'PUBLIC_SUPABASE_URL',
+  );
+  // Prefer service role; fall back to anon (RLS on orders allows insert).
+  const supabaseKey = pickEnv(
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'VITE_SUPABASE_ANON_KEY',
+    'SUPABASE_ANON_KEY',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    'PUBLIC_SUPABASE_ANON_KEY',
+    'VITE_SUPABASE_PUBLISHABLE_KEY',
+    'SUPABASE_PUBLISHABLE_KEY',
+  );
+
+  if (!supabaseUrl || !supabaseKey) return null;
+  return createClient(supabaseUrl, supabaseKey);
+}
+
 async function processUpayPayment(card, amount, orderRef) {
   const merchantId = process.env.UPAY_MERCHANT_ID;
   const apiKey = process.env.UPAY_API_KEY;
@@ -82,14 +112,14 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'Invalid payment method' });
     }
 
-    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !serviceKey) {
-      return res.status(503).json({ ok: false, error: 'Order storage is not configured.' });
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      return res.status(503).json({
+        ok: false,
+        error: 'Order storage is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or SUPABASE_SERVICE_ROLE_KEY) in Vercel → Environment Variables, then redeploy.',
+        code: 'not_configured',
+      });
     }
-
-    const supabase = createClient(supabaseUrl, serviceKey);
 
     const productMap = await loadProductsById(
       supabase,

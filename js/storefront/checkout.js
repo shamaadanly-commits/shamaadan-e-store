@@ -1,6 +1,8 @@
 /**
  * Checkout drawer — CAD (cash on delivery) & UPAY (credit card).
  */
+import { createOrder, isSupabaseConfigured } from '../../shared/supabase.js';
+
 const OVERLAY_ID = 'checkout-overlay';
 
 /**
@@ -321,38 +323,92 @@ async function submitOrder(overlay, cart, i18n, form) {
   if (errorEl) errorEl.textContent = '';
 
   try {
-    const res = await fetch('/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    let invoiceNumber = '';
 
-    let data;
     try {
-      data = await res.json();
-    } catch {
-      throw new Error('network');
-    }
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
-    if (!res.ok || !data.ok) {
-      throw new Error(data.error || t('checkout.errorGeneric'));
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error('network');
+      }
+
+      if (res.ok && data.ok) {
+        invoiceNumber = data.invoiceNumber || data.orderRef || '';
+      } else if (data?.code === 'not_configured' || /not configured/i.test(data?.error || '')) {
+        // API missing server env — place the order from the browser with the same keys as the catalog.
+        invoiceNumber = await placeOrderClientSide(payload);
+      } else {
+        throw new Error(data?.error || t('checkout.errorGeneric'));
+      }
+    } catch (apiErr) {
+      if (apiErr.message === 'network' || apiErr.message === 'Failed to fetch') {
+        if (isSupabaseConfigured()) {
+          invoiceNumber = await placeOrderClientSide(payload);
+        } else {
+          throw apiErr;
+        }
+      } else {
+        throw apiErr;
+      }
     }
 
     cart.clear();
-    const ref = data.invoiceNumber || data.orderRef || '—';
-    showSuccess(overlay, i18n, ref, paymentMethod);
+    showSuccess(overlay, i18n, invoiceNumber || '—', paymentMethod);
   } catch (err) {
-    // Demo completion when API unavailable (local static preview)
-    if (err.message === 'network' || err.message === 'Failed to fetch') {
-      const orderRef = `SHM-${Date.now().toString(36).toUpperCase()}`;
-      cart.clear();
-      showSuccess(overlay, i18n, orderRef, paymentMethod);
-      return;
-    }
     if (errorEl) errorEl.textContent = err.message || t('checkout.errorGeneric');
     submitBtn.disabled = false;
     submitBtn.textContent = t('checkout.placeOrder');
   }
+}
+
+/**
+ * Browser-side fallback using the storefront Supabase anon client.
+ * @param {object} payload
+ * @returns {Promise<string>} invoice number
+ */
+async function placeOrderClientSide(payload) {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Order storage is not configured. Set Supabase keys and redeploy.');
+  }
+
+  const lineItems = (payload.items || []).map((line) => ({
+    product_id: String(line.productId),
+    quantity: Math.trunc(Number(line.qty) || 0),
+    unit_price: Number(line.price) || 0,
+    wholesale_cost: Number(line.cost || line.wholesale_cost || 0),
+    product_name: String(line.name || 'Item'),
+  })).filter((line) => line.product_id && line.quantity > 0);
+
+  if (!lineItems.length) throw new Error('Your bag is empty.');
+
+  const status = payload.paymentMethod === 'upay' ? 'paid' : 'pending';
+  const customer = payload.customer || {};
+
+  const result = await createOrder({
+    source: 'online',
+    status,
+    total_amount: Number(payload.total) || 0,
+    subtotal_amount: Number(payload.subtotal) || 0,
+    shipping_amount: Number(payload.shipping) || 0,
+    customer_name: String(customer.fullName || '').trim(),
+    customer_phone: String(customer.phone || '').trim(),
+    customer_email: String(customer.email || '').trim(),
+    customer_address: String(customer.address || '').trim(),
+    customer_city: String(customer.city || '').trim(),
+    customer_location: [customer.address, customer.city].filter(Boolean).join(', '),
+    payment_method: payload.paymentMethod,
+    payment_status: payload.paymentMethod === 'upay' ? 'paid' : 'cod_pending',
+    notes: payload.locale ? `Locale: ${payload.locale}` : null,
+  }, lineItems);
+
+  return result?.order?.invoice_number || result?.order?.id || '';
 }
 
 function validateContact(form, errorEl, t) {
