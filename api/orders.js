@@ -56,7 +56,7 @@ async function processUpayPayment(card, amount, orderRef) {
     },
     body: JSON.stringify({
       amount: Math.round(amount * 100),
-      currency: 'USD',
+      currency: 'LYD',
       reference: orderRef,
       card: {
         number: card.number,

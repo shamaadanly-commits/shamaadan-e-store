@@ -35,7 +35,7 @@ const MESSAGES = {
       scroll: 'Scroll',
     },
     marquee: [
-      'Free shipping over $75',
+      'Free shipping over 75 LYD',
       'Hand-poured in small batches',
       'Sustainably sourced oud',
       'Complimentary gift wrapping',
@@ -214,7 +214,7 @@ const MESSAGES = {
       scroll: 'مرر',
     },
     marquee: [
-      'شحن مجاني فوق ٧٥$',
+      'شحن مجاني فوق ٧٥ د.ل',
       'صب يدوي بدفعات صغيرة',
       'عود مستدام المصدر',
       'تغليف هدايا مجاني',
@@ -466,8 +466,12 @@ export function createI18n(initialLocale) {
   }
 
   function formatPrice(amount) {
-    const loc = locale === 'ar' ? 'ar-AE' : 'en-US';
-    return new Intl.NumberFormat(loc, { style: 'currency', currency: 'USD' }).format(amount);
+    const loc = locale === 'ar' ? 'ar-LY' : 'en-LY';
+    return new Intl.NumberFormat(loc, {
+      style: 'currency',
+      currency: 'LYD',
+      minimumFractionDigits: 2,
+    }).format(Number(amount) || 0);
   }
 
   return {
