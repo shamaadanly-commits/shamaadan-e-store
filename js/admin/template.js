@@ -800,35 +800,59 @@ export function buildAdminShell() {
             <p class="dash-sidebar__sub">Central Dashboard</p>
           </div>
         </div>
-        <nav class="dash-nav">
-          <button type="button" class="dash-nav__link is-active" data-view="dashboard" aria-current="page">
-            <span aria-hidden="true">📊</span> Accounting
+        <nav class="dash-nav" aria-label="Admin sections">
+          <button type="button" class="dash-nav__link is-active" data-nav="accounting" data-view="dashboard" aria-current="page">
+            <span class="dash-nav__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M3 13h2v8H3v-8zm4-6h2v14H7V7zm4-4h2v18h-2V3zm4 8h2v10h-2V11zm4-5h2v15h-2V6z"/></svg>
+            </span>
+            <span class="dash-nav__label">Accounting</span>
           </button>
-          <button type="button" class="dash-nav__link" data-view="catalog">
-            <span aria-hidden="true">🛍</span> Store Catalog
+          <button type="button" class="dash-nav__link" data-nav="catalog" data-view="catalog">
+            <span class="dash-nav__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-1.99.9-1.99 2S15.9 22 17 22s2-.9 2-2-.9-2-2-2zM7.16 14.26l.03-.12L8.1 12h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0 0 20.01 3H5.21l-.94-2H1v2h2l3.6 7.59-1.35 2.44C4.52 14.37 5.48 16 7 16h12v-2H7.42c-.14 0-.25-.11-.26-.25z"/></svg>
+            </span>
+            <span class="dash-nav__label">Store Catalog</span>
           </button>
-          <button type="button" class="dash-nav__link" data-view="website-orders">
-            <span aria-hidden="true">📬</span> Website Orders
+          <button type="button" class="dash-nav__link" data-nav="orders" data-view="website-orders">
+            <span class="dash-nav__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>
+            </span>
+            <span class="dash-nav__label">Website Orders</span>
           </button>
-          <button type="button" class="dash-nav__link" data-view="taxonomy">
-            <span aria-hidden="true">🏷</span> Collections &amp; Categories
+          <button type="button" class="dash-nav__link" data-nav="taxonomy" data-view="taxonomy">
+            <span class="dash-nav__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M17.63 5.84C17.27 5.33 16.67 5 16 5L5 5.01C3.9 5.01 3 5.9 3 7v10c0 1.1.9 1.99 2 1.99L16 19c.67 0 1.27-.33 1.63-.84L22 12l-4.37-6.16z"/></svg>
+            </span>
+            <span class="dash-nav__label">Collections &amp; Categories</span>
           </button>
-          <button type="button" class="dash-nav__link" data-view="inventory">
-            <span aria-hidden="true">📦</span> Inventory Costs
+          <button type="button" class="dash-nav__link" data-nav="inventory" data-view="inventory">
+            <span class="dash-nav__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></svg>
+            </span>
+            <span class="dash-nav__label">Inventory Costs</span>
           </button>
-          <button type="button" class="dash-nav__link" data-view="waste">
-            <span aria-hidden="true">🗑</span> Waste
+          <button type="button" class="dash-nav__link" data-nav="waste" data-view="waste">
+            <span class="dash-nav__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+            </span>
+            <span class="dash-nav__label">Waste</span>
           </button>
-          <a href="/?app=storefront" class="dash-nav__link dash-nav__link--external" target="_blank" rel="noopener">
-            <span aria-hidden="true">🌐</span> View Website
+          <a href="/?app=storefront" class="dash-nav__link dash-nav__link--external" data-nav="website" target="_blank" rel="noopener">
+            <span class="dash-nav__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+            </span>
+            <span class="dash-nav__label">View Website</span>
           </a>
-          <a href="/?app=pos" class="dash-nav__link dash-nav__link--external">
-            <span aria-hidden="true">🏬</span> Open POS
+          <a href="/?app=pos" class="dash-nav__link dash-nav__link--external" data-nav="pos">
+            <span class="dash-nav__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
+            </span>
+            <span class="dash-nav__label">Open POS</span>
           </a>
         </nav>
         <footer class="dash-sidebar__footer">
-          <p class="dash-sidebar__user" data-admin-user hidden></p>
-          <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm dash-btn--full" data-logout>Sign out</button>
+          <p class="dash-sidebar__role" data-admin-user hidden></p>
+          <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm dash-btn--full dash-sidebar__logout" data-logout>Sign out</button>
         </footer>
       </aside>
 

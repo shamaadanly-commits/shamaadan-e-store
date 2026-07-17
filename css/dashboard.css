@@ -14,6 +14,17 @@
   --dash-accent: #4caf50;
   --dash-accent-dark: #43a047;
   --dash-accent-soft: rgb(76 175 80 / 12%);
+  /* Loyverse-style multi-color sidebar palette */
+  --nav-accounting: #4caf50;
+  --nav-catalog: #e91e63;
+  --nav-orders: #2196f3;
+  --nav-taxonomy: #9c27b0;
+  --nav-inventory: #009688;
+  --nav-waste: #f44336;
+  --nav-website: #607d8b;
+  --nav-pos: #00bcd4;
+  --nav-hover-bg: #f5f5f5;
+  --nav-active-bg: #f9f9f9;
   --dash-gold: #4caf50;
   --dash-gold-strong: #43a047;
   --dash-gold-dim: #81c784;
@@ -141,12 +152,15 @@
   margin-top: 0.85rem;
 }
 
-.dash-sidebar__user {
-  margin: 0 0 0.65rem;
-  font-size: 0.75rem;
+.dash-sidebar__user,
+.dash-sidebar__role {
+  margin: 0 0 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 500;
   color: var(--dash-text-muted);
   text-align: center;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 /* ── App shell ───────────────────────────────────────────────────── */
@@ -159,7 +173,7 @@
 .dash-sidebar {
   display: flex;
   flex-direction: column;
-  padding: 0.85rem 0.65rem;
+  padding: 0.85rem 0;
   background: var(--dash-surface);
   border-inline-end: 1px solid var(--dash-border);
   position: sticky;
@@ -172,9 +186,9 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.65rem 0.75rem 1rem;
+  padding: 0.65rem 1rem 1rem;
   border-bottom: 1px solid var(--dash-border-soft);
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
 .dash-sidebar__mark {
@@ -209,65 +223,124 @@
 .dash-nav {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0;
   flex: 1;
+  padding: 0.25rem 0;
+  overflow-y: auto;
 }
 
 .dash-nav__link {
+  --nav-item-color: var(--dash-text-muted);
   position: relative;
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  padding: 0.7rem 0.85rem;
+  gap: 0.85rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.75rem 1rem 0.75rem 1.1rem;
   border: none;
-  border-radius: var(--dash-radius-sm);
-  color: var(--dash-text-muted);
-  font-size: 0.88rem;
-  font-weight: 500;
+  border-radius: 0;
+  background: transparent;
+  color: var(--dash-text);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 400;
+  text-align: start;
   text-decoration: none;
+  cursor: pointer;
   transition: background 0.15s var(--dash-ease), color 0.15s var(--dash-ease);
 }
 
-.dash-nav__link span[aria-hidden] {
-  font-size: 1rem;
-  opacity: 0.85;
+.dash-nav__link[data-nav='accounting'] { --nav-item-color: var(--nav-accounting); }
+.dash-nav__link[data-nav='catalog'] { --nav-item-color: var(--nav-catalog); }
+.dash-nav__link[data-nav='orders'] { --nav-item-color: var(--nav-orders); }
+.dash-nav__link[data-nav='taxonomy'] { --nav-item-color: var(--nav-taxonomy); }
+.dash-nav__link[data-nav='inventory'] { --nav-item-color: var(--nav-inventory); }
+.dash-nav__link[data-nav='waste'] { --nav-item-color: var(--nav-waste); }
+.dash-nav__link[data-nav='website'] { --nav-item-color: var(--nav-website); }
+.dash-nav__link[data-nav='pos'] { --nav-item-color: var(--nav-pos); }
+
+.dash-nav__icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 1.35rem;
+  height: 1.35rem;
+  color: var(--nav-item-color);
+}
+
+.dash-nav__icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  display: block;
+}
+
+.dash-nav__label {
+  min-width: 0;
+  line-height: 1.3;
 }
 
 .dash-nav__link:hover {
-  background: rgb(0 0 0 / 4%);
+  background: var(--nav-hover-bg);
   color: var(--dash-text);
 }
 
+.dash-nav__link:hover .dash-nav__icon {
+  color: var(--nav-item-color);
+}
+
 .dash-nav__link:active {
-  background: rgb(0 0 0 / 6%);
+  background: var(--nav-hover-bg);
 }
 
 .dash-nav__link.is-active {
-  background: var(--dash-accent-soft);
-  color: var(--dash-accent-dark);
-  font-weight: 600;
+  background: var(--nav-active-bg);
+  color: var(--nav-item-color);
+  font-weight: 500;
 }
 
-.dash-nav__link.is-active span[aria-hidden] {
-  opacity: 1;
+.dash-nav__link.is-active .dash-nav__icon {
+  color: var(--nav-item-color);
 }
 
+/* Thick Loyverse-style left accent on the active item */
 .dash-nav__link.is-active::before {
   content: '';
   position: absolute;
-  inset-inline-start: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 1.25rem;
-  border-radius: 0 2px 2px 0;
-  background: var(--dash-accent);
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 0;
+  background: var(--nav-item-color);
+  transform: none;
+}
+
+[dir='rtl'] .dash-nav__link.is-active::before {
+  left: auto;
+  right: 0;
 }
 
 .dash-sidebar__footer {
   margin-top: auto;
-  padding-top: 0.85rem;
+  padding: 0.85rem 1rem 1rem;
   border-top: 1px solid var(--dash-border-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+.dash-sidebar__logout {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+  color: var(--dash-text-muted) !important;
+}
+
+.dash-sidebar__logout:hover:not(:disabled) {
+  background: var(--nav-hover-bg) !important;
+  color: var(--dash-danger) !important;
 }
 
 /* ── Main content ────────────────────────────────────────────────── */
