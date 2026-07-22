@@ -52,7 +52,6 @@ import {
 import {
   buildAdminShell,
   ledgerMatrixHtml,
-  inventoryTableHtml,
   catalogTableHtml,
   catalogFormHtml,
   collectionsPanelHtml,
@@ -61,7 +60,6 @@ import {
   categoryFormHtml,
   transactionFeedHtml,
   openTicketsPanelHtml,
-  productFormHtml,
   wasteFormHtml,
   wasteTableHtml,
   websiteOrdersTableHtml,
@@ -73,7 +71,6 @@ import {
  */
 export async function mount(root) {
   const state = getSharedDashboardState();
-  let editingProductId = null;
   let editingCatalogId = null;
   let catalogFormVisible = false;
   let editingCollectionId = null;
@@ -110,7 +107,6 @@ export async function mount(root) {
     transactionHost: root.querySelector('[data-transaction-host]'),
     openTicketsHost: root.querySelector('[data-open-tickets-host]'),
     marginHost: root.querySelector('[data-margin-host]'),
-    inventoryHost: root.querySelector('[data-inventory-host]'),
     wasteHost: root.querySelector('[data-waste-host]'),
     wasteFormHost: root.querySelector('[data-waste-form-host]'),
     websiteOrdersHost: root.querySelector('[data-website-orders-host]'),
@@ -118,9 +114,6 @@ export async function mount(root) {
     salesByItemHost: root.querySelector('[data-sales-by-item-host]'),
     valuationHost: root.querySelector('[data-valuation-host]'),
     orderModal: root.querySelector('[data-order-modal]'),
-    formHost: root.querySelector('[data-form-host]'),
-    formTitle: root.querySelector('[data-form-title]'),
-    productCount: root.querySelector('[data-product-count]'),
     catalogHost: root.querySelector('[data-catalog-host]'),
     catalogFormHost: root.querySelector('[data-catalog-form-host]'),
     catalogFormTitle: root.querySelector('[data-catalog-form-title]'),
@@ -194,7 +187,6 @@ export async function mount(root) {
       if (!preserveForms) {
         renderTaxonomyForms();
         renderCatalogForm();
-        renderForm();
         renderWasteForm();
       }
       refreshWebsiteOrders();
@@ -507,12 +499,10 @@ export async function mount(root) {
 
     if (target.matches('[data-seed-mock]')) {
       state.seedFromMock();
-      editingProductId = null;
       editingCatalogId = null;
       editingCollectionId = null;
       editingCategoryId = null;
       catalogFilter = 'All';
-      renderForm();
       renderCatalogForm();
       renderTaxonomyForms();
       return;
@@ -685,10 +675,6 @@ export async function mount(root) {
           editingCatalogId = null;
           renderCatalogForm();
         }
-        if (editingProductId === id) {
-          editingProductId = null;
-          renderForm();
-        }
       }
       return;
     }
@@ -698,51 +684,6 @@ export async function mount(root) {
       catalogFormVisible = false;
       renderCatalogForm();
       return;
-    }
-
-    const editBtn = target.closest('[data-edit-product]');
-    if (editBtn) {
-      editingProductId = editBtn.dataset.editProduct;
-      renderForm(state.getSnapshot().products.find((p) => p.id === editingProductId));
-      switchView('inventory');
-      return;
-    }
-
-    const deleteBtn = target.closest('[data-delete-product]');
-    if (deleteBtn) {
-      let id = '';
-      try {
-        id = assertLiveId(readRowId(deleteBtn, 'deleteProduct'), 'Product');
-      } catch (err) {
-        window.alert(err.message);
-        await refreshFromSupabase();
-        return;
-      }
-
-      if (confirm('Delete this product from the master inventory?')) {
-        try {
-          await persistDeleteProduct(id);
-          await refreshFromSupabase();
-        } catch (err) {
-          console.error('[admin] deleteProduct failed:', err);
-          window.alert(err?.message || 'Failed to delete product in Supabase.');
-          await refreshFromSupabase();
-        }
-        if (editingProductId === id) {
-          editingProductId = null;
-          renderForm();
-        }
-        if (editingCatalogId === id) {
-          editingCatalogId = null;
-          renderCatalogForm();
-        }
-      }
-      return;
-    }
-
-    if (target.matches('[data-cancel-edit]')) {
-      editingProductId = null;
-      renderForm();
     }
   });
 
@@ -804,15 +745,6 @@ export async function mount(root) {
       event.preventDefault();
       await saveWasteFromForm(wasteForm);
       return;
-    }
-
-    const form = event.target.closest('[data-product-form]');
-    if (!form) return;
-    event.preventDefault();
-    const saved = await saveProductFromForm(form);
-    if (saved) {
-      editingProductId = null;
-      renderForm();
     }
   });
 
@@ -988,7 +920,6 @@ export async function mount(root) {
       els.adminUser.hidden = false;
       els.adminUser.textContent = currentUser.displayName || currentUser.username;
     }
-    renderForm();
     renderCatalogForm();
     renderTaxonomyForms();
     renderWasteForm();
@@ -1049,10 +980,10 @@ export async function mount(root) {
     const ae = document.activeElement;
     if (ae && typeof ae.closest === 'function' && ae.closest('input, textarea, select')) return true;
     if (els.orderModal && !els.orderModal.hidden) return true;
-    if (editingProductId || editingCatalogId || editingCollectionId || editingCategoryId) return true;
+    if (editingCatalogId || editingCollectionId || editingCategoryId) return true;
 
     // Adding a new product (editingCatalogId is null) — treat filled forms as busy.
-    const openForm = root.querySelector('[data-catalog-form], [data-product-form]');
+    const openForm = root.querySelector('[data-catalog-form]');
     if (openForm) {
       const title = String(openForm.querySelector('[name="title"]')?.value || '').trim();
       const barcode = String(openForm.querySelector('[name="barcode"]')?.value || '').trim();
@@ -1145,7 +1076,6 @@ export async function mount(root) {
       catalog: 'Products',
       'website-orders': 'Website Orders',
       taxonomy: 'Collections & Categories',
-      inventory: 'Inventory Costs',
       valuation: 'Inventory Valuation',
       waste: 'Waste — Damaged & Lost Stock',
     };
@@ -1154,29 +1084,6 @@ export async function mount(root) {
     if (view === 'reports') refreshReports();
     if (view === 'sales-by-item') refreshSalesByItem();
     if (view === 'valuation') renderInventoryValuation();
-  }
-
-  function renderForm(product = null) {
-    if (!els.formHost) return;
-    const snapshot = state.getSnapshot();
-    const editing = product ?? (editingProductId
-      ? snapshot.products.find((p) => p.id === editingProductId)
-      : null);
-    const { collections, categories } = liveTaxonomy(snapshot);
-
-    if (els.formTitle) {
-      els.formTitle.textContent = editing ? 'Edit Product' : 'Add Product';
-    }
-    els.formHost.innerHTML = productFormHtml(editing, collections, categories);
-    const form = els.formHost.querySelector('[data-product-form]');
-    if (form) {
-      bindImageUploader(form);
-      populateFormDropdowns(collections, categories, form, {
-        collectionId: editing?.collection_id || '',
-        categoryId: editing?.category_id || '',
-      });
-      updateBarcodePreview(form);
-    }
   }
 
   function setCatalogFormVisible(visible) {
@@ -1510,15 +1417,6 @@ export async function mount(root) {
 
     if (els.marginHost) {
       els.marginHost.innerHTML = marginSummaryHtml(ledgers);
-    }
-
-    if (els.inventoryHost) {
-      els.inventoryHost.innerHTML = inventoryTableHtml(products.filter((p) => isLiveDbId(p.id)));
-    }
-
-    if (els.productCount) {
-      const liveCount = products.filter((p) => isLiveDbId(p.id)).length;
-      els.productCount.textContent = `${liveCount} product${liveCount === 1 ? '' : 's'}`;
     }
 
     renderCatalog(snapshot);

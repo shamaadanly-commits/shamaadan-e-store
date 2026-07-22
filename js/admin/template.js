@@ -841,12 +841,6 @@ export function buildAdminShell() {
             </span>
             <span class="dash-nav__label">Collections &amp; Categories</span>
           </button>
-          <button type="button" class="dash-nav__link" data-nav="inventory" data-view="inventory">
-            <span class="dash-nav__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></svg>
-            </span>
-            <span class="dash-nav__label">Inventory Costs</span>
-          </button>
           <button type="button" class="dash-nav__link" data-nav="valuation" data-view="valuation">
             <span class="dash-nav__icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
@@ -1006,24 +1000,6 @@ export function buildAdminShell() {
                 </header>
                 <div class="dash-panel__body" data-categories-host></div>
                 <div class="dash-panel__body dash-panel__body--form" data-category-form-host></div>
-              </article>
-            </div>
-          </section>
-
-          <section class="dash-view" data-panel="inventory" aria-label="Master inventory control" hidden>
-            <div class="dash-inventory-layout">
-              <article class="dash-panel dash-panel--grow">
-                <header class="dash-panel__header dash-panel__header--row">
-                  <h2>Master Inventory Ledger</h2>
-                  <span class="dash-panel__count" data-product-count>0 products</span>
-                </header>
-                <div class="dash-panel__body" data-inventory-host></div>
-              </article>
-              <article class="dash-panel dash-panel--form">
-                <header class="dash-panel__header">
-                  <h2 data-form-title>Add Product</h2>
-                </header>
-                <div class="dash-panel__body" data-form-host></div>
               </article>
             </div>
           </section>
