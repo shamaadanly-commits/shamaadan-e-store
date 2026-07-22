@@ -898,7 +898,6 @@ export function buildAdminShell() {
           <div class="dash-topbar__actions">
             <button type="button" class="dash-btn dash-btn--primary dash-btn--sm dash-topbar__backup" data-backup-pdf>⬇ Daily Backup (PDF)</button>
             <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-refresh>Refresh</button>
-            <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm dash-topbar__mock" data-seed-mock>Reset Mock Data</button>
           </div>
         </header>
 

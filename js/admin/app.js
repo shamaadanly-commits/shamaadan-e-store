@@ -613,17 +613,6 @@ export async function mount(root) {
       return;
     }
 
-    if (target.matches('[data-seed-mock]')) {
-      state.seedFromMock();
-      editingCatalogId = null;
-      editingCollectionId = null;
-      editingCategoryId = null;
-      catalogFilter = 'All';
-      renderCatalogForm();
-      renderTaxonomyForms();
-      return;
-    }
-
     const navBtn = target.closest('[data-view]');
     if (navBtn?.matches('button[data-view]')) {
       switchView(navBtn.dataset.view);
