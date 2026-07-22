@@ -584,6 +584,8 @@ async function mountRegister(root, staff) {
 
       showSaleComplete(root, {
         revenue: total,
+        subtotal: total,
+        discount: Number(ticket.discount_amount) || 0,
         cost,
         profit: total - cost,
         units,
@@ -594,6 +596,8 @@ async function mountRegister(root, staff) {
         staffUserId: staff.id,
         paidAt: new Date(),
         paymentMethod: payment.payment_method,
+        paymentReference: payment.payment_reference || null,
+        paymentDate: payment.payment_date || null,
       }, els.toast);
 
       await refreshTicketsList();
@@ -925,6 +929,8 @@ async function mountRegister(root, staff) {
             staffUserId: staff.id,
             paidAt: new Date(),
             paymentMethod: payment.payment_method,
+            paymentReference: payment.payment_reference || null,
+            paymentDate: payment.payment_date || null,
           };
           centralState.recordPosSale({
             ...sale,
@@ -1166,6 +1172,8 @@ function showSaleComplete(root, sale, toastEl) {
 
   const payload = encodeURIComponent(JSON.stringify({
     revenue: sale.revenue,
+    subtotal: sale.subtotal ?? sale.revenue,
+    discount: sale.discount || 0,
     cost: sale.cost,
     profit: sale.profit,
     units: sale.units,
@@ -1175,6 +1183,9 @@ function showSaleComplete(root, sale, toastEl) {
     cashier: sale.cashier,
     staffUserId: sale.staffUserId,
     paidAt: (sale.paidAt ?? new Date()).toISOString(),
+    paymentMethod: sale.paymentMethod || null,
+    paymentReference: sale.paymentReference || null,
+    paymentDate: sale.paymentDate || null,
   }));
 
   const modal = document.createElement('div');

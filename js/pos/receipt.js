@@ -14,6 +14,8 @@ import { formatLyd } from '../shared/format.js';
 /**
  * @typedef {object} SaleReceipt
  * @property {number} revenue
+ * @property {number} [subtotal]
+ * @property {number} [discount]
  * @property {number} cost
  * @property {number} profit
  * @property {number} units
@@ -21,15 +23,28 @@ import { formatLyd } from '../shared/format.js';
  * @property {string} [receiptNo]
  * @property {string} [register]
  * @property {string} [cashier]
- * @property {Date} [paidAt]
+ * @property {Date|string} [paidAt]
+ * @property {string} [paymentMethod]
+ * @property {string|null} [paymentReference]
+ * @property {string|null} [paymentDate]
  */
+
+/**
+ * @param {string} method
+ */
+function paymentMethodLabel(method) {
+  const m = String(method || '').toLowerCase();
+  if (m === 'cash') return 'Cash';
+  if (m === 'bank_transfer' || m === 'bank-transfer' || m === 'transfer') return 'Bank Transfer';
+  return method ? String(method) : '';
+}
 
 /**
  * @param {SaleReceipt} sale
  * @returns {string}
  */
 export function buildReceiptHtml(sale) {
-  const paidAt = sale.paidAt ?? new Date();
+  const paidAt = sale.paidAt ? new Date(sale.paidAt) : new Date();
   const receiptNo = sale.receiptNo ?? `R${Date.now().toString(36).toUpperCase()}`;
   const register = sale.register ?? 'Register #1';
   const cashier = sale.cashier || '';
@@ -40,6 +55,17 @@ export function buildReceiptHtml(sale) {
     hour: '2-digit',
     minute: '2-digit',
   });
+
+  const subtotal = Number(sale.subtotal);
+  const discount = Math.max(0, Number(sale.discount) || 0);
+  const total = Number(sale.revenue) || 0;
+  const shownSubtotal = Number.isFinite(subtotal) && subtotal > 0
+    ? subtotal
+    : (discount > 0 ? total + discount : total);
+
+  const payLabel = paymentMethodLabel(sale.paymentMethod);
+  const payRef = String(sale.paymentReference || '').trim();
+  const payDate = String(sale.paymentDate || '').trim();
 
   const rows = (sale.lines || []).map((line) => {
     const lineTotal = line.unitPrice * line.quantity;
@@ -102,6 +128,12 @@ export function buildReceiptHtml(sale) {
       padding-top: 8px;
       border-top: 2px solid #111;
     }
+    .pay {
+      margin: 0;
+      font-size: 11px;
+      color: #111;
+    }
+    .pay strong { font-weight: 800; }
     .thanks {
       margin-top: 12px;
       text-align: center;
@@ -156,18 +188,24 @@ export function buildReceiptHtml(sale) {
       </tr>
       <tr>
         <td>Subtotal</td>
-        <td class="amt">${formatLyd(Number(sale.subtotal ?? sale.revenue) || 0)}</td>
+        <td class="amt">${formatLyd(shownSubtotal)}</td>
       </tr>
-      ${Number(sale.discount) > 0 ? `
+      ${discount > 0 ? `
       <tr>
         <td>Discount</td>
-        <td class="amt">−${formatLyd(Number(sale.discount) || 0)}</td>
+        <td class="amt">−${formatLyd(discount)}</td>
       </tr>` : ''}
       <tr class="grand">
         <td>TOTAL</td>
-        <td class="amt">${formatLyd(sale.revenue)}</td>
+        <td class="amt">${formatLyd(total)}</td>
       </tr>
     </table>
+    ${payLabel || payRef || payDate ? `
+    <hr class="rule">
+    <p class="pay"><strong>Payment:</strong> ${escapeHtml(payLabel || '—')}</p>
+    ${payRef ? `<p class="pay"><strong>Txn #:</strong> ${escapeHtml(payRef)}</p>` : ''}
+    ${payDate ? `<p class="pay"><strong>Transfer date:</strong> ${escapeHtml(payDate)}</p>` : ''}
+    ` : ''}
     <p class="thanks">Thank you for shopping with Shamaadan</p>
     <div class="actions">
       <button type="button" onclick="window.print()">Print receipt</button>
