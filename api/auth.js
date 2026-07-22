@@ -6,7 +6,7 @@
  *
  * Also accepts action in JSON body for POST requests.
  */
-import { authenticateAdmin, authenticatePosPin } from '../server/lib/users.js';
+import { authenticateAdmin, authenticatePosPin, authenticateAdminPin } from '../server/lib/users.js';
 import { hashSecret } from '../server/lib/password.js';
 import {
   createSessionToken,
@@ -80,6 +80,15 @@ async function handlePin(req, res, body) {
   });
 }
 
+async function handleVerifyAdminPin(req, res, body) {
+  const pin = String(body.pin ?? body.password ?? '');
+  const result = await authenticateAdminPin(pin);
+  if (!result.ok) {
+    return res.status(401).json({ ok: false, error: result.error });
+  }
+  return res.status(200).json({ ok: true, user: result.user, source: result.source });
+}
+
 function handleLogout(req, res, body) {
   const scope = body.scope === 'admin' || body.scope === 'pos' ? body.scope : 'both';
   const cookies = [];
@@ -146,7 +155,7 @@ export default async function handler(req, res) {
     if (!action) {
       return res.status(400).json({
         ok: false,
-        error: 'Missing action. Use ?action=login|pin|logout|session|hash',
+        error: 'Missing action. Use ?action=login|pin|logout|session|hash|verify-admin-pin',
       });
     }
 
@@ -168,6 +177,8 @@ export default async function handler(req, res) {
         return await handleLogin(req, res, body);
       case 'pin':
         return await handlePin(req, res, body);
+      case 'verify-admin-pin':
+        return await handleVerifyAdminPin(req, res, body);
       case 'logout':
         return handleLogout(req, res, body);
       case 'hash':
@@ -175,7 +186,7 @@ export default async function handler(req, res) {
       default:
         return res.status(400).json({
           ok: false,
-          error: `Unknown action "${action}". Use login|pin|logout|session|hash`,
+          error: `Unknown action "${action}". Use login|pin|logout|session|hash|verify-admin-pin`,
         });
     }
   } catch (err) {

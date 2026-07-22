@@ -27,6 +27,7 @@ import {
   getWebsiteOrderDetail,
   updateWebsiteOrderStatus,
   getSalesOrdersForReport,
+  getPosPaymentBreakdown,
 } from '../../shared/supabase.js';
 import { downloadAccountingBackupPdf } from './backup.js';
 import {
@@ -107,6 +108,7 @@ export async function mount(root) {
     transactionHost: root.querySelector('[data-transaction-host]'),
     openTicketsHost: root.querySelector('[data-open-tickets-host]'),
     marginHost: root.querySelector('[data-margin-host]'),
+    paymentsHost: root.querySelector('[data-payments-host]'),
     wasteHost: root.querySelector('[data-waste-host]'),
     wasteFormHost: root.querySelector('[data-waste-form-host]'),
     websiteOrdersHost: root.querySelector('[data-website-orders-host]'),
@@ -143,6 +145,7 @@ export async function mount(root) {
 
   startSessionWatch();
   refreshOpenTickets();
+  refreshPosPayments();
 
   /**
    * Load parked POS tickets from Supabase into the accounting panel.
@@ -160,6 +163,41 @@ export async function mount(root) {
     } catch (err) {
       console.error('[admin] open tickets failed:', err);
       els.openTicketsHost.innerHTML = `<p class="dash-empty">${escapeHtml(err?.message || 'Failed to load open tickets.')}</p>`;
+    }
+  }
+
+  async function refreshPosPayments() {
+    if (!els.paymentsHost) return;
+    if (!isSupabaseReady()) {
+      els.paymentsHost.innerHTML = '<p class="dash-empty">Supabase not configured — payment totals unavailable.</p>';
+      return;
+    }
+
+    try {
+      const totals = await getPosPaymentBreakdown();
+      els.paymentsHost.innerHTML = `
+        <dl class="dash-summary">
+          <div class="dash-summary__row dash-summary__row--highlight">
+            <dt>Cash</dt>
+            <dd class="dash-summary__profit">${formatLyd(totals.cash)}</dd>
+          </div>
+          <div class="dash-summary__row dash-summary__row--highlight">
+            <dt>Bank transfer</dt>
+            <dd class="dash-summary__profit">${formatLyd(totals.bankTransfer)}</dd>
+          </div>
+          ${totals.unknown > 0 ? `
+          <div class="dash-summary__row">
+            <dt>Unspecified method</dt>
+            <dd>${formatLyd(totals.unknown)}</dd>
+          </div>` : ''}
+          <div class="dash-summary__row">
+            <dt>Completed POS sales</dt>
+            <dd>${totals.count}</dd>
+          </div>
+        </dl>`;
+    } catch (err) {
+      console.error('[admin] payment breakdown failed:', err);
+      els.paymentsHost.innerHTML = `<p class="dash-empty">${escapeHtml(err?.message || 'Failed to load payment totals.')}</p>`;
     }
   }
 
@@ -368,6 +406,11 @@ export async function mount(root) {
 
     if (target.matches('[data-refresh-open-tickets]')) {
       await refreshOpenTickets();
+      return;
+    }
+
+    if (target.matches('[data-refresh-payments]')) {
+      await refreshPosPayments();
       return;
     }
 
@@ -924,6 +967,7 @@ export async function mount(root) {
     renderTaxonomyForms();
     renderWasteForm();
     refreshOpenTickets();
+    refreshPosPayments();
     refreshWaste();
     refreshWebsiteOrders();
     switchView('catalog');
@@ -1080,6 +1124,7 @@ export async function mount(root) {
       waste: 'Waste — Damaged & Lost Stock',
     };
     if (els.pageTitle) els.pageTitle.textContent = titles[view] ?? 'Main Dashboard';
+    if (view === 'dashboard') refreshPosPayments();
     if (view === 'website-orders') refreshWebsiteOrders();
     if (view === 'reports') refreshReports();
     if (view === 'sales-by-item') refreshSalesByItem();

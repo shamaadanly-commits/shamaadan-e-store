@@ -933,6 +933,15 @@ export function buildAdminShell() {
                 </header>
                 <div class="dash-panel__body" data-margin-host></div>
               </article>
+              <article class="dash-panel">
+                <header class="dash-panel__header dash-panel__header--row">
+                  <h2>POS Payments</h2>
+                  <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-refresh-payments>Refresh</button>
+                </header>
+                <div class="dash-panel__body" data-payments-host>
+                  <p class="dash-empty">Loading payment totals…</p>
+                </div>
+              </article>
             </div>
           </section>
 

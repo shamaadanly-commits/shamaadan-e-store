@@ -2136,3 +2136,199 @@
     bottom: calc(4rem + env(safe-area-inset-bottom));
   }
 }
+
+/* Payment + invoice modals */
+.pos-pay-modal,
+.pos-admin-pin,
+.pos-invoice-modal {
+  max-width: 28rem;
+  width: min(94vw, 28rem);
+  text-align: start;
+}
+
+.pos-pay-modal h2,
+.pos-admin-pin h2 {
+  text-align: start;
+  font-family: var(--pos-display);
+  font-weight: 400;
+  font-size: 1.45rem !important;
+  color: var(--pos-text) !important;
+}
+
+.pos-pay-modal__total {
+  margin: 0.25rem 0 1rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--pos-gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.pos-pay-modal__methods {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+  margin-bottom: 0.85rem;
+}
+
+.pos-pay-modal__method {
+  min-height: 3rem;
+  border: 1px solid var(--pos-border);
+  border-radius: 0.75rem;
+  background: var(--pos-bg-elevated);
+  color: var(--pos-text);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.pos-pay-modal__method.is-selected {
+  border-color: var(--pos-gold);
+  box-shadow: inset 0 0 0 1px var(--pos-gold);
+  color: var(--pos-gold);
+}
+
+.pos-pay-modal__bank {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.pos-pay-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  text-align: start;
+}
+
+.pos-pay-modal__field span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pos-muted);
+}
+
+.pos-pay-modal__field input {
+  min-height: 2.6rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.65rem;
+  border: 1px solid var(--pos-border);
+  background: var(--pos-bg);
+  color: var(--pos-text);
+  font: inherit;
+}
+
+.pos-pay-modal__error {
+  margin: 0 0 0.65rem;
+  color: #e57373;
+  font-size: 0.82rem;
+}
+
+.pos-pay-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  margin-top: 0.5rem;
+}
+
+.pos-pay-modal__submit {
+  min-height: 2.7rem;
+  padding: 0.45rem 1rem;
+  border-radius: 0.65rem;
+  background: var(--pos-gold);
+  color: #1a1510;
+  font-weight: 800;
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.pos-pay-modal__submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pos-admin-pin__hint {
+  margin: 0.35rem 0 1rem;
+  color: var(--pos-muted);
+  font-size: 0.85rem;
+}
+
+.pos-invoice-filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.5rem;
+  align-items: end;
+  margin-bottom: 0.85rem;
+}
+
+.pos-invoice-detail__back {
+  border: none;
+  background: transparent;
+  color: var(--pos-gold);
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0;
+  margin-bottom: 0.65rem;
+  cursor: pointer;
+}
+
+.pos-invoice-detail__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+  color: var(--pos-gold);
+}
+
+.pos-invoice-detail__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0.85rem 0 1rem;
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.pos-invoice-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border: 1px solid var(--pos-border);
+  border-radius: 0.75rem;
+  background: var(--pos-bg-elevated);
+}
+
+.pos-invoice-line__name {
+  margin: 0;
+  font-weight: 700;
+  color: var(--pos-text);
+}
+
+.pos-invoice-line__meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: var(--pos-muted);
+}
+
+.pos-refund-modal__btn--line {
+  background: transparent;
+  color: var(--pos-danger);
+  border: 1px solid var(--pos-danger);
+}
+
+.pos-refund-modal__btn--muted {
+  background: transparent;
+  color: var(--pos-muted);
+  border: 1px solid var(--pos-border);
+}
+
+.pos-invoice-detail__full {
+  width: 100%;
+}
+
+@media (max-width: 520px) {
+  .pos-invoice-filters {
+    grid-template-columns: 1fr;
+  }
+}

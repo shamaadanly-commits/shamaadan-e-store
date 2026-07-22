@@ -751,6 +751,8 @@ export async function createOrder(orderData, itemsArray) {
     downpayment,
     payment_method: orderData?.payment_method ? String(orderData.payment_method) : null,
     payment_status: orderData?.payment_status ? String(orderData.payment_status) : null,
+    payment_reference: orderData?.payment_reference ? String(orderData.payment_reference).trim() : null,
+    payment_date: orderData?.payment_date ? String(orderData.payment_date).slice(0, 10) : null,
     updated_at: now,
   };
 
@@ -764,7 +766,14 @@ export async function createOrder(orderData, itemsArray) {
     .select('*')
     .single();
 
-  if (orderError) throw new Error(`Order failed: ${orderError.message}`);
+  if (orderError) {
+    if (/payment_reference|payment_date|column/i.test(orderError.message)) {
+      throw new Error(
+        'Payment columns missing. Run sql/pos_payments_refunds.sql in the Supabase SQL Editor.',
+      );
+    }
+    throw new Error(`Order failed: ${orderError.message}`);
+  }
 
   // 2) Insert line items
   const orderItemRows = items.map((item) => ({
@@ -898,8 +907,9 @@ export async function getOpenTicket(orderId) {
  * Charge a parked ticket: mark completed.
  * Stock was already reserved when the ticket was parked — do not deduct again.
  * @param {string} orderId
+ * @param {{ payment_method?: string, payment_reference?: string, payment_date?: string, payment_status?: string }} [payment]
  */
-export async function completeOpenTicket(orderId) {
+export async function completeOpenTicket(orderId, payment = {}) {
   const ticket = await getOpenTicket(orderId);
   if (ticket.status !== 'open' && ticket.status !== 'parked') {
     throw new Error('This ticket is not open.');
@@ -909,18 +919,38 @@ export async function completeOpenTicket(orderId) {
   if (!items.length) throw new Error('Open ticket has no line items.');
 
   const now = new Date().toISOString();
+  const update = {
+    status: 'completed',
+    completed_at: now,
+    updated_at: now,
+  };
+
+  if (payment?.payment_method) {
+    update.payment_method = String(payment.payment_method);
+    update.payment_status = payment.payment_status ? String(payment.payment_status) : 'paid';
+  }
+  if (payment?.payment_reference) {
+    update.payment_reference = String(payment.payment_reference).trim();
+  }
+  if (payment?.payment_date) {
+    update.payment_date = String(payment.payment_date).slice(0, 10);
+  }
+
   const { data: order, error: updateError } = await getSupabase()
     .from('orders')
-    .update({
-      status: 'completed',
-      completed_at: now,
-      updated_at: now,
-    })
+    .update(update)
     .eq('id', ticket.id)
     .select('*')
     .single();
 
-  if (updateError) throw new Error(updateError.message);
+  if (updateError) {
+    if (/payment_reference|payment_date|column/i.test(updateError.message)) {
+      throw new Error(
+        'Payment columns missing. Run sql/pos_payments_refunds.sql in the Supabase SQL Editor.',
+      );
+    }
+    throw new Error(updateError.message);
+  }
 
   return { order, items, inventory: [] };
 }
@@ -972,7 +1002,7 @@ export async function cancelOpenTicket(orderId) {
 }
 
 /**
- * Recent completed POS sales (for refunds).
+ * Recent completed POS sales (for invoices / refunds).
  * @param {number} [limit]
  * @returns {Promise<object[]>}
  */
@@ -987,6 +1017,71 @@ export async function getRecentPosSales(limit = 25) {
 
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+/**
+ * POS completed/refunded sales filtered by local date range (YYYY-MM-DD).
+ * @param {{ from?: string, to?: string, limit?: number }} [opts]
+ * @returns {Promise<object[]>}
+ */
+export async function getPosSalesByDate(opts = {}) {
+  const limit = Math.max(1, Math.min(Number(opts.limit) || 100, 300));
+  let query = getSupabase()
+    .from('orders')
+    .select('*, order_items(*)')
+    .eq('source', 'pos')
+    .in('status', ['completed', 'refunded'])
+    .order('completed_at', { ascending: false })
+    .limit(limit);
+
+  const from = String(opts.from || '').trim();
+  const to = String(opts.to || '').trim();
+  if (from) {
+    query = query.gte('created_at', `${from}T00:00:00.000Z`);
+  }
+  if (to) {
+    const toDate = new Date(`${to}T00:00:00.000Z`);
+    toDate.setUTCDate(toDate.getUTCDate() + 1);
+    query = query.lt('created_at', toDate.toISOString());
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+/**
+ * Cash vs bank transfer totals for completed POS sales (net of line refunds via total_amount).
+ * @returns {Promise<{ cash: number, bankTransfer: number, unknown: number, count: number }>}
+ */
+export async function getPosPaymentBreakdown() {
+  const { data, error } = await getSupabase()
+    .from('orders')
+    .select('payment_method, total_amount, status')
+    .eq('source', 'pos')
+    .eq('status', 'completed')
+    .limit(5000);
+
+  if (error) {
+    if (/Could not find the table|schema cache/i.test(error.message)) {
+      return { cash: 0, bankTransfer: 0, unknown: 0, count: 0 };
+    }
+    throw mapSupabaseNetworkError(error, 'loading payment breakdown');
+  }
+
+  const totals = { cash: 0, bankTransfer: 0, unknown: 0, count: 0 };
+  for (const row of data || []) {
+    const amount = Number(row.total_amount) || 0;
+    totals.count += 1;
+    const method = String(row.payment_method || '').toLowerCase();
+    if (method === 'cash') totals.cash += amount;
+    else if (method === 'bank_transfer' || method === 'bank-transfer' || method === 'transfer') {
+      totals.bankTransfer += amount;
+    } else {
+      totals.unknown += amount;
+    }
+  }
+  return totals;
 }
 
 /**
@@ -1006,7 +1101,7 @@ export async function getSalesOrdersForReport(range) {
 
   const { data, error } = await getSupabase()
     .from('orders')
-    .select('id, source, status, total_amount, subtotal_amount, shipping_amount, created_at, completed_at, updated_at, invoice_number, order_items(product_id, product_name, quantity, unit_price, wholesale_cost)')
+    .select('id, source, status, total_amount, subtotal_amount, shipping_amount, payment_method, created_at, completed_at, updated_at, invoice_number, order_items(product_id, product_name, quantity, unit_price, wholesale_cost, refunded_quantity)')
     .in('source', ['pos', 'online'])
     .gte('created_at', fromIso)
     .lt('created_at', toIso)
@@ -1017,17 +1112,31 @@ export async function getSalesOrdersForReport(range) {
     if (/Could not find the table|schema cache/i.test(error.message)) {
       throw new Error('Orders table not ready. Run the orders SQL scripts in Supabase.');
     }
+    // Older DBs without refunded_quantity — retry without it
+    if (/refunded_quantity|column/i.test(error.message)) {
+      const retry = await getSupabase()
+        .from('orders')
+        .select('id, source, status, total_amount, subtotal_amount, shipping_amount, payment_method, created_at, completed_at, updated_at, invoice_number, order_items(product_id, product_name, quantity, unit_price, wholesale_cost)')
+        .in('source', ['pos', 'online'])
+        .gte('created_at', fromIso)
+        .lt('created_at', toIso)
+        .order('created_at', { ascending: true })
+        .limit(5000);
+      if (retry.error) throw mapSupabaseNetworkError(retry.error, 'loading sales report');
+      return retry.data ?? [];
+    }
     throw mapSupabaseNetworkError(error, 'loading sales report');
   }
   return data ?? [];
 }
 
 /**
- * Refund a completed POS sale — restores stock and marks the order refunded.
+ * Refund a completed POS sale — full invoice or a single line item.
  * @param {string} orderId
+ * @param {{ orderItemId?: string, quantity?: number }} [opts]
  * @returns {Promise<object>}
  */
-export async function refundPosOrder(orderId) {
+export async function refundPosOrder(orderId, opts = {}) {
   const id = String(orderId || '').trim();
   if (!id) throw new Error('Order id is required.');
 
@@ -1036,18 +1145,43 @@ export async function refundPosOrder(orderId) {
   if (order.status === 'refunded') throw new Error('This sale was already refunded.');
   if (order.status !== 'completed') throw new Error('Only completed sales can be refunded.');
 
-  const items = (order.order_items || []).filter(
+  const allItems = (order.order_items || []).filter(
     (item) => item.product_id && Number(item.quantity) > 0,
   );
-  if (!items.length) throw new Error('Sale has no line items to refund.');
+  if (!allItems.length) throw new Error('Sale has no line items to refund.');
+
+  const orderItemId = opts.orderItemId ? String(opts.orderItemId) : '';
+  /** @type {Array<{ item: object, qty: number }>} */
+  const targets = [];
+
+  if (orderItemId) {
+    const item = allItems.find((row) => String(row.id) === orderItemId);
+    if (!item) throw new Error('Line item not found on this invoice.');
+    const already = Number(item.refunded_quantity) || 0;
+    const remaining = Math.max(0, Number(item.quantity) - already);
+    if (remaining <= 0) throw new Error('This line was already fully refunded.');
+    const qty = Math.min(
+      remaining,
+      Math.max(1, Number(opts.quantity) || remaining),
+    );
+    targets.push({ item, qty });
+  } else {
+    for (const item of allItems) {
+      const already = Number(item.refunded_quantity) || 0;
+      const remaining = Math.max(0, Number(item.quantity) - already);
+      if (remaining > 0) targets.push({ item, qty: remaining });
+    }
+  }
+
+  if (!targets.length) throw new Error('Nothing left to refund on this invoice.');
 
   const invoice = order.invoice_number || order.id;
-  const restoreRows = items.map((item) => ({
+  const restoreRows = targets.map(({ item, qty }) => ({
     product_id: item.product_id,
-    quantity_changed: Math.abs(Number(item.quantity)),
+    quantity_changed: Math.abs(qty),
     type: 'refund',
     source: 'pos',
-    notes: `Refund ${invoice}`,
+    notes: `Refund ${invoice}${orderItemId ? ` · line ${item.product_name || item.id}` : ''}`,
   }));
 
   const { error: inventoryError } = await getSupabase()
@@ -1064,12 +1198,49 @@ export async function refundPosOrder(orderId) {
   }
 
   const now = new Date().toISOString();
+  let refundAmount = 0;
+
+  for (const { item, qty } of targets) {
+    const already = Number(item.refunded_quantity) || 0;
+    const nextRefunded = already + qty;
+    refundAmount += qty * (Number(item.unit_price) || 0);
+
+    const { error: lineError } = await getSupabase()
+      .from('order_items')
+      .update({ refunded_quantity: nextRefunded })
+      .eq('id', item.id);
+
+    if (lineError) {
+      if (/refunded_quantity|column/i.test(lineError.message)) {
+        throw new Error(
+          'Partial refunds need sql/pos_payments_refunds.sql — run it in the Supabase SQL Editor.',
+        );
+      }
+      throw new Error(`Could not update line refund: ${lineError.message}`);
+    }
+    item.refunded_quantity = nextRefunded;
+  }
+
+  const refreshed = await getOpenTicket(id);
+  const lines = refreshed.order_items || [];
+  const fullyRefunded = lines.length > 0 && lines.every((line) => {
+    const qty = Number(line.quantity) || 0;
+    const refunded = Number(line.refunded_quantity) || 0;
+    return refunded >= qty;
+  });
+
+  const nextTotal = Math.max(0, (Number(order.total_amount) || 0) - refundAmount);
+  const note = orderItemId
+    ? `Partial refund ${now.slice(0, 10)} (−${refundAmount.toFixed(2)} LYD)`
+    : `Refunded ${now.slice(0, 10)}`;
+
   const { data, error } = await getSupabase()
     .from('orders')
     .update({
-      status: 'refunded',
+      status: fullyRefunded ? 'refunded' : 'completed',
+      total_amount: fullyRefunded ? 0 : nextTotal,
       updated_at: now,
-      notes: [order.notes, `Refunded ${now.slice(0, 10)}`].filter(Boolean).join(' · '),
+      notes: [order.notes, note].filter(Boolean).join(' · '),
     })
     .eq('id', id)
     .eq('status', 'completed')
@@ -1077,7 +1248,7 @@ export async function refundPosOrder(orderId) {
     .maybeSingle();
 
   if (error) throw new Error(error.message);
-  if (!data) throw new Error('Sale could not be marked refunded (already refunded?).');
+  if (!data) throw new Error('Sale could not be updated (already refunded?).');
   return data;
 }
 

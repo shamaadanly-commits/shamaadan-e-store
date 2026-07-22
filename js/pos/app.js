@@ -9,20 +9,29 @@ import {
   getOpenTickets,
   cancelOpenTicket,
   completeOpenTicket,
-  getRecentPosSales,
+  getPosSalesByDate,
+  getOpenTicket,
   refundPosOrder,
   isSupabaseConfigured,
 } from '../../shared/supabase.js';
 import { getSharedDashboardState, toPosCatalogRow } from '../dashboard.js';
 import { formatLyd } from '../shared/format.js';
 import { BRAND, logoImg } from '../shared/brand.js';
-import { fetchSession, loginPosPin, logout } from '../shared/auth-client.js';
+import { fetchSession, loginPosPin, logout, verifyAdminPin } from '../shared/auth-client.js';
 import { createCartState } from './cart-state.js';
 import { createDashboard, renderDashboard } from './dashboard.js';
 import { createBarcodeScanner } from './scanner.js';
 import { printReceipt } from './receipt.js';
 import { pinGateHtml, bindPinGate } from './pin-gate.js';
 import { ticketsPageHtml, ticketsListHtml } from './tickets-page.js';
+import {
+  promptPaymentMethod,
+  promptAdminPin,
+  invoicesModalHtml,
+  invoicesListHtml,
+  invoiceDetailHtml,
+  todayLocalDate,
+} from './payment-invoice.js';
 
 const CATEGORY_COLORS = {
   Candles: '#c9a84c',
@@ -240,68 +249,72 @@ async function mountRegister(root, staff) {
     showParkTicketForm(snapshot.subtotal);
   }
 
-  async function showRefundModal() {
+  async function showInvoiceModal() {
     if (!isSupabaseConfigured()) {
       showToast(els.toast, 'Supabase not configured');
       return;
     }
 
-    root.querySelector('[data-refund-modal]')?.remove();
+    const allowed = await promptAdminPin(root, verifyAdminPin);
+    if (!allowed) return;
+
+    root.querySelector('[data-invoice-modal]')?.remove();
+
+    const to = todayLocalDate();
+    const fromDate = new Date(`${to}T12:00:00`);
+    fromDate.setDate(fromDate.getDate() - 30);
+    const range = {
+      from: `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}-${String(fromDate.getDate()).padStart(2, '0')}`,
+      to,
+    };
 
     const modal = document.createElement('div');
     modal.className = 'pos-sale-modal';
-    modal.dataset.refundModal = '';
-    modal.innerHTML = `
-      <div class="pos-sale-modal__backdrop" data-refund-backdrop></div>
-      <div class="pos-sale-modal__card pos-refund-modal" role="dialog" aria-modal="true" aria-labelledby="pos-refund-title">
-        <p class="pos-sale-modal__badge">Refund</p>
-        <h2 id="pos-refund-title">Recent POS sales</h2>
-        <p class="pos-refund-modal__hint">Pick a completed sale to refund — stock is restored to inventory.</p>
-        <div class="pos-refund-modal__list" data-refund-list>
-          <p class="pos-refund-modal__loading">Loading…</p>
-        </div>
-        <button type="button" class="pos-sale-modal__skip" data-refund-close>Close</button>
-      </div>
-    `;
+    modal.dataset.invoiceModal = '';
+    modal.innerHTML = invoicesModalHtml(range);
     root.appendChild(modal);
 
-    const list = modal.querySelector('[data-refund-list]');
-    try {
-      const sales = await getRecentPosSales(30);
-      const refundable = sales.filter((s) => s.status === 'completed');
-      if (!refundable.length) {
-        list.innerHTML = '<p class="pos-refund-modal__empty">No completed sales to refund.</p>';
-        return;
-      }
+    await loadInvoiceList(modal);
+  }
 
-      list.innerHTML = refundable.map((sale) => {
-        const lines = sale.order_items || [];
-        const qty = lines.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
-        const when = sale.completed_at || sale.created_at;
-        const invoice = sale.invoice_number || String(sale.id).slice(0, 8);
-        return `
-          <div class="pos-refund-modal__item">
-            <div>
-              <p class="pos-refund-modal__invoice">${escapeHtml(invoice)}</p>
-              <p class="pos-refund-modal__meta">
-                ${formatLyd(Number(sale.total_amount || 0))}
-                · ${qty} item${qty === 1 ? '' : 's'}
-                · ${escapeHtml(sale.staff_name || 'Staff')}
-                ${when ? ` · ${escapeHtml(new Date(when).toLocaleString('en-LY'))}` : ''}
-              </p>
-            </div>
-            <button
-              type="button"
-              class="pos-refund-modal__btn"
-              data-refund-sale="${escapeAttr(sale.id)}"
-              data-refund-invoice="${escapeAttr(invoice)}"
-            >Refund</button>
-          </div>`;
-      }).join('');
+  /**
+   * @param {HTMLElement} modal
+   */
+  async function loadInvoiceList(modal) {
+    const list = modal.querySelector('[data-invoice-list]');
+    if (!list) return;
+    const from = modal.querySelector('[data-invoice-from]')?.value || '';
+    const to = modal.querySelector('[data-invoice-to]')?.value || '';
+    list.innerHTML = '<p class="pos-refund-modal__loading">Loading…</p>';
+    try {
+      const sales = await getPosSalesByDate({ from, to, limit: 150 });
+      list.innerHTML = invoicesListHtml(sales);
+      modal._invoiceCache = new Map(sales.map((s) => [String(s.id), s]));
     } catch (err) {
-      console.error('[pos] refund list failed:', err);
-      list.innerHTML = `<p class="pos-refund-modal__empty">${escapeHtml(err?.message || 'Could not load sales.')}</p>`;
+      console.error('[pos] invoice list failed:', err);
+      list.innerHTML = `<p class="pos-refund-modal__empty">${escapeHtml(err?.message || 'Could not load invoices.')}</p>`;
     }
+  }
+
+  /**
+   * @param {string} orderId
+   */
+  async function showInvoiceDetail(orderId) {
+    const modal = root.querySelector('[data-invoice-modal]');
+    if (!modal) return;
+    const list = modal.querySelector('[data-invoice-list]');
+    if (!list) return;
+
+    let sale = modal._invoiceCache?.get(String(orderId));
+    try {
+      sale = await getOpenTicket(orderId);
+      if (modal._invoiceCache) modal._invoiceCache.set(String(orderId), sale);
+    } catch (err) {
+      window.alert(err?.message || 'Could not open invoice.');
+      return;
+    }
+
+    list.innerHTML = invoiceDetailHtml(sale);
   }
 
   /**
@@ -535,9 +548,10 @@ async function mountRegister(root, staff) {
       const balance = Math.max(0, total - down);
       const name = ticket.customer_name || ticket.ticket_label || 'customer';
 
-      if (!confirm(`Charge remaining ${formatLyd(balance)} for ${name}?`)) return;
+      const payment = await promptPaymentMethod(root, balance);
+      if (!payment) return;
 
-      const result = await completeOpenTicket(orderId);
+      const result = await completeOpenTicket(orderId, payment);
       await syncCartStockFromServer();
 
       const lines = (ticket.order_items || []).map((line) => ({
@@ -558,6 +572,7 @@ async function mountRegister(root, staff) {
         lines,
         staffUserId: staff.id,
         staffName: staff.displayName || staff.username,
+        paymentMethod: payment.payment_method,
       });
       dashboard.refresh();
 
@@ -572,10 +587,11 @@ async function mountRegister(root, staff) {
         cashier: staff.displayName || staff.username,
         staffUserId: staff.id,
         paidAt: new Date(),
+        paymentMethod: payment.payment_method,
       }, els.toast);
 
       await refreshTicketsList();
-      showToast(els.toast, `Charged ${name} · ${formatLyd(balance)} collected`);
+      showToast(els.toast, `Charged ${name} · ${formatLyd(balance)} · ${payment.payment_method === 'cash' ? 'Cash' : 'Bank transfer'}`);
       return result;
     } catch (err) {
       console.error('[pos] charge parked ticket failed:', err);
@@ -707,13 +723,31 @@ async function mountRegister(root, staff) {
       return;
     }
 
-    if (target.closest('[data-open-refund]')) {
-      await showRefundModal();
+    if (target.closest('[data-open-invoice]')) {
+      await showInvoiceModal();
       return;
     }
 
-    if (target.closest('[data-refund-close]') || target.matches('[data-refund-backdrop]')) {
-      root.querySelector('[data-refund-modal]')?.remove();
+    if (target.closest('[data-invoice-close]') || target.matches('[data-invoice-backdrop]')) {
+      root.querySelector('[data-invoice-modal]')?.remove();
+      return;
+    }
+
+    if (target.closest('[data-invoice-search]')) {
+      const modal = root.querySelector('[data-invoice-modal]');
+      if (modal) await loadInvoiceList(modal);
+      return;
+    }
+
+    if (target.closest('[data-invoice-back]')) {
+      const modal = root.querySelector('[data-invoice-modal]');
+      if (modal) await loadInvoiceList(modal);
+      return;
+    }
+
+    const openDetail = target.closest('[data-open-invoice-detail]');
+    if (openDetail) {
+      await showInvoiceDetail(openDetail.dataset.openInvoiceDetail);
       return;
     }
 
@@ -721,20 +755,44 @@ async function mountRegister(root, staff) {
       const btn = target.closest('[data-refund-sale]');
       const orderId = btn.dataset.refundSale;
       const invoice = btn.dataset.refundInvoice || orderId;
-      if (!confirm(`Refund sale ${invoice}? Stock will be restored.`)) return;
+      if (!confirm(`Refund full invoice ${invoice}? Stock will be restored.`)) return;
       btn.disabled = true;
       btn.textContent = 'Refunding…';
       try {
         await refundPosOrder(orderId);
         await syncCartStockFromServer();
-        root.querySelector('[data-refund-modal]')?.remove();
+        root.querySelector('[data-invoice-modal]')?.remove();
         showToast(els.toast, `Refunded ${invoice} · stock restored`);
         refreshCatalog();
       } catch (err) {
         console.error('[pos] refund failed:', err);
         window.alert(err?.message || 'Refund failed.');
         btn.disabled = false;
-        btn.textContent = 'Refund';
+        btn.textContent = 'Refund full invoice';
+      }
+      return;
+    }
+
+    if (target.closest('[data-refund-line]')) {
+      const btn = target.closest('[data-refund-line]');
+      const orderId = btn.dataset.refundLine;
+      const itemId = btn.dataset.refundItem;
+      const invoice = btn.dataset.refundInvoice || orderId;
+      const label = btn.dataset.refundLabel || 'item';
+      if (!confirm(`Refund “${label}” from invoice ${invoice}? Stock will be restored.`)) return;
+      btn.disabled = true;
+      btn.textContent = '…';
+      try {
+        await refundPosOrder(orderId, { orderItemId: itemId });
+        await syncCartStockFromServer();
+        showToast(els.toast, `Refunded ${label} · stock restored`);
+        refreshCatalog();
+        await showInvoiceDetail(orderId);
+      } catch (err) {
+        console.error('[pos] line refund failed:', err);
+        window.alert(err?.message || 'Refund failed.');
+        btn.disabled = false;
+        btn.textContent = 'Refund item';
       }
       return;
     }
@@ -804,6 +862,12 @@ async function mountRegister(root, staff) {
 
       els.checkout.disabled = true;
       try {
+        const payment = await promptPaymentMethod(root, snapshot.subtotal);
+        if (!payment) {
+          els.checkout.disabled = false;
+          return;
+        }
+
         let invoiceNo = '';
         if (isSupabaseConfigured()) {
           const result = await createOrder({
@@ -812,6 +876,10 @@ async function mountRegister(root, staff) {
             total_amount: snapshot.subtotal,
             staff_user_id: staff.id,
             staff_name: staff.displayName || staff.username,
+            payment_method: payment.payment_method,
+            payment_status: payment.payment_status,
+            payment_reference: payment.payment_reference,
+            payment_date: payment.payment_date,
           }, ticketItemsPayload(snapshot.items));
           invoiceNo = result?.order?.invoice_number || '';
         }
@@ -826,11 +894,13 @@ async function mountRegister(root, staff) {
             cashier: staff.displayName || staff.username,
             staffUserId: staff.id,
             paidAt: new Date(),
+            paymentMethod: payment.payment_method,
           };
           centralState.recordPosSale({
             ...sale,
             staffUserId: staff.id,
             staffName: staff.displayName || staff.username,
+            paymentMethod: payment.payment_method,
           });
           dashboard.refresh();
           showSaleComplete(root, receiptSale, els.toast);
@@ -927,8 +997,8 @@ function buildShell(categories, staff) {
           Tickets
           <span class="pos__badge" data-open-tickets-count hidden>0</span>
         </button>
-        <button type="button" class="pos__refund-btn" data-open-refund aria-label="Refund a sale">
-          Refund
+        <button type="button" class="pos__refund-btn" data-open-invoice aria-label="Open invoices">
+          Invoice
         </button>
         <button type="button" class="pos__icon-btn" data-toggle-metrics aria-label="Toggle sales metrics">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">

@@ -158,6 +158,43 @@ export async function loginPosPin(pin) {
 }
 
 /**
+ * Confirm admin PIN for sensitive actions (no session created).
+ * @param {string} pin
+ */
+export async function verifyAdminPin(pin) {
+  const secret = String(pin || '').trim();
+  const { res, data, unreachable } = await apiSafe('/api/auth?action=verify-admin-pin', {
+    method: 'POST',
+    body: JSON.stringify({ pin: secret }),
+  });
+
+  if (!unreachable && res) {
+    if (res.ok && data?.ok) {
+      return { ok: true, user: data.user, source: data.source || 'server' };
+    }
+    if (res.status === 401 || res.status === 400) {
+      return { ok: false, error: data?.error || 'Invalid admin PIN' };
+    }
+  }
+
+  const demo = demoAdminCredentials();
+  if (secret === demo.password || secret.replace(/\D/g, '') === String(demo.password).replace(/\D/g, '')) {
+    return {
+      ok: true,
+      user: {
+        id: 'demo-admin',
+        username: demo.username,
+        role: 'admin',
+        displayName: 'Administrator',
+      },
+      source: 'local',
+    };
+  }
+
+  return { ok: false, error: 'Invalid admin PIN' };
+}
+
+/**
  * @param {'admin' | 'pos' | 'both'} [scope]
  */
 export async function logout(scope = 'both') {

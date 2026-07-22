@@ -186,6 +186,63 @@ export async function authenticatePosPin(pin) {
 }
 
 /**
+ * Verify admin PIN / password for sensitive POS actions (refunds).
+ * Does not create a session — confirmation only.
+ * @param {string} pin
+ */
+export async function authenticateAdminPin(pin) {
+  const secret = String(pin || '').trim();
+  if (!secret) {
+    return { ok: false, error: 'Enter admin PIN' };
+  }
+
+  const digits = secret.replace(/\D/g, '');
+
+  const supabase = getServiceSupabase();
+  if (supabase) {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('role', 'admin')
+      .eq('active', true);
+
+    if (!error && data?.length) {
+      for (const row of data) {
+        const user = mapUser(row);
+        if (user.pin_hash && digits.length >= 4 && verifySecret(digits, user.pin_hash)) {
+          return { ok: true, user: publicUser(user), source: 'database' };
+        }
+        if (user.password_hash && verifySecret(secret, user.password_hash)) {
+          return { ok: true, user: publicUser(user), source: 'database' };
+        }
+      }
+    }
+  }
+
+  const expected = String(
+    process.env.AUTH_ADMIN_PIN
+    || process.env.ADMIN_PIN
+    || process.env.AUTH_ADMIN_PASSWORD
+    || 'shamaadan',
+  ).trim();
+
+  if (secret === expected || (digits.length >= 4 && digits === expected.replace(/\D/g, '') && expected.replace(/\D/g, '').length >= 4)) {
+    return {
+      ok: true,
+      user: {
+        id: 'demo-admin',
+        username: String(process.env.AUTH_ADMIN_USERNAME || 'admin').trim().toLowerCase(),
+        role: 'admin',
+        displayName: 'Administrator',
+      },
+      source: 'demo',
+    };
+  }
+
+  return { ok: false, error: 'Invalid admin PIN' };
+}
+
+/**
  * @param {ReturnType<typeof mapUser>} user
  */
 function publicUser(user) {
