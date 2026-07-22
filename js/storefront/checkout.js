@@ -131,37 +131,17 @@ function renderCheckoutBody(overlay, cart, i18n) {
                 </span>
               </span>
             </label>
-            <label class="checkout-payment">
-              <input type="radio" name="paymentMethod" value="upay">
-              <span class="checkout-payment__card">
-                <span class="checkout-payment__icon">UPAY</span>
-                <span>
-                  <p class="checkout-payment__name">${t('checkout.upay')}</p>
+            <div class="checkout-payment checkout-payment--coming-soon" aria-disabled="true">
+              <span class="checkout-payment__card checkout-payment__card--credit">
+                <span class="checkout-payment__icon checkout-payment__icon--credit">CR</span>
+                <span class="checkout-payment__body">
+                  <span class="checkout-payment__name-row">
+                    <p class="checkout-payment__name">${t('checkout.upay')}</p>
+                    <span class="checkout-payment__badge">${t('checkout.comingSoon')}</span>
+                  </span>
                   <p class="checkout-payment__desc">${t('checkout.upayDesc')}</p>
                 </span>
               </span>
-            </label>
-          </div>
-
-          <div class="checkout-upay" data-upay-form>
-            <div class="checkout-upay__badge">🔒 UPAY Secure</div>
-            <div class="checkout-field">
-              <label for="co-card-name">${t('checkout.cardName')}</label>
-              <input type="text" id="co-card-name" name="cardName" autocomplete="cc-name" inputmode="text">
-            </div>
-            <div class="checkout-field">
-              <label for="co-card-number">${t('checkout.cardNumber')}</label>
-              <input type="text" id="co-card-number" name="cardNumber" autocomplete="cc-number" inputmode="numeric" maxlength="19" placeholder="0000 0000 0000 0000">
-            </div>
-            <div class="checkout-field--row">
-              <div class="checkout-field">
-                <label for="co-card-expiry">${t('checkout.cardExpiry')}</label>
-                <input type="text" id="co-card-expiry" name="cardExpiry" autocomplete="cc-exp" inputmode="numeric" maxlength="7" placeholder="MM / YY">
-              </div>
-              <div class="checkout-field">
-                <label for="co-card-cvc">${t('checkout.cardCvc')}</label>
-                <input type="text" id="co-card-cvc" name="cardCvc" autocomplete="cc-csc" inputmode="numeric" maxlength="4" placeholder="•••">
-              </div>
             </div>
           </div>
         </section>
@@ -250,29 +230,10 @@ function bindOverlayEvents(overlay, cart, i18n) {
 
 function bindFormEvents(overlay, cart, i18n) {
   const form = overlay.querySelector('[data-checkout-form]');
-  const upayPanel = overlay.querySelector('[data-upay-form]');
-  const paymentRadios = form?.querySelectorAll('input[name="paymentMethod"]');
-
-  paymentRadios?.forEach((radio) => {
-    radio.addEventListener('change', () => {
-      const isUpay = form.querySelector('input[name="paymentMethod"]:checked')?.value === 'upay';
-      upayPanel?.classList.toggle('is-visible', isUpay);
-    });
-  });
 
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     await submitOrder(overlay, cart, i18n, form);
-  });
-
-  const cardNumber = form?.querySelector('[name="cardNumber"]');
-  cardNumber?.addEventListener('input', () => {
-    cardNumber.value = formatCardNumber(cardNumber.value);
-  });
-
-  const expiry = form?.querySelector('[name="cardExpiry"]');
-  expiry?.addEventListener('input', () => {
-    expiry.value = formatExpiry(expiry.value);
   });
 }
 
@@ -284,9 +245,8 @@ async function submitOrder(overlay, cart, i18n, form) {
 
   if (!validateContact(form, errorEl, t)) return;
 
-  const paymentMethod = form.querySelector('input[name="paymentMethod"]:checked')?.value ?? 'cad';
-
-  if (paymentMethod === 'upay' && !validateCard(form, errorEl, t)) return;
+  // Credit card is Coming Soon — only CAD is available.
+  const paymentMethod = 'cad';
 
   const payload = {
     paymentMethod,
@@ -308,15 +268,6 @@ async function submitOrder(overlay, cart, i18n, form) {
     total: snapshot.total,
     locale: i18n.getLocale(),
   };
-
-  if (paymentMethod === 'upay') {
-    payload.card = {
-      name: form.cardName.value.trim(),
-      number: form.cardNumber.value.replace(/\s/g, ''),
-      expiry: form.cardExpiry.value.trim(),
-      cvc: form.cardCvc.value.trim(),
-    };
-  }
 
   submitBtn.disabled = true;
   submitBtn.textContent = t('checkout.processing');

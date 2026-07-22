@@ -338,7 +338,47 @@
   line-height: 1.45;
 }
 
-/* UPAY card form */
+.checkout-payment--coming-soon {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.checkout-payment__card--credit {
+  border-color: #3b82f6;
+  background: linear-gradient(135deg, rgb(59 130 246 / 14%), rgb(37 99 235 / 8%));
+}
+
+.checkout-payment__icon--credit {
+  background: #2563eb;
+  color: #fff;
+}
+
+.checkout-payment__name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  margin-bottom: 0.2rem;
+}
+
+.checkout-payment__name-row .checkout-payment__name {
+  margin: 0;
+}
+
+.checkout-payment__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* UPAY card form (kept for future enablement) */
 .checkout-upay {
   margin-top: 0.85rem;
   padding: 1rem;
