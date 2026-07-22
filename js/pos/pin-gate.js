@@ -37,7 +37,6 @@ export function pinGateHtml(opts = {}) {
         </div>
 
         <button type="button" class="pos-pin__submit" data-pin-submit disabled>Unlock Register</button>
-        <p class="pos-pin__hint">Demo PIN: <code>1234</code></p>
       </div>
     </div>
   `;

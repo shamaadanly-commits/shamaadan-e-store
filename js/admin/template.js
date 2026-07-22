@@ -787,7 +787,6 @@ export function authGateHtml() {
         </div>
         <p class="dash-auth__error" data-auth-error hidden></p>
         <button type="submit" class="dash-btn dash-btn--primary dash-btn--full" data-auth-submit>Sign in</button>
-        <p class="dash-auth__hint">Demo: <code>admin</code> / <code>shamaadan</code></p>
         <p class="dash-auth__hint"><a href="/?app=pos">Open POS register →</a></p>
       </form>
     </div>
