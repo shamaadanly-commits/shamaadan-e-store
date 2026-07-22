@@ -271,6 +271,7 @@ export function buildStorefrontHtml({ products, categories, collections = [], i1
           <div class="shop-footer__col shop-footer__col--location">
             <h4>${t('footer.visit')}</h4>
             <p class="shop-footer__location">${t('footer.location')}</p>
+            <a class="shop-footer__phone" href="tel:+218910229971" aria-label="${t('footer.phoneLabel')}">${t('footer.phone')}</a>
           </div>
           <div class="shop-footer__col">
             <h4>${t('footer.shop')}</h4>
