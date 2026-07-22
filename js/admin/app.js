@@ -26,8 +26,16 @@ import {
   getWebsiteOrders,
   getWebsiteOrderDetail,
   updateWebsiteOrderStatus,
+  getSalesOrdersForReport,
 } from '../../shared/supabase.js';
 import { downloadAccountingBackupPdf } from './backup.js';
+import {
+  defaultReportRange,
+  shiftReportRange,
+  buildSalesSummary,
+  salesSummaryHtml,
+  downloadSalesCsv,
+} from './reports.js';
 import {
   generateBarcodeValue,
   renderBarcodeInto,
@@ -67,6 +75,10 @@ export async function mount(root) {
   let sessionTimer = 0;
   let autoRefreshTimer = 0;
   const AUTO_REFRESH_MS = 25_000;
+  let reportRange = defaultReportRange();
+  let reportMetric = 'grossSales';
+  /** @type {ReturnType<typeof buildSalesSummary> | null} */
+  let reportSummary = null;
 
   root.className = 'dashboard-app';
   root.innerHTML = buildAdminShell();
@@ -86,6 +98,7 @@ export async function mount(root) {
     wasteHost: root.querySelector('[data-waste-host]'),
     wasteFormHost: root.querySelector('[data-waste-form-host]'),
     websiteOrdersHost: root.querySelector('[data-website-orders-host]'),
+    reportsHost: root.querySelector('[data-reports-host]'),
     orderModal: root.querySelector('[data-order-modal]'),
     formHost: root.querySelector('[data-form-host]'),
     formTitle: root.querySelector('[data-form-title]'),
@@ -222,6 +235,23 @@ export async function mount(root) {
     renderCatalog(state.getSnapshot());
   });
 
+  root.addEventListener('change', async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (!target.matches('[data-rpt-from], [data-rpt-to]')) return;
+
+    const host = target.closest('[data-reports-root]') || els.reportsHost;
+    const nextFrom = host?.querySelector('[data-rpt-from]')?.value || reportRange.from;
+    const nextTo = host?.querySelector('[data-rpt-to]')?.value || reportRange.to;
+    if (!nextFrom || !nextTo) return;
+    if (nextFrom > nextTo) {
+      window.alert('From date must be on or before the To date.');
+      return;
+    }
+    reportRange = { from: nextFrom, to: nextTo };
+    await refreshReports();
+  });
+
   root.addEventListener('input', (event) => {
     if (event.target.matches('[data-barcode-input]')) {
       updateBarcodePreview(event.target.closest('form'));
@@ -292,6 +322,7 @@ export async function mount(root) {
     if (target.matches('[data-refresh]')) {
       await refreshFromSupabase();
       await refreshOpenTickets();
+      await refreshReports();
       return;
     }
 
@@ -307,6 +338,27 @@ export async function mount(root) {
 
     if (target.matches('[data-refresh-website-orders]')) {
       await refreshWebsiteOrders();
+      return;
+    }
+
+    const rptShift = target.closest('[data-rpt-shift]');
+    if (rptShift) {
+      reportRange = shiftReportRange(reportRange, Number(rptShift.dataset.rptShift) || -1);
+      await refreshReports();
+      return;
+    }
+
+    const rptMetricBtn = target.closest('[data-rpt-metric]');
+    if (rptMetricBtn) {
+      reportMetric = rptMetricBtn.dataset.rptMetric || 'grossSales';
+      if (reportSummary && els.reportsHost) {
+        els.reportsHost.innerHTML = salesSummaryHtml(reportSummary, { metric: reportMetric });
+      }
+      return;
+    }
+
+    if (target.matches('[data-rpt-export]')) {
+      if (reportSummary) downloadSalesCsv(reportSummary);
       return;
     }
 
@@ -934,6 +986,8 @@ export async function mount(root) {
       await refreshOpenTickets();
       await refreshWaste();
       await refreshWebsiteOrders();
+      const reportsPanel = root.querySelector('[data-panel="reports"]');
+      if (reportsPanel && !reportsPanel.hidden) await refreshReports();
     } catch (err) {
       console.warn('[admin] auto-refresh skipped:', err?.message || err);
     }
@@ -979,6 +1033,7 @@ export async function mount(root) {
     });
 
     const titles = {
+      reports: 'Reports — Sales summary',
       dashboard: 'Accounting Dashboard',
       catalog: 'Store Catalog — Website Products',
       'website-orders': 'Website Orders',
@@ -988,6 +1043,7 @@ export async function mount(root) {
     };
     if (els.pageTitle) els.pageTitle.textContent = titles[view] ?? 'Main Dashboard';
     if (view === 'website-orders') refreshWebsiteOrders();
+    if (view === 'reports') refreshReports();
   }
 
   function renderForm(product = null) {
@@ -1048,6 +1104,31 @@ export async function mount(root) {
     } catch (err) {
       console.error('[admin] website orders load failed:', err);
       els.websiteOrdersHost.innerHTML = `<p class="dash-empty">${escapeHtml(err?.message || 'Failed to load website orders.')}</p>`;
+    }
+  }
+
+  async function refreshReports() {
+    if (!els.reportsHost) return;
+    if (!isSupabaseReady()) {
+      els.reportsHost.innerHTML = salesSummaryHtml(
+        buildSalesSummary([], reportRange),
+        { error: 'Supabase not configured — sales report unavailable.' },
+      );
+      return;
+    }
+
+    els.reportsHost.innerHTML = salesSummaryHtml(buildSalesSummary([], reportRange), { loading: true });
+
+    try {
+      const orders = await getSalesOrdersForReport(reportRange);
+      reportSummary = buildSalesSummary(orders, reportRange);
+      els.reportsHost.innerHTML = salesSummaryHtml(reportSummary, { metric: reportMetric });
+    } catch (err) {
+      console.error('[admin] sales report failed:', err);
+      els.reportsHost.innerHTML = salesSummaryHtml(
+        buildSalesSummary([], reportRange),
+        { error: err?.message || 'Failed to load sales summary.' },
+      );
     }
   }
 

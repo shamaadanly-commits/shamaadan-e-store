@@ -993,6 +993,39 @@ export async function getRecentPosSales(limit = 25) {
 }
 
 /**
+ * Load POS + online orders for the Sales summary report (date range inclusive).
+ * @param {{ from: string, to: string }} range — ISO date strings YYYY-MM-DD
+ * @returns {Promise<object[]>}
+ */
+export async function getSalesOrdersForReport(range) {
+  const from = String(range?.from || '').trim();
+  const to = String(range?.to || '').trim();
+  if (!from || !to) throw new Error('Report date range is required.');
+
+  const fromIso = `${from}T00:00:00.000Z`;
+  const toDate = new Date(`${to}T00:00:00.000Z`);
+  toDate.setUTCDate(toDate.getUTCDate() + 1);
+  const toIso = toDate.toISOString();
+
+  const { data, error } = await getSupabase()
+    .from('orders')
+    .select('id, source, status, total_amount, subtotal_amount, shipping_amount, created_at, completed_at, updated_at, invoice_number, order_items(quantity, unit_price, wholesale_cost)')
+    .in('source', ['pos', 'online'])
+    .gte('created_at', fromIso)
+    .lt('created_at', toIso)
+    .order('created_at', { ascending: true })
+    .limit(5000);
+
+  if (error) {
+    if (/Could not find the table|schema cache/i.test(error.message)) {
+      throw new Error('Orders table not ready. Run the orders SQL scripts in Supabase.');
+    }
+    throw mapSupabaseNetworkError(error, 'loading sales report');
+  }
+  return data ?? [];
+}
+
+/**
  * Refund a completed POS sale — restores stock and marks the order refunded.
  * @param {string} orderId
  * @returns {Promise<object>}
