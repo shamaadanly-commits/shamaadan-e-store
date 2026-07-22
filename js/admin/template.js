@@ -94,11 +94,11 @@ function ledgerPanelHtml(channel, title, ledger, metrics) {
  */
 export function catalogTableHtml(products, filterCollection = 'All') {
   const filtered = filterCollection && filterCollection !== 'All'
-    ? products.filter((p) => p.collectionName === filterCollection)
+    ? products.filter((p) => p.collectionName === filterCollection || p.category === filterCollection)
     : products;
 
   if (!filtered.length) {
-    return '<p class="dash-empty">No products yet. Add a product to inventory using the form.</p>';
+    return '<p class="dash-empty">No products yet. Click <strong>+ ADD ITEM</strong> to create one.</p>';
   }
 
   return `
@@ -106,13 +106,12 @@ export function catalogTableHtml(products, filterCollection = 'All') {
       <table class="dash-table" data-catalog-table>
         <thead>
           <tr>
-            <th scope="col">Product</th>
-            <th scope="col">Collection</th>
+            <th scope="col">Item name</th>
             <th scope="col">Category</th>
-            <th scope="col"><span class="dash-field__label-en">Retail</span> <span class="dash-field__label-ar" lang="ar">سعر البيع</span></th>
-            <th scope="col">Stock</th>
-            <th scope="col">Barcode</th>
-            <th scope="col">On Website</th>
+            <th scope="col">Price</th>
+            <th scope="col">Cost</th>
+            <th scope="col">Margin</th>
+            <th scope="col">In stock</th>
             <th scope="col"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
@@ -125,29 +124,31 @@ export function catalogTableHtml(products, filterCollection = 'All') {
 }
 
 function catalogRowHtml(product) {
-  const thumb = product.imageUrls[0]
+  const thumb = product.imageUrls?.[0]
     ? `<img src="${escapeAttr(product.imageUrls[0])}" alt="" class="dash-table__thumb" loading="lazy">`
-    : `<span class="dash-table__thumb dash-table__thumb--placeholder" aria-hidden="true">${escapeHtml(product.title.charAt(0))}</span>`;
+    : `<span class="dash-table__thumb dash-table__thumb--placeholder" aria-hidden="true">${escapeHtml((product.title || '?').charAt(0))}</span>`;
+
+  const retail = Number(product.retailPrice) || 0;
+  const cost = Number(product.costPrice) || 0;
+  const margin = retail > 0 ? ((retail - cost) / retail) * 100 : 0;
+  const categoryLabel = product.category || product.collectionName || '—';
 
   return `
-    <tr data-id="${escapeAttr(product.id)}" data-product-row="${escapeAttr(product.id)}">
+    <tr data-id="${escapeAttr(product.id)}" data-product-row="${escapeAttr(product.id)}" class="dash-row-clickable" data-edit-catalog="${escapeAttr(product.id)}">
       <td>
         <div class="dash-table__product">
           ${thumb}
           <div>
             <span class="dash-table__title">${escapeHtml(product.title)}</span>
-            <span class="dash-table__sub">${product.imageUrls.length} image${product.imageUrls.length === 1 ? '' : 's'}</span>
+            ${product.description ? `<span class="dash-table__sub">${escapeHtml(String(product.description).slice(0, 80))}</span>` : ''}
           </div>
         </div>
       </td>
-      <td><span class="dash-chip">${escapeHtml(product.collectionName)}</span></td>
-      <td><span class="dash-chip dash-chip--muted">${escapeHtml(product.category || product.collectionName)}</span></td>
-      <td class="dash-table__num">${formatNum(product.retailPrice)} LYD</td>
+      <td><span class="dash-chip dash-chip--muted">${escapeHtml(categoryLabel)}</span></td>
+      <td class="dash-table__num">${formatNum(retail)} LD</td>
+      <td class="dash-table__num">${formatNum(cost)} LD</td>
+      <td class="dash-table__num">${margin.toFixed(2).replace('.', ',')}%</td>
       <td class="dash-table__num">${stockStatusCellHtml(product.stockQuantity, product.minStockAlert)}</td>
-      <td><code class="dash-barcode">${escapeHtml(product.barcode)}</code></td>
-      <td>${product.showOnWebsite !== false && product.show_on_website !== false
-    ? '<span class="dash-status dash-status--live">Live</span>'
-    : '<span class="dash-status dash-status--off">Inventory only</span>'}</td>
       <td>
         <div class="dash-table__actions">
           <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-edit-catalog="${escapeAttr(product.id)}">Edit</button>
@@ -284,32 +285,36 @@ export function catalogFormHtml(product = null, collections = [], categories = [
 
       <div class="dash-form__grid">
         <div class="dash-field dash-field--full">
-          <label for="cat-title"><span class="dash-field__label-en">Product Title</span> <span class="dash-field__label-ar" lang="ar">اسم المنتج</span></label>
+          <label for="cat-title"><span class="dash-field__label-en">Item name</span> <span class="dash-field__label-ar" lang="ar">اسم المنتج</span></label>
           <input id="cat-title" name="title" type="text" class="dash-input--bidi" required value="${escapeAttr(product?.title ?? '')}" placeholder="Oud Noir Candle">
         </div>
+        <div class="dash-field dash-field--full">
+          <label for="cat-description"><span class="dash-field__label-en">Description</span> <span class="dash-field__label-ar" lang="ar">الوصف</span></label>
+          <textarea id="cat-description" name="description" class="dash-input--bidi" rows="3" placeholder="Optional product details for the website">${escapeHtml(product?.description ?? '')}</textarea>
+        </div>
         <div class="dash-field">
-          <label for="cat-collection"><span class="dash-field__label-en">Collection</span></label>
-          <select id="cat-collection" name="collection_id" data-collection-select required ${liveCollections.length ? '' : 'disabled'}>
-            ${taxonomySelectOptionsHtml(liveCollections, selectedCollectionId, 'Please create a Collection first')}
+          <label for="cat-collection"><span class="dash-field__label-en">Collection</span> <span class="dash-field__hint">(optional)</span></label>
+          <select id="cat-collection" name="collection_id" data-collection-select>
+            ${taxonomySelectOptionsHtml(liveCollections, selectedCollectionId, 'No collections yet', { optional: true })}
           </select>
         </div>
         <div class="dash-field">
-          <label for="cat-category"><span class="dash-field__label-en">Category</span></label>
-          <select id="cat-category" name="category_id" data-category-select required ${liveCategories.length ? '' : 'disabled'}>
-            ${taxonomySelectOptionsHtml(liveCategories, selectedCategoryId, 'Please create a Category first')}
+          <label for="cat-category"><span class="dash-field__label-en">Category</span> <span class="dash-field__hint">(optional)</span></label>
+          <select id="cat-category" name="category_id" data-category-select>
+            ${taxonomySelectOptionsHtml(liveCategories, selectedCategoryId, 'No categories yet', { optional: true })}
           </select>
         </div>
         ${barcodeFieldHtml('cat-barcode', product?.barcode ?? '', 'Barcode / SKU')}
         <div class="dash-field">
-          <label for="cat-retail"><span class="dash-field__label-en">Retail Price</span> <span class="dash-field__label-ar" lang="ar">سعر البيع</span></label>
+          <label for="cat-retail"><span class="dash-field__label-en">Price</span> <span class="dash-field__label-ar" lang="ar">سعر البيع</span></label>
           <input id="cat-retail" name="retailPrice" type="number" min="0" step="0.01" required value="${product?.retailPrice ?? ''}" placeholder="48.00">
         </div>
         <div class="dash-field">
-          <label for="cat-cost"><span class="dash-field__label-en">Cost Price</span> <span class="dash-field__label-ar" lang="ar">سعر التكلفة</span></label>
+          <label for="cat-cost"><span class="dash-field__label-en">Cost</span> <span class="dash-field__label-ar" lang="ar">سعر التكلفة</span></label>
           <input id="cat-cost" name="costPrice" type="number" min="0" step="0.01" required value="${product?.costPrice ?? ''}" placeholder="18.00">
         </div>
         <div class="dash-field">
-          <label for="cat-stock">Stock Quantity</label>
+          <label for="cat-stock">In stock</label>
           <input id="cat-stock" name="stockQuantity" type="number" min="0" step="1" required value="${product?.stockQuantity ?? ''}" placeholder="24">
         </div>
       </div>
@@ -319,12 +324,10 @@ export function catalogFormHtml(product = null, collections = [], categories = [
       ${pushToWebsiteFieldHtml(product, 'cat-push-website')}
 
       <div class="dash-form__actions">
-        <button type="submit" class="dash-btn dash-btn--primary" ${liveCollections.length && liveCategories.length ? '' : 'disabled'}>${isEdit ? 'Save to Inventory' : 'Add to Inventory'}</button>
-        ${isEdit ? '<button type="button" class="dash-btn dash-btn--ghost" data-cancel-catalog-edit>Cancel</button>' : ''}
+        <button type="submit" class="dash-btn dash-btn--primary">${isEdit ? 'Save item' : 'Add item'}</button>
+        <button type="button" class="dash-btn dash-btn--ghost" data-cancel-catalog-edit>Cancel</button>
       </div>
-      <p class="dash-form__note">${liveCollections.length && liveCategories.length
-    ? 'Products are always saved to inventory and POS. Check “Push to Website” to also show them in the online store.'
-    : 'Create at least one Collection and one Category under “Collections &amp; Categories” before adding products.'}</p>
+      <p class="dash-form__note">Collection and category are optional. Check “Push to Website” to show this item in the online store.</p>
     </form>
   `;
 }
@@ -431,14 +434,14 @@ export function wasteTableHtml(rows = []) {
  * @param {string} selectedId
  * @param {string} emptyLabel
  */
-function taxonomySelectOptionsHtml(items, selectedId = '', emptyLabel = 'None available') {
+function taxonomySelectOptionsHtml(items, selectedId = '', emptyLabel = 'None available', { optional = false } = {}) {
   if (!items.length) {
-    return `<option value="">${escapeHtml(emptyLabel)}</option>`;
+    return `<option value="">${escapeHtml(optional ? 'None (optional)' : emptyLabel)}</option>`;
   }
 
   const hasSelected = items.some((item) => String(item.id) === String(selectedId));
   return `
-    <option value="" disabled ${hasSelected ? '' : 'selected'}>Select…</option>
+    <option value="" ${hasSelected ? '' : 'selected'}>${optional ? 'None (optional)' : 'Select…'}</option>
     ${items.map((item) => `
       <option value="${escapeAttr(item.id)}"${String(item.id) === String(selectedId) ? ' selected' : ''}>${escapeHtml(item.name)}</option>
     `).join('')}
@@ -817,7 +820,7 @@ export function buildAdminShell() {
             <span class="dash-nav__icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-1.99.9-1.99 2S15.9 22 17 22s2-.9 2-2-.9-2-2-2zM7.16 14.26l.03-.12L8.1 12h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0 0 20.01 3H5.21l-.94-2H1v2h2l3.6 7.59-1.35 2.44C4.52 14.37 5.48 16 7 16h12v-2H7.42c-.14 0-.25-.11-.26-.25z"/></svg>
             </span>
-            <span class="dash-nav__label">Store Catalog</span>
+            <span class="dash-nav__label">Products</span>
           </button>
           <button type="button" class="dash-nav__link" data-nav="orders" data-view="website-orders">
             <span class="dash-nav__icon" aria-hidden="true">
@@ -926,33 +929,30 @@ export function buildAdminShell() {
             </div>
           </section>
 
-          <section class="dash-view" data-panel="catalog" aria-label="Store catalog management" hidden>
-            <div class="dash-catalog-intro">
-              <p>Manage inventory products for POS and the online store. Use “Push to Website” when adding a product to also show it on the storefront.</p>
-            </div>
-            <div class="dash-inventory-layout">
-              <article class="dash-panel dash-panel--grow">
-                <header class="dash-panel__header dash-panel__header--row">
-                  <div>
-                    <h2>Website Products</h2>
-                    <p class="dash-panel__sub">These products show in the online store &amp; POS</p>
-                  </div>
-                  <div class="dash-panel__header-actions">
-                    <select class="dash-select" data-catalog-filter aria-label="Filter by collection">
-                      <option value="All">All collections</option>
-                    </select>
-                    <span class="dash-panel__count" data-catalog-count>0 products</span>
-                  </div>
-                </header>
-                <div class="dash-panel__body" data-catalog-host></div>
-              </article>
-              <article class="dash-panel dash-panel--form">
-                <header class="dash-panel__header">
-                  <h2 data-catalog-form-title>Add Store Product</h2>
-                </header>
-                <div class="dash-panel__body" data-catalog-form-host></div>
-              </article>
-            </div>
+          <section class="dash-view" data-panel="catalog" aria-label="Products" hidden>
+            <article class="dash-panel dash-panel--items">
+              <header class="dash-panel__header dash-panel__header--row items-toolbar">
+                <div class="items-toolbar__actions">
+                  <button type="button" class="dash-btn dash-btn--primary" data-add-catalog-item>+ ADD ITEM</button>
+                  <button type="button" class="rpt-export" data-export-catalog>EXPORT</button>
+                </div>
+                <div class="dash-panel__header-actions">
+                  <select class="dash-select" data-catalog-filter aria-label="Filter by collection">
+                    <option value="All">All items</option>
+                  </select>
+                  <span class="dash-panel__count" data-catalog-count>0 items</span>
+                </div>
+              </header>
+              <div class="dash-panel__body" data-catalog-host></div>
+            </article>
+
+            <article class="dash-panel dash-panel--form dash-panel--item-form" data-catalog-form-panel hidden>
+              <header class="dash-panel__header dash-panel__header--row">
+                <h2 data-catalog-form-title>Add item</h2>
+                <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-cancel-catalog-edit aria-label="Close">✕</button>
+              </header>
+              <div class="dash-panel__body" data-catalog-form-host></div>
+            </article>
           </section>
 
           <section class="dash-view" data-panel="website-orders" aria-label="Website orders" hidden>

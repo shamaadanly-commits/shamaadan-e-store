@@ -72,6 +72,7 @@ export async function mount(root) {
   const state = getSharedDashboardState();
   let editingProductId = null;
   let editingCatalogId = null;
+  let catalogFormVisible = false;
   let editingCollectionId = null;
   let editingCategoryId = null;
   let catalogFilter = 'All';
@@ -116,6 +117,7 @@ export async function mount(root) {
     catalogHost: root.querySelector('[data-catalog-host]'),
     catalogFormHost: root.querySelector('[data-catalog-form-host]'),
     catalogFormTitle: root.querySelector('[data-catalog-form-title]'),
+    catalogFormPanel: root.querySelector('[data-catalog-form-panel]'),
     catalogCount: root.querySelector('[data-catalog-count]'),
     collectionsHost: root.querySelector('[data-collections-host]'),
     collectionCount: root.querySelector('[data-collection-count]'),
@@ -592,9 +594,23 @@ export async function mount(root) {
       return;
     }
 
+    if (target.matches('[data-add-catalog-item]')) {
+      editingCatalogId = null;
+      catalogFormVisible = true;
+      switchView('catalog');
+      renderCatalogForm();
+      return;
+    }
+
+    if (target.matches('[data-export-catalog]')) {
+      exportCatalogCsv();
+      return;
+    }
+
     const editCatalog = target.closest('[data-edit-catalog]');
     if (editCatalog) {
       editingCatalogId = editCatalog.dataset.editCatalog;
+      catalogFormVisible = true;
       renderCatalogForm(state.getSnapshot().products.find((p) => p.id === editingCatalogId));
       switchView('catalog');
       return;
@@ -634,6 +650,7 @@ export async function mount(root) {
 
     if (target.matches('[data-cancel-catalog-edit]')) {
       editingCatalogId = null;
+      catalogFormVisible = false;
       renderCatalogForm();
       return;
     }
@@ -731,6 +748,7 @@ export async function mount(root) {
       const saved = await saveProductFromForm(catalogForm);
       if (saved) {
         editingCatalogId = null;
+        catalogFormVisible = false;
         renderCatalogForm();
       }
       return;
@@ -783,19 +801,19 @@ export async function mount(root) {
     const collectionId = String(data.get('collection_id') || '').trim();
     const categoryId = String(data.get('category_id') || '').trim();
 
-    if (!isLiveDbId(collectionId) || !isLiveDbId(categoryId)) {
-      window.alert('Please create a Collection and Category first, then select them from the dropdowns.');
-      return false;
-    }
-
-    const collectionName = managedCollections.find((c) => c.id === collectionId)?.name || '';
-    const category = managedCategories.find((c) => c.id === categoryId)?.name || '';
+    const collectionName = isLiveDbId(collectionId)
+      ? (managedCollections.find((c) => c.id === collectionId)?.name || '')
+      : '';
+    const category = isLiveDbId(categoryId)
+      ? (managedCategories.find((c) => c.id === categoryId)?.name || '')
+      : '';
 
     const product = {
       id: isLiveDbId(data.get('id')) ? String(data.get('id')) : undefined,
       title: String(data.get('title')),
-      collection_id: collectionId,
-      category_id: categoryId,
+      description: String(data.get('description') || '').trim(),
+      collection_id: isLiveDbId(collectionId) ? collectionId : null,
+      category_id: isLiveDbId(categoryId) ? categoryId : null,
       collectionName,
       category,
       costPrice: Number(data.get('costPrice')),
@@ -849,21 +867,20 @@ export async function mount(root) {
       const current = selected.collectionId || select.value || '';
       select.innerHTML = '';
       if (!liveCollections.length) {
-        select.disabled = true;
+        select.disabled = false;
         select.required = false;
         const opt = document.createElement('option');
         opt.value = '';
-        opt.textContent = 'Please create a Collection first';
+        opt.textContent = 'None (optional)';
         select.appendChild(opt);
         return;
       }
 
       select.disabled = false;
-      select.required = true;
+      select.required = false;
       const placeholder = document.createElement('option');
       placeholder.value = '';
-      placeholder.disabled = true;
-      placeholder.textContent = 'Select…';
+      placeholder.textContent = liveCollections.length ? 'None (optional)' : 'No collections yet';
       if (!liveCollections.some((c) => c.id === current)) placeholder.selected = true;
       select.appendChild(placeholder);
 
@@ -880,21 +897,20 @@ export async function mount(root) {
       const current = selected.categoryId || select.value || '';
       select.innerHTML = '';
       if (!liveCategories.length) {
-        select.disabled = true;
+        select.disabled = false;
         select.required = false;
         const opt = document.createElement('option');
         opt.value = '';
-        opt.textContent = 'Please create a Category first';
+        opt.textContent = 'None (optional)';
         select.appendChild(opt);
         return;
       }
 
       select.disabled = false;
-      select.required = true;
+      select.required = false;
       const placeholder = document.createElement('option');
       placeholder.value = '';
-      placeholder.disabled = true;
-      placeholder.textContent = 'Select…';
+      placeholder.textContent = 'None (optional)';
       if (!liveCategories.some((c) => c.id === current)) placeholder.selected = true;
       select.appendChild(placeholder);
 
@@ -1064,7 +1080,7 @@ export async function mount(root) {
     const titles = {
       reports: 'Reports — Sales summary',
       dashboard: 'Accounting Dashboard',
-      catalog: 'Store Catalog — Website Products',
+      catalog: 'Products',
       'website-orders': 'Website Orders',
       taxonomy: 'Collections & Categories',
       inventory: 'Inventory Costs',
@@ -1100,6 +1116,13 @@ export async function mount(root) {
     }
   }
 
+  function setCatalogFormVisible(visible) {
+    catalogFormVisible = Boolean(visible);
+    if (els.catalogFormPanel) {
+      els.catalogFormPanel.hidden = !catalogFormVisible;
+    }
+  }
+
   function renderCatalogForm(product = null) {
     if (!els.catalogFormHost) return;
     const snapshot = state.getSnapshot();
@@ -1109,7 +1132,7 @@ export async function mount(root) {
     const { collections, categories } = liveTaxonomy(snapshot);
 
     if (els.catalogFormTitle) {
-      els.catalogFormTitle.textContent = editing ? 'Edit Store Product' : 'Add Store Product';
+      els.catalogFormTitle.textContent = editing ? 'Edit item' : 'Add item';
     }
     els.catalogFormHost.innerHTML = catalogFormHtml(editing, collections, categories);
     const form = els.catalogFormHost.querySelector('[data-catalog-form]');
@@ -1121,6 +1144,40 @@ export async function mount(root) {
       });
       updateBarcodePreview(form);
     }
+    setCatalogFormVisible(catalogFormVisible || Boolean(editing));
+  }
+
+  function exportCatalogCsv() {
+    const products = (state.getSnapshot().products || []).filter((p) => isLiveDbId(p.id));
+    const header = ['Item name', 'Description', 'Category', 'Collection', 'Price', 'Cost', 'Margin %', 'In stock', 'Barcode'];
+    const lines = [header.join(',')];
+    for (const p of products) {
+      const retail = Number(p.retailPrice) || 0;
+      const cost = Number(p.costPrice) || 0;
+      const margin = retail > 0 ? ((retail - cost) / retail) * 100 : 0;
+      const cell = (v) => {
+        const s = String(v ?? '');
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      lines.push([
+        cell(p.title),
+        cell(p.description || ''),
+        cell(p.category || ''),
+        cell(p.collectionName || ''),
+        retail.toFixed(2),
+        cost.toFixed(2),
+        margin.toFixed(2),
+        Number(p.stockQuantity) || 0,
+        cell(p.barcode || ''),
+      ].join(','));
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `shamaadan-products-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   async function refreshWebsiteOrders() {
@@ -1316,12 +1373,11 @@ export async function mount(root) {
 
       if (!liveFilters.length) {
         els.catalogFilter.innerHTML = `
-          <option value="All" selected>All collections</option>
-          <option value="" disabled>Please create a Collection first</option>
+          <option value="All" selected>All items</option>
         `;
       } else {
         els.catalogFilter.innerHTML = `
-          <option value="All"${current === 'All' ? ' selected' : ''}>All collections</option>
+          <option value="All"${current === 'All' ? ' selected' : ''}>All items</option>
           ${liveFilters.map((c) => `
             <option value="${escapeAttr(c.name)}"${c.name === current ? ' selected' : ''}>${escapeHtml(c.name)}</option>
           `).join('')}
@@ -1340,8 +1396,8 @@ export async function mount(root) {
       const liveProducts = products.filter((p) => isLiveDbId(p.id));
       const count = catalogFilter === 'All'
         ? liveProducts.length
-        : liveProducts.filter((p) => p.collectionName === catalogFilter).length;
-      els.catalogCount.textContent = `${count} product${count === 1 ? '' : 's'}`;
+        : liveProducts.filter((p) => p.collectionName === catalogFilter || p.category === catalogFilter).length;
+      els.catalogCount.textContent = `${count} item${count === 1 ? '' : 's'}`;
     }
 
     renderTaxonomyForms();

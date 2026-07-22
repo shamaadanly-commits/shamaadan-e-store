@@ -2146,3 +2146,42 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Products (Loyverse item list) */
+.dash-panel--items {
+  margin-bottom: 1rem;
+}
+
+.items-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.dash-panel--item-form {
+  position: sticky;
+  top: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 1025px) {
+  [data-panel='catalog'] {
+    display: grid;
+    grid-template-columns: 1fr minmax(20rem, 24rem);
+    gap: 1rem;
+    align-items: start;
+  }
+
+  [data-panel='catalog'][hidden] {
+    display: none !important;
+  }
+
+  .dash-panel--item-form[hidden] {
+    display: none !important;
+  }
+
+  .dash-panel--items {
+    margin-bottom: 0;
+  }
+}

@@ -444,9 +444,9 @@ export async function upsertProductRow(product) {
     } catch (err) {
       console.warn('[shared/supabase] taxonomy lookup by id skipped:', err.message);
     }
-  } else {
-    // Legacy name-only path (POS / older callers)
-    collectionName = collectionName || 'General';
+  } else if (collectionName || categoryName) {
+    // Legacy name-only path (POS / older callers that pass names without UUIDs)
+    collectionName = collectionName || categoryName;
     categoryName = categoryName || collectionName;
     try {
       const [cat, col] = await Promise.all([
@@ -459,13 +459,10 @@ export async function upsertProductRow(product) {
       console.warn('[shared/supabase] taxonomy ensure skipped:', err.message);
     }
   }
+  // else: collection/category intentionally optional — leave null
 
-  if (!collectionId || !categoryId) {
-    throw new Error('Please create a Collection and Category first, then select them when adding a product.');
-  }
-
-  collectionName = collectionName || 'General';
-  categoryName = categoryName || collectionName;
+  collectionName = collectionName || null;
+  categoryName = categoryName || null;
 
   const row = {
     barcode: String(product.barcode || product.sku || ''),
