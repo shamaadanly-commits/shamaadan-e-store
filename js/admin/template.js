@@ -837,6 +837,12 @@ export function buildAdminShell() {
             </span>
             <span class="dash-nav__label">Inventory Costs</span>
           </button>
+          <button type="button" class="dash-nav__link" data-nav="valuation" data-view="valuation">
+            <span class="dash-nav__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+            </span>
+            <span class="dash-nav__label">Inventory Valuation</span>
+          </button>
           <button type="button" class="dash-nav__link" data-nav="waste" data-view="waste">
             <span class="dash-nav__icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
@@ -1006,6 +1012,12 @@ export function buildAdminShell() {
                 </header>
                 <div class="dash-panel__body" data-form-host></div>
               </article>
+            </div>
+          </section>
+
+          <section class="dash-view" data-panel="valuation" aria-label="Inventory valuation" hidden>
+            <div data-valuation-host>
+              <p class="dash-empty">Loading inventory valuation…</p>
             </div>
           </section>
 

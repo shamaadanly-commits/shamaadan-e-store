@@ -258,6 +258,7 @@
 .dash-nav__link[data-nav='orders'] { --nav-item-color: var(--nav-orders); }
 .dash-nav__link[data-nav='taxonomy'] { --nav-item-color: var(--nav-taxonomy); }
 .dash-nav__link[data-nav='inventory'] { --nav-item-color: var(--nav-inventory); }
+.dash-nav__link[data-nav='valuation'] { --nav-item-color: var(--nav-inventory); }
 .dash-nav__link[data-nav='waste'] { --nav-item-color: var(--nav-waste); }
 .dash-nav__link[data-nav='website'] { --nav-item-color: var(--nav-website); }
 .dash-nav__link[data-nav='pos'] { --nav-item-color: var(--nav-pos); }
@@ -2118,5 +2119,30 @@
 
   .rpt-kpi__value {
     font-size: 1.05rem;
+  }
+}
+
+.rpt-kpis--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.rpt-chip--select {
+  padding: 0.2rem 0.55rem;
+}
+
+.rpt-chip--select select {
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--dash-text);
+  outline: none;
+  cursor: pointer;
+  padding: 0.25rem 0.15rem;
+}
+
+@media (max-width: 1024px) {
+  .rpt-kpis--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

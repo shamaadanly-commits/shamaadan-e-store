@@ -37,6 +37,11 @@ import {
   downloadSalesCsv,
 } from './reports.js';
 import {
+  buildInventoryValuation,
+  inventoryValuationHtml,
+  downloadInventoryValuationCsv,
+} from './inventory-valuation.js';
+import {
   generateBarcodeValue,
   renderBarcodeInto,
   printBarcodeLabels,
@@ -79,6 +84,10 @@ export async function mount(root) {
   let reportMetric = 'grossSales';
   /** @type {ReturnType<typeof buildSalesSummary> | null} */
   let reportSummary = null;
+  let valuationCategory = 'All';
+  let valuationAsOf = new Date().toISOString().slice(0, 10);
+  /** @type {ReturnType<typeof buildInventoryValuation> | null} */
+  let valuationSummary = null;
 
   root.className = 'dashboard-app';
   root.innerHTML = buildAdminShell();
@@ -99,6 +108,7 @@ export async function mount(root) {
     wasteFormHost: root.querySelector('[data-waste-form-host]'),
     websiteOrdersHost: root.querySelector('[data-website-orders-host]'),
     reportsHost: root.querySelector('[data-reports-host]'),
+    valuationHost: root.querySelector('[data-valuation-host]'),
     orderModal: root.querySelector('[data-order-modal]'),
     formHost: root.querySelector('[data-form-host]'),
     formTitle: root.querySelector('[data-form-title]'),
@@ -237,19 +247,33 @@ export async function mount(root) {
 
   root.addEventListener('change', async (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLInputElement)) return;
-    if (!target.matches('[data-rpt-from], [data-rpt-to]')) return;
+    if (!(target instanceof HTMLElement)) return;
 
-    const host = target.closest('[data-reports-root]') || els.reportsHost;
-    const nextFrom = host?.querySelector('[data-rpt-from]')?.value || reportRange.from;
-    const nextTo = host?.querySelector('[data-rpt-to]')?.value || reportRange.to;
-    if (!nextFrom || !nextTo) return;
-    if (nextFrom > nextTo) {
-      window.alert('From date must be on or before the To date.');
+    if (target.matches('[data-rpt-from], [data-rpt-to]')) {
+      if (!(target instanceof HTMLInputElement)) return;
+      const host = target.closest('[data-reports-root]') || els.reportsHost;
+      const nextFrom = host?.querySelector('[data-rpt-from]')?.value || reportRange.from;
+      const nextTo = host?.querySelector('[data-rpt-to]')?.value || reportRange.to;
+      if (!nextFrom || !nextTo) return;
+      if (nextFrom > nextTo) {
+        window.alert('From date must be on or before the To date.');
+        return;
+      }
+      reportRange = { from: nextFrom, to: nextTo };
+      await refreshReports();
       return;
     }
-    reportRange = { from: nextFrom, to: nextTo };
-    await refreshReports();
+
+    if (target.matches('[data-val-category]')) {
+      valuationCategory = /** @type {HTMLSelectElement} */ (target).value || 'All';
+      renderInventoryValuation();
+      return;
+    }
+
+    if (target.matches('[data-val-asof]')) {
+      valuationAsOf = /** @type {HTMLInputElement} */ (target).value || valuationAsOf;
+      renderInventoryValuation();
+    }
   });
 
   root.addEventListener('input', (event) => {
@@ -359,6 +383,11 @@ export async function mount(root) {
 
     if (target.matches('[data-rpt-export]')) {
       if (reportSummary) downloadSalesCsv(reportSummary);
+      return;
+    }
+
+    if (target.matches('[data-val-export]')) {
+      if (valuationSummary) downloadInventoryValuationCsv(valuationSummary, valuationAsOf);
       return;
     }
 
@@ -1039,11 +1068,13 @@ export async function mount(root) {
       'website-orders': 'Website Orders',
       taxonomy: 'Collections & Categories',
       inventory: 'Inventory Costs',
+      valuation: 'Inventory Valuation',
       waste: 'Waste — Damaged & Lost Stock',
     };
     if (els.pageTitle) els.pageTitle.textContent = titles[view] ?? 'Main Dashboard';
     if (view === 'website-orders') refreshWebsiteOrders();
     if (view === 'reports') refreshReports();
+    if (view === 'valuation') renderInventoryValuation();
   }
 
   function renderForm(product = null) {
@@ -1130,6 +1161,13 @@ export async function mount(root) {
         { error: err?.message || 'Failed to load sales summary.' },
       );
     }
+  }
+
+  function renderInventoryValuation() {
+    if (!els.valuationHost) return;
+    const products = state.getSnapshot().products || [];
+    valuationSummary = buildInventoryValuation(products, { category: valuationCategory });
+    els.valuationHost.innerHTML = inventoryValuationHtml(valuationSummary, { asOf: valuationAsOf });
   }
 
   function closeOrderModal() {
@@ -1336,6 +1374,8 @@ export async function mount(root) {
     renderCatalog(snapshot);
     // Skip form re-render during silent auto-refresh so in-progress edits survive.
     if (options.withForms !== false) renderCatalogForm();
+    const valuationPanel = root.querySelector('[data-panel="valuation"]');
+    if (valuationPanel && !valuationPanel.hidden) renderInventoryValuation();
 
     if (els.lastUpdated) {
       els.lastUpdated.textContent = `Last updated ${new Date(updatedAt).toLocaleString('en-LY')}`;
