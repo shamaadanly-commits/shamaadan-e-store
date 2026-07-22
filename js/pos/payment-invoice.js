@@ -48,7 +48,7 @@ export function promptPaymentMethod(root, amount) {
           <button type="button" class="pos-pay-modal__method is-selected" data-pay-method="cash">Cash</button>
           <button type="button" class="pos-pay-modal__method" data-pay-method="bank_transfer">Bank Transfer</button>
         </div>
-        <div class="pos-pay-modal__bank" data-pay-bank hidden>
+        <div class="pos-pay-modal__bank" data-pay-bank>
           <label class="pos-pay-modal__field">
             <span>Transaction number</span>
             <input type="text" data-pay-ref autocomplete="off" placeholder="Bank reference / txn #">
@@ -74,15 +74,24 @@ export function promptPaymentMethod(root, amount) {
     let method = 'cash';
     const bankBox = modal.querySelector('[data-pay-bank]');
     const errorEl = modal.querySelector('[data-pay-error]');
+    const refInput = modal.querySelector('[data-pay-ref]');
 
     function setMethod(next) {
-      method = next;
+      method = next === 'bank_transfer' ? 'bank_transfer' : 'cash';
       modal.querySelectorAll('[data-pay-method]').forEach((btn) => {
-        btn.classList.toggle('is-selected', btn.dataset.payMethod === next);
+        btn.classList.toggle('is-selected', btn.dataset.payMethod === method);
       });
-      if (bankBox) bankBox.hidden = next !== 'bank_transfer';
+      if (bankBox) {
+        bankBox.classList.toggle('is-open', method === 'bank_transfer');
+        bankBox.setAttribute('aria-hidden', method === 'bank_transfer' ? 'false' : 'true');
+      }
       if (errorEl) errorEl.hidden = true;
+      if (method === 'bank_transfer') {
+        window.setTimeout(() => refInput?.focus(), 0);
+      }
     }
+
+    setMethod('cash');
 
     function close(result) {
       modal.remove();
@@ -100,11 +109,15 @@ export function promptPaymentMethod(root, amount) {
 
       const methodBtn = target.closest('[data-pay-method]');
       if (methodBtn) {
-        setMethod(methodBtn.dataset.payMethod || 'cash');
+        event.preventDefault();
+        event.stopPropagation();
+        setMethod(methodBtn.getAttribute('data-pay-method') || 'cash');
         return;
       }
 
-      if (target.matches('[data-pay-confirm]')) {
+      if (target.closest('[data-pay-confirm]')) {
+        event.preventDefault();
+        event.stopPropagation();
         if (method === 'bank_transfer') {
           const ref = String(modal.querySelector('[data-pay-ref]')?.value || '').trim();
           const date = String(modal.querySelector('[data-pay-date]')?.value || today).slice(0, 10);
@@ -114,6 +127,7 @@ export function promptPaymentMethod(root, amount) {
               errorEl.textContent = 'Enter the bank transaction number.';
               errorEl.hidden = false;
             }
+            refInput?.focus();
             return;
           }
           if (!Number.isFinite(paid) || paid <= 0) {

@@ -2187,10 +2187,14 @@
 }
 
 .pos-pay-modal__bank {
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 0.65rem;
   margin-bottom: 0.75rem;
+}
+
+.pos-pay-modal__bank.is-open {
+  display: flex;
 }
 
 .pos-pay-modal__field {
