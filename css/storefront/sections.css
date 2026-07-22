@@ -713,7 +713,8 @@
     grid-template-columns: 1fr 1fr;
   }
 
-  .shop-footer__grid > :first-child {
+  .shop-footer__grid > :first-child,
+  .shop-footer__col--location {
     grid-column: 1 / -1;
   }
 }
