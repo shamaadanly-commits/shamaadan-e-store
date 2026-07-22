@@ -117,6 +117,74 @@ export function getSupabase() {
 }
 
 /**
+ * Upload a product image to Supabase Storage (public URL).
+ * Used when Cloudflare R2 is not configured.
+ * @param {{ dataUrl: string, filename?: string, contentType?: string }} input
+ * @returns {Promise<string>} public URL
+ */
+export async function uploadProductImage(input) {
+  const dataUrl = String(input?.dataUrl || '');
+  if (!dataUrl.startsWith('data:')) {
+    throw new Error('Expected a data URL for image upload.');
+  }
+
+  const match = /^data:([^;,]+)?(;base64)?,([\s\S]+)$/i.exec(dataUrl);
+  if (!match) throw new Error('Invalid image data URL.');
+
+  const contentType = String(input?.contentType || match[1] || 'image/jpeg').split(';')[0].trim() || 'image/jpeg';
+  const isBase64 = Boolean(match[2] && match[2].includes('base64'));
+  const raw = match[3];
+
+  let bytes;
+  if (isBase64) {
+    const binary = atob(raw);
+    bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  } else {
+    bytes = new TextEncoder().encode(decodeURIComponent(raw));
+  }
+
+  const ext = contentType.includes('png')
+    ? 'png'
+    : contentType.includes('webp')
+      ? 'webp'
+      : contentType.includes('gif')
+        ? 'gif'
+        : 'jpg';
+
+  const safeName = String(input?.filename || `product.${ext}`)
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 60) || `product.${ext}`;
+
+  const path = `products/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
+  const client = getSupabase();
+  const bucket = 'product-images';
+
+  const { error } = await client.storage
+    .from(bucket)
+    .upload(path, bytes, {
+      contentType,
+      upsert: false,
+      cacheControl: '31536000',
+    });
+
+  if (error) {
+    console.error('[shared/supabase] storage upload failed:', error);
+    throw new Error(
+      error.message.includes('Bucket not found') || error.message.includes('not found')
+        ? 'Image storage bucket is missing. Run sql/product_images_storage.sql in the Supabase SQL Editor, then try again.'
+        : `Image upload failed: ${error.message}`,
+    );
+  }
+
+  const { data } = client.storage.from(bucket).getPublicUrl(path);
+  if (!data?.publicUrl) throw new Error('Upload succeeded but no public URL was returned.');
+  return data.publicUrl;
+}
+
+/**
  * Back-compat proxy so existing `supabase.from(...)` call sites stay valid
  * while still initializing lazily after /api/env.js injects credentials.
  */
@@ -403,7 +471,21 @@ export async function upsertProductRow(product) {
     barcode: String(product.barcode || product.sku || ''),
     name,
     description: product.description ? String(product.description) : null,
-    image_url: product.imageUrls?.[0] || product.image || null,
+    image_url: (() => {
+      const urls = Array.isArray(product.imageUrls)
+        ? product.imageUrls.filter(Boolean)
+        : product.image
+          ? [product.image]
+          : [];
+      const first = urls[0] || product.image || null;
+      if (typeof first === 'string' && first.startsWith('data:')) {
+        throw new Error(
+          'Product image is still a temporary local preview and was not uploaded. '
+            + 'Wait for the upload to finish, or run sql/product_images_storage.sql in Supabase, then re-upload the image.',
+        );
+      }
+      return first;
+    })(),
     wholesale_cost: Number(product.costPrice ?? product.cost ?? 0),
     retail_price: Number(product.retailPrice ?? product.price ?? 0),
     stock_quantity: Number(product.stockQuantity ?? product.stock ?? 0),

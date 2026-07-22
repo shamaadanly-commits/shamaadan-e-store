@@ -1,7 +1,9 @@
 /**
  * Product image uploader — PC file picker + mobile camera/gallery.
- * Uploads to /api/upload (Cloudflare R2 when configured).
+ * Prefers /api/upload (Cloudflare R2). Falls back to Supabase Storage.
  */
+
+import { isSupabaseConfigured, uploadProductImage } from '../../shared/supabase.js';
 
 const MAX_FILES = 6;
 const MAX_DIMENSION = 1600;
@@ -33,6 +35,8 @@ export function bindImageUploader(form) {
 
   function setUrls(urls) {
     urlsField.value = urls.join('\n');
+    // Keep a stable copy so a form re-render can be detected as dirty editing.
+    urlsField.dataset.hasImages = urls.length ? '1' : '';
     renderPreview();
   }
 
@@ -99,9 +103,6 @@ export function bindImageUploader(form) {
           data: dataUrl,
         });
         uploaded.push(result.url);
-        if (result.configured === false) {
-          setStatus('Saved locally — connect Cloudflare R2 later for cloud storage', 'warn');
-        }
       } catch (error) {
         console.error('[image-upload]', error);
         setStatus(error.message || 'Upload failed', 'error');
@@ -110,9 +111,7 @@ export function bindImageUploader(form) {
 
     if (uploaded.length) {
       setUrls([...existing, ...uploaded]);
-      if (!status?.dataset.tone || status.dataset.tone !== 'warn') {
-        setStatus(`${uploaded.length} image(s) added`, 'ok');
-      }
+      setStatus(`${uploaded.length} image(s) uploaded`, 'ok');
     }
   });
 
@@ -121,8 +120,10 @@ export function bindImageUploader(form) {
 
 /**
  * @param {{ filename: string, contentType: string, data: string }} payload
+ * @returns {Promise<{ ok: boolean, url: string, configured?: boolean }>}
  */
 async function uploadImage(payload) {
+  // 1) Prefer Cloudflare R2 via serverless API when configured.
   try {
     const res = await fetch('/api/upload', {
       method: 'POST',
@@ -130,38 +131,45 @@ async function uploadImage(payload) {
       body: JSON.stringify(payload),
     });
 
-    // Static local server may not run serverless API — fall back to data URL
-    if (!res.ok) {
+    if (res.ok) {
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const json = await res.json();
+        if (json.ok && json.url && !String(json.url).startsWith('data:')) {
+          return json;
+        }
+        // R2 not configured or returned a temporary data URL — fall through.
+      }
+    } else if (res.status !== 404 && res.status < 500) {
       const text = await res.text();
-      let message = 'Upload endpoint unavailable';
+      let message = 'Upload failed';
       try {
         message = JSON.parse(text).error || message;
       } catch {
         // keep default
       }
-      if (res.status === 404 || res.status >= 500) {
-        return { ok: true, configured: false, url: payload.data };
-      }
       throw new Error(message);
     }
-
-    const contentType = res.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) {
-      return { ok: true, configured: false, url: payload.data };
-    }
-
-    const json = await res.json();
-    if (!json.ok || !json.url) {
-      throw new Error(json.error || 'Upload failed');
-    }
-    return json;
   } catch (error) {
-    // Network / static host: keep local preview so PC & mobile upload still works
-    if (payload.data?.startsWith('data:')) {
-      return { ok: true, configured: false, url: payload.data };
+    if (error instanceof Error && /upload failed|too large|missing image|only image/i.test(error.message)) {
+      throw error;
     }
-    throw error;
+    // Network / missing API — try Supabase Storage next.
   }
+
+  // 2) Durable fallback: Supabase Storage (uses existing project keys).
+  if (isSupabaseConfigured() && payload.data?.startsWith('data:')) {
+    const url = await uploadProductImage({
+      dataUrl: payload.data,
+      filename: payload.filename,
+      contentType: payload.contentType,
+    });
+    return { ok: true, configured: true, url };
+  }
+
+  throw new Error(
+    'Could not store the image. Configure Cloudflare R2, or run sql/product_images_storage.sql in Supabase.',
+  );
 }
 
 /**
@@ -217,7 +225,7 @@ export function imageUploaderHtml(imageUrls = [], fieldId = 'product-images') {
           🖼 Choose from gallery
         </button>
       </div>
-      <p class="dash-field__hint">Pick from your phone gallery or take a new photo. Stored in Cloudflare R2 when configured.</p>
+      <p class="dash-field__hint">Pick from your phone gallery or take a new photo. Images are stored in the cloud so they stay after saving.</p>
 
       <input
         type="file"

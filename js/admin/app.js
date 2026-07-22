@@ -145,7 +145,7 @@ export async function mount(root) {
   async function refreshFromSupabase() {
     if (!isSupabaseReady()) {
       console.warn('[admin] Supabase not configured — using local catalog only');
-      renderAll(state.getSnapshot());
+      renderAll(state.getSnapshot(), { withForms: false });
       return;
     }
 
@@ -156,16 +156,20 @@ export async function mount(root) {
       } else if (typeof state.replaceProducts === 'function') {
         state.replaceProducts(catalog.products || []);
       }
-      renderAll(state.getSnapshot());
-      renderTaxonomyForms();
-      renderCatalogForm();
-      renderForm();
-      renderWasteForm();
+      // Keep in-progress Add Product / image uploads intact.
+      const preserveForms = isBusyEditing();
+      renderAll(state.getSnapshot(), { withForms: false });
+      if (!preserveForms) {
+        renderTaxonomyForms();
+        renderCatalogForm();
+        renderForm();
+        renderWasteForm();
+      }
       refreshWebsiteOrders();
     } catch (err) {
       console.error('[admin] refreshFromSupabase failed:', err);
       window.alert(err?.message || 'Failed to sync catalog from Supabase.');
-      renderAll(state.getSnapshot());
+      renderAll(state.getSnapshot(), { withForms: false });
     }
   }
 
@@ -643,9 +647,11 @@ export async function mount(root) {
     const catalogForm = event.target.closest('[data-catalog-form]');
     if (catalogForm) {
       event.preventDefault();
-      await saveProductFromForm(catalogForm);
-      editingCatalogId = null;
-      renderCatalogForm();
+      const saved = await saveProductFromForm(catalogForm);
+      if (saved) {
+        editingCatalogId = null;
+        renderCatalogForm();
+      }
       return;
     }
 
@@ -659,12 +665,15 @@ export async function mount(root) {
     const form = event.target.closest('[data-product-form]');
     if (!form) return;
     event.preventDefault();
-    await saveProductFromForm(form);
-    editingProductId = null;
-    renderForm();
+    const saved = await saveProductFromForm(form);
+    if (saved) {
+      editingProductId = null;
+      renderForm();
+    }
   });
 
-  state.subscribe((snapshot) => renderAll(snapshot));
+  // Never wipe open forms on background ledger/catalog updates.
+  state.subscribe((snapshot) => renderAll(snapshot, { withForms: false }));
   state.startTransactionStream(60_000);
 
   async function saveProductFromForm(form) {
@@ -673,6 +682,14 @@ export async function mount(root) {
       .split('\n')
       .map((s) => s.trim())
       .filter(Boolean);
+
+    if (imageUrls.some((url) => url.startsWith('data:'))) {
+      window.alert(
+        'Please wait until the image finishes uploading (you should see a normal https link, not a temporary preview). '
+          + 'If upload keeps failing, run sql/product_images_storage.sql in the Supabase SQL Editor, then try again.',
+      );
+      return false;
+    }
 
     const snapshot = state.getSnapshot();
     const managedCollections = snapshot.managedCollections?.length
@@ -687,7 +704,7 @@ export async function mount(root) {
 
     if (!isLiveDbId(collectionId) || !isLiveDbId(categoryId)) {
       window.alert('Please create a Collection and Category first, then select them from the dropdowns.');
-      return;
+      return false;
     }
 
     const collectionName = managedCollections.find((c) => c.id === collectionId)?.name || '';
@@ -711,9 +728,11 @@ export async function mount(root) {
     try {
       await persistUpsertProduct(product);
       await refreshFromSupabase();
+      return true;
     } catch (err) {
       console.error('[admin] upsertProduct failed:', err);
       window.alert(err?.message || 'Failed to save product to Supabase.');
+      return false;
     }
   }
 
@@ -888,7 +907,17 @@ export async function mount(root) {
     const ae = document.activeElement;
     if (ae && typeof ae.closest === 'function' && ae.closest('input, textarea, select')) return true;
     if (els.orderModal && !els.orderModal.hidden) return true;
-    return Boolean(editingProductId || editingCatalogId || editingCollectionId || editingCategoryId);
+    if (editingProductId || editingCatalogId || editingCollectionId || editingCategoryId) return true;
+
+    // Adding a new product (editingCatalogId is null) — treat filled forms as busy.
+    const openForm = root.querySelector('[data-catalog-form], [data-product-form]');
+    if (openForm) {
+      const title = String(openForm.querySelector('[name="title"]')?.value || '').trim();
+      const barcode = String(openForm.querySelector('[name="barcode"]')?.value || '').trim();
+      const images = String(openForm.querySelector('[name="imageUrls"]')?.value || '').trim();
+      if (title || barcode || images) return true;
+    }
+    return false;
   }
 
   /** Silently pull fresh data and update the read-only views (never the forms). */
