@@ -81,6 +81,31 @@ export async function uploadProductImage(input) {
 }
 
 /**
+ * Extract R2 object key from a public CDN URL for this bucket.
+ * @param {string} url
+ * @returns {string | null}
+ */
+export function r2KeyFromPublicUrl(url) {
+  const raw = String(url || '').trim();
+  if (!raw || raw.startsWith('data:')) return null;
+
+  const base = String(process.env.R2_PUBLIC_BASE_URL || '').replace(/\/$/, '');
+  if (base && (raw === base || raw.startsWith(`${base}/`))) {
+    return raw.slice(base.length).replace(/^\//, '').split('?')[0] || null;
+  }
+
+  // Fallback: path after /products/ (our upload prefix)
+  try {
+    const u = new URL(raw);
+    const match = u.pathname.match(/\/(?:products\/[^?#]+)/);
+    if (match) return match[0].replace(/^\//, '');
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+/**
  * Delete an object from R2 by key.
  * @param {string} key
  * @returns {Promise<{ ok: true }>}
@@ -96,6 +121,38 @@ export async function deleteProductImage(key) {
   }));
 
   return { ok: true };
+}
+
+/**
+ * Delete many product images from R2 by public URL.
+ * Non-R2 URLs are skipped. Failures are collected, not thrown.
+ * @param {string[]} urls
+ * @returns {Promise<{ deleted: number, skipped: number, errors: string[] }>}
+ */
+export async function deleteProductImagesByUrls(urls) {
+  const list = Array.isArray(urls) ? urls.map((u) => String(u || '').trim()).filter(Boolean) : [];
+  if (!list.length) return { deleted: 0, skipped: 0, errors: [] };
+  if (!isR2Configured()) return { deleted: 0, skipped: list.length, errors: ['R2 not configured'] };
+
+  let deleted = 0;
+  let skipped = 0;
+  const errors = [];
+
+  for (const url of list) {
+    const key = r2KeyFromPublicUrl(url);
+    if (!key || !key.startsWith('products/')) {
+      skipped += 1;
+      continue;
+    }
+    try {
+      await deleteProductImage(key);
+      deleted += 1;
+    } catch (err) {
+      errors.push(`${key}: ${err?.message || err}`);
+    }
+  }
+
+  return { deleted, skipped, errors };
 }
 
 /**

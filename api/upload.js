@@ -1,14 +1,13 @@
 /**
- * Cloudflare R2 image upload API.
- * Configure R2 env vars later — until then returns a clear not-configured response
- * so the admin UI can keep a local preview URL.
+ * Cloudflare R2 image upload / delete API.
  *
- * Required env (when ready):
- *   R2_ACCOUNT_ID
- *   R2_ACCESS_KEY_ID
- *   R2_SECRET_ACCESS_KEY
- *   R2_BUCKET_NAME
- *   R2_PUBLIC_BASE_URL  (e.g. https://cdn.shamaadan.ly or r2.dev public URL)
+ * Required env:
+ *   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+ *   R2_BUCKET_NAME, R2_PUBLIC_BASE_URL
+ *
+ * POST body:
+ *   { filename, contentType, data } — upload
+ *   { action: 'delete', urls: string[] } — delete objects by public URL
  */
 export const config = {
   api: {
@@ -43,14 +42,9 @@ function extensionFromType(contentType) {
   return 'jpg';
 }
 
-async function uploadToR2({ buffer, contentType, filename }) {
-  const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
-
+async function getR2() {
+  const { S3Client, PutObjectCommand, DeleteObjectCommand } = await import('@aws-sdk/client-s3');
   const accountId = process.env.R2_ACCOUNT_ID;
-  const bucket = process.env.R2_BUCKET_NAME;
-  const publicBase = process.env.R2_PUBLIC_BASE_URL.replace(/\/$/, '');
-  const key = `products/${Date.now().toString(36)}-${sanitizeFilename(filename)}`;
-
   const client = new S3Client({
     region: 'auto',
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
@@ -59,6 +53,33 @@ async function uploadToR2({ buffer, contentType, filename }) {
       secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
     },
   });
+  return { client, PutObjectCommand, DeleteObjectCommand };
+}
+
+function r2KeyFromPublicUrl(url) {
+  const raw = String(url || '').trim();
+  if (!raw || raw.startsWith('data:')) return null;
+
+  const base = String(process.env.R2_PUBLIC_BASE_URL || '').replace(/\/$/, '');
+  if (base && (raw === base || raw.startsWith(`${base}/`))) {
+    return raw.slice(base.length).replace(/^\//, '').split('?')[0] || null;
+  }
+
+  try {
+    const u = new URL(raw);
+    const match = u.pathname.match(/\/(?:products\/[^?#]+)/);
+    if (match) return match[0].replace(/^\//, '');
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+async function uploadToR2({ buffer, contentType, filename }) {
+  const { client, PutObjectCommand } = await getR2();
+  const bucket = process.env.R2_BUCKET_NAME;
+  const publicBase = process.env.R2_PUBLIC_BASE_URL.replace(/\/$/, '');
+  const key = `products/${Date.now().toString(36)}-${sanitizeFilename(filename)}`;
 
   await client.send(new PutObjectCommand({
     Bucket: bucket,
@@ -70,6 +91,36 @@ async function uploadToR2({ buffer, contentType, filename }) {
   return `${publicBase}/${key}`;
 }
 
+async function deleteFromR2(urls) {
+  const list = Array.isArray(urls) ? urls : [];
+  if (!isR2Configured()) {
+    return { deleted: 0, skipped: list.length, errors: ['R2 not configured'] };
+  }
+
+  const { client, DeleteObjectCommand } = await getR2();
+  const bucket = process.env.R2_BUCKET_NAME;
+  let deleted = 0;
+  let skipped = 0;
+  const errors = [];
+
+  for (const url of list) {
+    const key = r2KeyFromPublicUrl(url);
+    // Only delete objects under our products/ prefix
+    if (!key || !key.startsWith('products/')) {
+      skipped += 1;
+      continue;
+    }
+    try {
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+      deleted += 1;
+    } catch (err) {
+      errors.push(`${key}: ${err?.message || err}`);
+    }
+  }
+
+  return { deleted, skipped, errors };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -78,6 +129,13 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const action = String(body?.action || '').trim().toLowerCase();
+
+    if (action === 'delete') {
+      const result = await deleteFromR2(body?.urls || []);
+      return res.status(200).json({ ok: true, ...result });
+    }
+
     const { filename, contentType, data } = body || {};
 
     if (!data || typeof data !== 'string') {
@@ -104,7 +162,6 @@ export default async function handler(req, res) {
         configured: false,
         code: 'R2_NOT_CONFIGURED',
         message: 'Cloudflare R2 is not configured yet. Using local preview until R2 credentials are set.',
-        // Echo data URL so the product can still be saved locally for now
         url: data.startsWith('data:') ? data : `data:${type};base64,${base64}`,
         filename: safeName,
       });

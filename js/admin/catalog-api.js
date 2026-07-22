@@ -15,6 +15,7 @@ import {
   upsertCollectionRow,
   upsertProductRow,
   deleteProductRow,
+  deleteSupabaseProductImages,
   mapProductFromDb,
   isSupabaseConfigured,
   mapSupabaseNetworkError,
@@ -183,14 +184,40 @@ export async function persistUpsertProduct(product) {
 }
 
 /**
- * Hard-delete a product row in Supabase.
+ * Hard-delete a product row in Supabase and remove its images from R2 / Storage.
  * @param {string} productId
  */
 export async function persistDeleteProduct(productId) {
   assertLiveSupabase();
   console.info('[catalog-api] deleteProduct', productId);
   try {
-    await deleteProductRow(productId);
+    const result = await deleteProductRow(productId);
+    const imageUrls = result?.imageUrls || [];
+
+    if (imageUrls.length) {
+      // Supabase Storage cleanup (browser client)
+      await deleteSupabaseProductImages(imageUrls).catch((err) => {
+        console.warn('[catalog-api] supabase image cleanup skipped:', err?.message || err);
+      });
+
+      // Cloudflare R2 cleanup (server API — credentials stay server-side)
+      try {
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete', urls: imageUrls }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data?.ok === false) {
+          console.warn('[catalog-api] R2 image cleanup failed:', data?.error || res.status);
+        } else if (data?.deleted) {
+          console.info('[catalog-api] R2 images deleted:', data.deleted);
+        }
+      } catch (err) {
+        console.warn('[catalog-api] R2 image cleanup skipped:', err?.message || err);
+      }
+    }
+
     return fetchAdminCatalog();
   } catch (err) {
     throw mapSupabaseNetworkError(err, 'deleting product');

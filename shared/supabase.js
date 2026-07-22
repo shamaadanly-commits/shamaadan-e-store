@@ -566,14 +566,54 @@ export async function upsertProductRow(product) {
 
 /**
  * Permanently delete a product from Supabase.
+ * Returns image URLs that should be cleaned from storage.
  * @param {string} productId
+ * @returns {Promise<{ ok: true, id: string, imageUrls: string[] }>}
  */
 export async function deleteProductRow(productId) {
   const id = isLiveDbId(productId) ? String(productId).trim() : '';
   if (!id) throw new Error('Product id must be a live Supabase UUID.');
 
   try {
-    const { error } = await getSupabase()
+    const supabase = getSupabase();
+    let existing = null;
+    {
+      const full = await supabase
+        .from('products')
+        .select('id, image_url, image_urls')
+        .eq('id', id)
+        .maybeSingle();
+      if (full.error && /image_urls|column/i.test(full.error.message)) {
+        const lite = await supabase
+          .from('products')
+          .select('id, image_url')
+          .eq('id', id)
+          .maybeSingle();
+        if (lite.error) {
+          console.warn('[shared/supabase] deleteProductRow fetch images:', lite.error.message);
+        } else {
+          existing = lite.data;
+        }
+      } else if (full.error) {
+        console.warn('[shared/supabase] deleteProductRow fetch images:', full.error.message);
+      } else {
+        existing = full.data;
+      }
+    }
+
+    const imageUrls = [];
+    if (existing) {
+      if (Array.isArray(existing.image_urls)) {
+        for (const u of existing.image_urls) {
+          if (u && typeof u === 'string' && !u.startsWith('data:')) imageUrls.push(u);
+        }
+      }
+      if (existing.image_url && typeof existing.image_url === 'string' && !existing.image_url.startsWith('data:')) {
+        if (!imageUrls.includes(existing.image_url)) imageUrls.push(existing.image_url);
+      }
+    }
+
+    const { error } = await supabase
       .from('products')
       .delete()
       .eq('id', id);
@@ -582,9 +622,45 @@ export async function deleteProductRow(productId) {
       console.error('[shared/supabase] deleteProductRow failed:', error);
       throw new Error(error.message);
     }
-    return { ok: true, id };
+    return { ok: true, id, imageUrls };
   } catch (err) {
     throw mapSupabaseNetworkError(err, 'deleting product');
+  }
+}
+
+/**
+ * Remove product images from Supabase Storage bucket when URLs point there.
+ * @param {string[]} urls
+ * @returns {Promise<{ deleted: number, skipped: number }>}
+ */
+export async function deleteSupabaseProductImages(urls) {
+  const list = Array.isArray(urls) ? urls.map((u) => String(u || '').trim()).filter(Boolean) : [];
+  if (!list.length) return { deleted: 0, skipped: 0 };
+
+  const paths = [];
+  for (const url of list) {
+    const marker = '/storage/v1/object/public/product-images/';
+    const idx = url.indexOf(marker);
+    if (idx === -1) continue;
+    const path = decodeURIComponent(url.slice(idx + marker.length).split('?')[0]);
+    if (path) paths.push(path);
+  }
+
+  if (!paths.length) return { deleted: 0, skipped: list.length };
+
+  try {
+    const { error } = await getSupabase()
+      .storage
+      .from('product-images')
+      .remove(paths);
+    if (error) {
+      console.warn('[shared/supabase] deleteSupabaseProductImages:', error.message);
+      return { deleted: 0, skipped: list.length };
+    }
+    return { deleted: paths.length, skipped: list.length - paths.length };
+  } catch (err) {
+    console.warn('[shared/supabase] deleteSupabaseProductImages failed:', err?.message || err);
+    return { deleted: 0, skipped: list.length };
   }
 }
 
