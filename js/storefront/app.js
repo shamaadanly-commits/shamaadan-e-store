@@ -8,7 +8,7 @@ import { buildStorefrontHtml, productCardCartControlHtml } from './template.js';
 import { loadProducts, filterProducts, renderProductGrid } from './products.js';
 import { createCart, bindCartUI, showToast } from './cart.js';
 import { initCheckout } from './checkout.js';
-import { initNav, bindNewsletter, bindFilters } from './nav.js';
+import { initNav, bindFilters } from './nav.js';
 import { syncLangToggle, handleLangClick } from './lang.js';
 import { initSmoothScroll, syncScrollTrigger, getLenis } from './scroll.js';
 import { initAnimations, animateProductGrid } from './animations.js';
@@ -96,7 +96,6 @@ export async function mount(root) {
 
     bindCartUI(root, cart);
     navApi = initNav(root, i18n);
-    bindNewsletter(root, i18n);
     syncLangToggle(root, i18n);
     checkout.refresh();
     syncCardCartControls();

@@ -62,7 +62,6 @@ export function buildStorefrontHtml({ products, categories, collections = [], i1
           <a href="#collections" data-nav-link>${t('nav.collections')}</a>
           <a href="#shop" data-nav-link>${t('nav.shop')}</a>
           <a href="#ritual" data-nav-link>${t('nav.ritual')}</a>
-          <a href="#contact" data-nav-link>${t('nav.contact')}</a>
         </nav>
 
         <div class="shop-header__actions">
@@ -90,7 +89,6 @@ export function buildStorefrontHtml({ products, categories, collections = [], i1
       <a href="#collections" data-nav-link>${t('nav.collections')}</a>
       <a href="#shop" data-nav-link>${t('nav.shop')}</a>
       <a href="#ritual" data-nav-link>${t('nav.ritual')}</a>
-      <a href="#contact" data-nav-link>${t('nav.contact')}</a>
     </nav>
 
     <main id="main-content">
@@ -259,20 +257,6 @@ export function buildStorefrontHtml({ products, categories, collections = [], i1
           </div>
         </div>
       </section>
-
-      <section class="shop__section newsletter" id="contact" aria-labelledby="contact-heading">
-        <div class="shop__container">
-          <div class="newsletter__box" data-animate="fade-up">
-            <p class="shop__eyebrow">${t('newsletter.eyebrow')}</p>
-            <h2 class="shop__title" id="contact-heading">${t('newsletter.title')}</h2>
-            <p class="shop__lead" style="margin-inline:auto">${t('newsletter.lead')}</p>
-            <form class="newsletter__form" data-newsletter novalidate>
-              <input type="email" class="newsletter__input" placeholder="${t('newsletter.placeholder')}" aria-label="${t('newsletter.emailLabel')}" required>
-              <button type="submit" class="btn btn--primary">${t('newsletter.submit')}</button>
-            </form>
-          </div>
-        </div>
-      </section>
     </main>
 
     <footer class="shop-footer" role="contentinfo">
@@ -312,14 +296,18 @@ export function buildStorefrontHtml({ products, categories, collections = [], i1
             <ul>
               <li><a href="#">${t('footer.shipping')}</a></li>
               <li><a href="#">${t('footer.returns')}</a></li>
-              <li><a href="#contact">${t('nav.contact')}</a></li>
               <li><a href="#">${t('footer.faq')}</a></li>
             </ul>
           </div>
         </div>
         <div class="shop-footer__bottom">
           <span>&copy; ${year} Shamaadan. ${t('footer.rights')}</span>
-          <span>${t('footer.crafted')}</span>
+          <a
+            class="shop-footer__credit"
+            href="https://vexstudiolb.com"
+            target="_blank"
+            rel="noopener noreferrer"
+          >Design By Vexstudiolb</a>
         </div>
       </div>
     </footer>

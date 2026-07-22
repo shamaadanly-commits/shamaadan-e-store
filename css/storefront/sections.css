@@ -690,6 +690,16 @@
   color: var(--color-text-muted);
 }
 
+.shop-footer__credit {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.shop-footer__credit:hover {
+  color: var(--color-gold);
+}
+
 @media (max-width: 768px) {
   .shop-footer__grid {
     grid-template-columns: 1fr 1fr;
