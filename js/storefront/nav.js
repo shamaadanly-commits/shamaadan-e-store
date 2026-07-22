@@ -79,36 +79,6 @@ export function initNav(root, i18n) {
 
 /**
  * @param {HTMLElement} root
- * @param {ReturnType<import('./i18n.js').createI18n>} i18n
- */
-export function bindNewsletter(root, i18n) {
-  const form = root.querySelector('[data-newsletter]');
-  if (!form) return;
-
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const input = form.querySelector('input[type="email"]');
-    if (!input?.value) return;
-
-    const btn = form.querySelector('button[type="submit"]');
-    const original = btn?.textContent ?? i18n.t('newsletter.submit');
-    if (btn) {
-      btn.textContent = i18n.t('newsletter.welcome');
-      btn.disabled = true;
-    }
-    input.value = '';
-
-    setTimeout(() => {
-      if (btn) {
-        btn.textContent = original;
-        btn.disabled = false;
-      }
-    }, 3000);
-  });
-}
-
-/**
- * @param {HTMLElement} root
  * @param {Array} allProducts
  * @param {function} onFilter
  */
