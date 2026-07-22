@@ -1088,24 +1088,35 @@ export async function getPosPaymentBreakdown() {
 }
 
 /**
- * Load POS + online orders for the Sales summary report (date range inclusive).
+ * Load orders for the Sales summary / Sales by item reports (date range inclusive).
  * @param {{ from: string, to: string }} range — ISO date strings YYYY-MM-DD
+ * @param {{ channel?: 'both' | 'online' | 'pos' }} [opts]
  * @returns {Promise<object[]>}
  */
-export async function getSalesOrdersForReport(range) {
+export async function getSalesOrdersForReport(range, opts = {}) {
   const from = String(range?.from || '').trim();
   const to = String(range?.to || '').trim();
   if (!from || !to) throw new Error('Report date range is required.');
+
+  const channel = String(opts.channel || 'both').toLowerCase();
+  const sources = channel === 'online'
+    ? ['online']
+    : channel === 'pos'
+      ? ['pos']
+      : ['pos', 'online'];
 
   const fromIso = `${from}T00:00:00.000Z`;
   const toDate = new Date(`${to}T00:00:00.000Z`);
   toDate.setUTCDate(toDate.getUTCDate() + 1);
   const toIso = toDate.toISOString();
 
+  const selectFull = 'id, source, status, total_amount, subtotal_amount, discount_amount, shipping_amount, payment_method, created_at, completed_at, updated_at, invoice_number, order_items(product_id, product_name, quantity, unit_price, wholesale_cost, refunded_quantity)';
+  const selectLite = 'id, source, status, total_amount, subtotal_amount, shipping_amount, payment_method, created_at, completed_at, updated_at, invoice_number, order_items(product_id, product_name, quantity, unit_price, wholesale_cost)';
+
   const { data, error } = await getSupabase()
     .from('orders')
-    .select('id, source, status, total_amount, subtotal_amount, discount_amount, shipping_amount, payment_method, created_at, completed_at, updated_at, invoice_number, order_items(product_id, product_name, quantity, unit_price, wholesale_cost, refunded_quantity)')
-    .in('source', ['pos', 'online'])
+    .select(selectFull)
+    .in('source', sources)
     .gte('created_at', fromIso)
     .lt('created_at', toIso)
     .order('created_at', { ascending: true })
@@ -1119,8 +1130,8 @@ export async function getSalesOrdersForReport(range) {
     if (/refunded_quantity|discount_amount|column/i.test(error.message)) {
       const retry = await getSupabase()
         .from('orders')
-        .select('id, source, status, total_amount, subtotal_amount, shipping_amount, payment_method, created_at, completed_at, updated_at, invoice_number, order_items(product_id, product_name, quantity, unit_price, wholesale_cost)')
-        .in('source', ['pos', 'online'])
+        .select(selectLite)
+        .in('source', sources)
         .gte('created_at', fromIso)
         .lt('created_at', toIso)
         .order('created_at', { ascending: true })

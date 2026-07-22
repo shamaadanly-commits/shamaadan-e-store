@@ -2141,6 +2141,24 @@
   padding: 0.25rem 0.15rem;
 }
 
+.rpt-channel-note {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--dash-text-muted);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @media (max-width: 1024px) {
   .rpt-kpis--4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));

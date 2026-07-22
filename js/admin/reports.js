@@ -67,8 +67,10 @@ function orderCost(order) {
  * @param {object[]} orders
  * @param {{ from: string, to: string }} range
  * @param {{ from: string, to: string }} [compareRange]
+ * @param {{ channel?: 'both' | 'online' | 'pos' }} [opts]
  */
-export function buildSalesSummary(orders, range, compareRange = null) {
+export function buildSalesSummary(orders, range, compareRange = null, opts = {}) {
+  const channel = normalizeReportChannel(opts.channel);
   const days = [];
   const cursor = parseLocalDate(range.from);
   const end = parseLocalDate(range.to);
@@ -91,6 +93,7 @@ export function buildSalesSummary(orders, range, compareRange = null) {
   const byDate = new Map(days.map((d) => [d.date, d]));
 
   for (const order of orders || []) {
+    if (!orderMatchesChannel(order, channel)) continue;
     const key = orderDayKey(order);
     if (!key || !byDate.has(key)) continue;
     const bucket = byDate.get(key);
@@ -151,7 +154,34 @@ export function buildSalesSummary(orders, range, compareRange = null) {
     compare = null;
   }
 
-  return { days, totals, range, compare };
+  return { days, totals, range, compare, channel };
+}
+
+/**
+ * @param {string} [channel]
+ * @returns {'both' | 'online' | 'pos'}
+ */
+export function normalizeReportChannel(channel) {
+  const c = String(channel || 'both').toLowerCase();
+  if (c === 'online' || c === 'pos') return c;
+  return 'both';
+}
+
+/**
+ * @param {object} order
+ * @param {'both' | 'online' | 'pos'} channel
+ */
+function orderMatchesChannel(order, channel) {
+  if (channel === 'both') return true;
+  const source = String(order?.source || '').toLowerCase();
+  return source === channel;
+}
+
+export function reportChannelLabel(channel) {
+  const c = normalizeReportChannel(channel);
+  if (c === 'online') return 'Online store';
+  if (c === 'pos') return 'In-store POS';
+  return 'Both channels';
 }
 
 function formatDayLabel(d) {
@@ -249,10 +279,11 @@ const KPI_DEFS = [
 /**
  * Full Sales summary page markup.
  * @param {ReturnType<typeof buildSalesSummary>} summary
- * @param {{ metric?: string, loading?: boolean, error?: string }} [opts]
+ * @param {{ metric?: string, loading?: boolean, error?: string, channel?: string }} [opts]
  */
 export function salesSummaryHtml(summary, opts = {}) {
   const metric = opts.metric || 'grossSales';
+  const channel = normalizeReportChannel(opts.channel || summary.channel || 'both');
   const rangeLabel = formatRangeLabel(summary.range);
   const totals = summary.totals;
 
@@ -300,9 +331,18 @@ export function salesSummaryHtml(summary, opts = {}) {
         </div>
         <div class="rpt-toolbar__filters">
           <span class="rpt-chip">All day</span>
-          <span class="rpt-chip">All channels</span>
+          <label class="rpt-chip rpt-chip--select">
+            <span class="visually-hidden">Sales channel</span>
+            <select data-rpt-channel aria-label="Sales channel">
+              <option value="both"${channel === 'both' ? ' selected' : ''}>Both channels</option>
+              <option value="online"${channel === 'online' ? ' selected' : ''}>Online store only</option>
+              <option value="pos"${channel === 'pos' ? ' selected' : ''}>In-store POS only</option>
+            </select>
+          </label>
         </div>
       </div>
+
+      <p class="rpt-channel-note">Showing: <strong>${escapeHtml(reportChannelLabel(channel))}</strong></p>
 
       <article class="rpt-card">
         <div class="rpt-kpis" role="tablist" aria-label="Sales metrics">

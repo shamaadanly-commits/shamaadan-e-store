@@ -84,6 +84,8 @@ export async function mount(root) {
   const AUTO_REFRESH_MS = 25_000;
   let reportRange = defaultReportRange();
   let reportMetric = 'grossSales';
+  /** @type {'both' | 'online' | 'pos'} */
+  let reportChannel = 'both';
   /** @type {ReturnType<typeof buildSalesSummary> | null} */
   let reportSummary = null;
   /** @type {ReturnType<typeof buildSalesByItem> | null} */
@@ -303,6 +305,13 @@ export async function mount(root) {
       return;
     }
 
+    if (target.matches('[data-rpt-channel]')) {
+      if (!(target instanceof HTMLSelectElement)) return;
+      reportChannel = target.value === 'online' || target.value === 'pos' ? target.value : 'both';
+      await refreshReports();
+      return;
+    }
+
     if (target.matches('[data-sbi-from], [data-sbi-to]')) {
       if (!(target instanceof HTMLInputElement)) return;
       const host = target.closest('[data-sales-by-item-root]') || els.salesByItemHost;
@@ -442,7 +451,10 @@ export async function mount(root) {
     if (rptMetricBtn) {
       reportMetric = rptMetricBtn.dataset.rptMetric || 'grossSales';
       if (reportSummary && els.reportsHost) {
-        els.reportsHost.innerHTML = salesSummaryHtml(reportSummary, { metric: reportMetric });
+        els.reportsHost.innerHTML = salesSummaryHtml(reportSummary, {
+          metric: reportMetric,
+          channel: reportChannel,
+        });
       }
       return;
     }
@@ -1214,23 +1226,29 @@ export async function mount(root) {
     if (!els.reportsHost) return;
     if (!isSupabaseReady()) {
       els.reportsHost.innerHTML = salesSummaryHtml(
-        buildSalesSummary([], reportRange),
-        { error: 'Supabase not configured — sales report unavailable.' },
+        buildSalesSummary([], reportRange, null, { channel: reportChannel }),
+        { error: 'Supabase not configured — sales report unavailable.', channel: reportChannel },
       );
       return;
     }
 
-    els.reportsHost.innerHTML = salesSummaryHtml(buildSalesSummary([], reportRange), { loading: true });
+    els.reportsHost.innerHTML = salesSummaryHtml(
+      buildSalesSummary([], reportRange, null, { channel: reportChannel }),
+      { loading: true, channel: reportChannel },
+    );
 
     try {
-      const orders = await getSalesOrdersForReport(reportRange);
-      reportSummary = buildSalesSummary(orders, reportRange);
-      els.reportsHost.innerHTML = salesSummaryHtml(reportSummary, { metric: reportMetric });
+      const orders = await getSalesOrdersForReport(reportRange, { channel: reportChannel });
+      reportSummary = buildSalesSummary(orders, reportRange, null, { channel: reportChannel });
+      els.reportsHost.innerHTML = salesSummaryHtml(reportSummary, {
+        metric: reportMetric,
+        channel: reportChannel,
+      });
     } catch (err) {
       console.error('[admin] sales report failed:', err);
       els.reportsHost.innerHTML = salesSummaryHtml(
-        buildSalesSummary([], reportRange),
-        { error: err?.message || 'Failed to load sales summary.' },
+        buildSalesSummary([], reportRange, null, { channel: reportChannel }),
+        { error: err?.message || 'Failed to load sales summary.', channel: reportChannel },
       );
     }
   }
