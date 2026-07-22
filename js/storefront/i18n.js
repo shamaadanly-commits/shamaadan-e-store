@@ -38,7 +38,7 @@ const MESSAGES = {
       'Hand-poured in small batches',
       'Sustainably sourced oud',
       'Complimentary gift wrapping',
-      'Same-day Tripoli delivery',
+      'Same-day Benghazi delivery',
     ],
     ethos: {
       quote: '"Every flame<br>is an invitation<br>to pause."',
@@ -46,7 +46,7 @@ const MESSAGES = {
       title: 'Crafted with intention',
       lead: 'Shamaadan sources rare oud, amber, and rose taif from trusted ateliers — blended in micro-batches to preserve depth and longevity.',
       p1Title: 'Small-batch atelier',
-      p1Desc: 'Each product is poured, packed, and numbered by hand in our Libya studio.',
+      p1Desc: 'Each product is poured, packed, and numbered by hand in our Benghazi studio.',
       p2Title: 'Ethically sourced',
       p2Desc: 'We partner directly with growers — no middlemen, no compromise on purity.',
       p3Title: 'Designed to linger',
@@ -139,6 +139,8 @@ const MESSAGES = {
     },
     footer: {
       tagline: 'Luxury fragrance & home rituals — composed in Libya, delivered nationwide.',
+      visit: 'Visit us',
+      location: 'Benghazi, Venice Street, My Home intersection — directly opposite the mosque, next to Cafe Della Palma, below World of Skewers Restaurant.',
       shop: 'Shop',
       house: 'House',
       support: 'Support',
@@ -216,7 +218,7 @@ const MESSAGES = {
       'صب يدوي بدفعات صغيرة',
       'عود مستدام المصدر',
       'تغليف هدايا مجاني',
-      'توصيل في نفس اليوم — طرابلس',
+      'توصيل في نفس اليوم — بنغازي',
     ],
     ethos: {
       quote: '"كل لهب<br>دعوة<br>للتوقف."',
@@ -224,7 +226,7 @@ const MESSAGES = {
       title: 'صُنع بنية واعية',
       lead: 'تستورد شمعدان العود والعنبر وورد الطائف النادر من أفضل المشاغل — تُمزج بدفعات صغيرة لتحافظ على العمق والثبات.',
       p1Title: 'مشغل بدفعات محدودة',
-      p1Desc: 'كل منتج يُصب ويُعبأ ويُرقّم يدوياً في استوديونا في ليبيا.',
+      p1Desc: 'كل منتج يُصب ويُعبأ ويُرقّم يدوياً في استوديونا في بنغازي.',
       p2Title: 'مصادر أخلاقية',
       p2Desc: 'نتعاون مباشرة مع المزارعين — بلا وسطاء، بلا تنازل عن النقاء.',
       p3Title: 'مصمم للبقاء',
@@ -317,6 +319,8 @@ const MESSAGES = {
     },
     footer: {
       tagline: 'عطور وطقوس منزلية فاخرة — من ليبيا إلى كل المدن.',
+      visit: 'زورونا',
+      location: 'بنغازي، شارع البندقية، تقاطع ماي هوم — مقابل المسجد مباشرة، بجوار كافيه ديلا بالما للآيس كريم، وأسفل مطعم عالم الأسياخ.',
       shop: 'تسوق',
       house: 'الدار',
       support: 'الدعم',

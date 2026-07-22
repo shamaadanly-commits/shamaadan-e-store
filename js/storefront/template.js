@@ -268,6 +268,10 @@ export function buildStorefrontHtml({ products, categories, collections = [], i1
             </a>
             <p class="shop-footer__tagline">${t('footer.tagline')}</p>
           </div>
+          <div class="shop-footer__col shop-footer__col--location">
+            <h4>${t('footer.visit')}</h4>
+            <p class="shop-footer__location">${t('footer.location')}</p>
+          </div>
           <div class="shop-footer__col">
             <h4>${t('footer.shop')}</h4>
             <ul>

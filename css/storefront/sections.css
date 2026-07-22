@@ -595,7 +595,7 @@
 
 .shop-footer__grid {
   display: grid;
-  grid-template-columns: 1.5fr repeat(2, 1fr);
+  grid-template-columns: 1.2fr 1.6fr repeat(2, 0.9fr);
   gap: clamp(2rem, 4vw, 3rem);
   margin-bottom: 3rem;
 }
@@ -625,6 +625,14 @@
   margin: 0 0 1.25rem;
   max-width: 22rem;
   line-height: 1.65;
+}
+
+.shop-footer__location {
+  margin: 0;
+  font-size: var(--text-small);
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+  max-width: 28rem;
 }
 
 .shop-footer__social {
