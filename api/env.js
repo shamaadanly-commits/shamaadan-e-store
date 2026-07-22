@@ -36,6 +36,7 @@ export default function handler(_req, res) {
     ADMIN_PIN: process.env.ADMIN_PIN || '',
     AUTH_STAFF_PIN: process.env.AUTH_STAFF_PIN || '',
     AUTH_STAFF_NAME: process.env.AUTH_STAFF_NAME || '',
+    VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY || '',
   };
 
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');

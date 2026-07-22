@@ -69,6 +69,7 @@ export async function bootRouter(options = {}) {
   document.title = config.title;
 
   loadStylesheet(config.css);
+  loadStylesheet('/css/mobile-perf.css');
   renderBootScreen(config.label);
 
   try {

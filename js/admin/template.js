@@ -888,9 +888,9 @@ export function buildAdminShell() {
             </div>
           </div>
           <div class="dash-topbar__actions">
-            <button type="button" class="dash-btn dash-btn--primary dash-btn--sm" data-backup-pdf>⬇ Daily Backup (PDF)</button>
+            <button type="button" class="dash-btn dash-btn--primary dash-btn--sm dash-topbar__backup" data-backup-pdf>⬇ Daily Backup (PDF)</button>
             <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-refresh>Refresh</button>
-            <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-seed-mock>Reset Mock Data</button>
+            <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm dash-topbar__mock" data-seed-mock>Reset Mock Data</button>
           </div>
         </header>
 
@@ -981,7 +981,11 @@ export function buildAdminShell() {
                   <h2>Website Orders</h2>
                   <p class="dash-panel__sub">Cash on delivery and UPAY card payments</p>
                 </div>
-                <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-refresh-website-orders>Refresh</button>
+                <div class="dash-panel__header-actions">
+                  <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-enable-order-push title="Get a phone alert when a customer orders online">Enable order alerts</button>
+                  <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-test-order-push hidden>Test alert</button>
+                  <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-refresh-website-orders>Refresh</button>
+                </div>
               </header>
               <div class="dash-panel__body" data-website-orders-host>
                 <p class="dash-empty">Loading website orders…</p>

@@ -41,6 +41,14 @@ import {
   downloadSalesByItemCsv,
 } from './reports.js';
 import {
+  fetchPushConfig,
+  enableOrderPush,
+  disableOrderPush,
+  sendTestPush,
+  detectNewWebsiteOrders,
+  showLocalOrderNotification,
+} from './push-notify.js';
+import {
   buildInventoryValuation,
   inventoryValuationHtml,
   downloadInventoryValuationCsv,
@@ -95,6 +103,7 @@ export async function mount(root) {
   let valuationAsOf = new Date().toISOString().slice(0, 10);
   /** @type {ReturnType<typeof buildInventoryValuation> | null} */
   let valuationSummary = null;
+  const orderPushState = { knownIds: new Set(), primed: false };
 
   root.className = 'dashboard-app';
   root.innerHTML = buildAdminShell();
@@ -430,6 +439,58 @@ export async function mount(root) {
 
     if (target.matches('[data-refresh-website-orders]')) {
       await refreshWebsiteOrders();
+      return;
+    }
+
+    if (target.matches('[data-enable-order-push]')) {
+      const btn = target;
+      btn.disabled = true;
+      try {
+        const config = await fetchPushConfig();
+        if (!config.configured || !config.publicKey) {
+          window.alert(
+            'Push is not configured on the server yet.\n\n'
+            + 'Add VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY in Vercel Environment Variables, '
+            + 'run sql/push_subscriptions.sql in Supabase, then try again.\n\n'
+            + 'You can still allow notifications in this browser for alerts while Admin is open.',
+          );
+          // Still request local notification permission for in-tab alerts
+          if ('Notification' in window && Notification.permission === 'default') {
+            await Notification.requestPermission();
+          }
+          return;
+        }
+        await enableOrderPush(config.publicKey);
+        if ('Notification' in window && Notification.permission === 'default') {
+          await Notification.requestPermission();
+        }
+        updatePushButtons();
+        window.alert('Order alerts enabled on this device.');
+      } catch (err) {
+        window.alert(err?.message || 'Could not enable order alerts.');
+      } finally {
+        btn.disabled = false;
+      }
+      return;
+    }
+
+    if (target.matches('[data-test-order-push]')) {
+      try {
+        await sendTestPush();
+        window.alert('Test notification sent. Check this device.');
+      } catch (err) {
+        window.alert(err?.message || 'Test alert failed.');
+      }
+      return;
+    }
+
+    if (target.matches('[data-disable-order-push]')) {
+      try {
+        await disableOrderPush();
+        updatePushButtons();
+      } catch (err) {
+        window.alert(err?.message || 'Could not disable alerts.');
+      }
       return;
     }
 
@@ -982,8 +1043,19 @@ export async function mount(root) {
     refreshPosPayments();
     refreshWaste();
     refreshWebsiteOrders();
-    switchView('catalog');
+    updatePushButtons();
+    switchView(initialAdminView());
     startAutoRefresh();
+  }
+
+  function initialAdminView() {
+    try {
+      const view = new URLSearchParams(window.location.search).get('view');
+      if (view && root.querySelector(`[data-panel="${view}"]`)) return view;
+    } catch {
+      /* ignore */
+    }
+    return 'catalog';
   }
 
   function lock() {
@@ -1053,16 +1125,22 @@ export async function mount(root) {
   async function autoRefreshData() {
     if (!currentUser || document.hidden || isBusyEditing() || !isSupabaseReady()) return;
     try {
+      // Lightweight path on mobile / backgrounded tabs: only sync orders + open tickets
+      const isMobile = window.matchMedia('(max-width: 768px)').matches;
       const catalog = await fetchAdminCatalog();
       if (typeof state.hydrateCatalog === 'function') {
         state.hydrateCatalog(catalog);
       } else if (typeof state.replaceProducts === 'function') {
         state.replaceProducts(catalog.products || []);
       }
-      renderAll(state.getSnapshot(), { withForms: false });
+      if (!isMobile) {
+        renderAll(state.getSnapshot(), { withForms: false });
+      } else {
+        renderCatalog(state.getSnapshot());
+      }
       await refreshOpenTickets();
-      await refreshWaste();
       await refreshWebsiteOrders();
+      if (!isMobile) await refreshWaste();
       const reportsPanel = root.querySelector('[data-panel="reports"]');
       if (reportsPanel && !reportsPanel.hidden) await refreshReports();
       const sbiPanel = root.querySelector('[data-panel="sales-by-item"]');
@@ -1215,10 +1293,29 @@ export async function mount(root) {
     }
     try {
       const rows = await getWebsiteOrders();
+      const fresh = detectNewWebsiteOrders(rows, orderPushState);
+      for (const order of fresh) showLocalOrderNotification(order);
       els.websiteOrdersHost.innerHTML = websiteOrdersTableHtml(rows);
     } catch (err) {
       console.error('[admin] website orders load failed:', err);
       els.websiteOrdersHost.innerHTML = `<p class="dash-empty">${escapeHtml(err?.message || 'Failed to load website orders.')}</p>`;
+    }
+  }
+
+  async function updatePushButtons() {
+    const enableBtn = root.querySelector('[data-enable-order-push]');
+    const testBtn = root.querySelector('[data-test-order-push]');
+    if (!enableBtn) return;
+    try {
+      const config = await fetchPushConfig();
+      const enabled = localStorage.getItem('shamaadan-push-enabled') === '1'
+        && typeof Notification !== 'undefined'
+        && Notification.permission === 'granted';
+      enableBtn.textContent = enabled ? 'Alerts on' : 'Enable order alerts';
+      enableBtn.classList.toggle('is-active', enabled);
+      if (testBtn) testBtn.hidden = !(config.configured && enabled);
+    } catch {
+      if (testBtn) testBtn.hidden = true;
     }
   }
 

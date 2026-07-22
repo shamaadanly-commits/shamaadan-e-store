@@ -246,6 +246,19 @@ export default async function handler(req, res) {
         .eq('id', order.id);
     }
 
+    // Fire-and-forget admin push (never block the customer response).
+    try {
+      const { notifyNewOnlineOrder } = await import('../server/lib/push.js');
+      notifyNewOnlineOrder({
+        orderId: order.id,
+        invoiceNumber,
+        total: Number(total) || Number(order.total_amount) || 0,
+        customerName: order.customer_name || customer?.name || '',
+      }).catch((err) => console.warn('[orders] push notify failed:', err?.message || err));
+    } catch (err) {
+      console.warn('[orders] push import failed:', err?.message || err);
+    }
+
     return res.status(200).json({
       ok: true,
       orderRef: invoiceNumber,

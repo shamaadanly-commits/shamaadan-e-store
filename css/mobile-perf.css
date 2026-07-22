@@ -1,0 +1,133 @@
+/* Mobile performance + touch polish — admin / POS / storefront */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Safer tap targets and no accidental zoom on iOS */
+@media (max-width: 768px) {
+  button,
+  .dash-btn,
+  .pos__checkout-btn,
+  .pos__park-btn,
+  .pos__mtab,
+  .store-tabbar a,
+  .store-tabbar button {
+    min-height: 2.75rem;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  .dash-table-wrap,
+  .dash-panel__body {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dash-table {
+    min-width: 36rem;
+  }
+
+  .dash-topbar__actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.35rem;
+  }
+
+  .dash-topbar__mock,
+  .dash-topbar__backup {
+    display: none;
+  }
+
+  .dash-main {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+
+  .dash-views {
+    content-visibility: auto;
+    contain-intrinsic-size: 800px;
+  }
+
+  .dash-panel__header--row {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .dash-panel__header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    width: 100%;
+  }
+
+  .dash-panel__header-actions .dash-btn {
+    flex: 1 1 auto;
+  }
+
+  .rpt-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.65rem;
+  }
+
+  .rpt-toolbar__dates {
+    flex-wrap: wrap;
+  }
+
+  .rpt-kpis {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .pos__ticket-footer {
+    padding-bottom: calc(0.85rem + env(safe-area-inset-bottom));
+  }
+
+  .pos__mobile-tabbar {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+@media (max-width: 480px) {
+  .dash-topbar__title {
+    font-size: 1.05rem;
+  }
+
+  .dash-ledgers,
+  .dash-panels-row,
+  .dash-taxonomy-layout,
+  .rpt-split {
+    grid-template-columns: 1fr !important;
+  }
+
+  .pos-pay-modal__methods {
+    grid-template-columns: 1fr;
+  }
+
+  .pos__discount-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pos__discount-input {
+    width: 100%;
+    text-align: start;
+  }
+}
+
+/* Pause expensive paint when page is in background (CSS hint) */
+@media (max-width: 768px) {
+  img {
+    content-visibility: auto;
+  }
+}

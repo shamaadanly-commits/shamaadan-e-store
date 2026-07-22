@@ -408,6 +408,15 @@ async function placeOrderClientSide(payload) {
     notes: payload.locale ? `Locale: ${payload.locale}` : null,
   }, lineItems);
 
+  const orderId = result?.order?.id;
+  if (orderId) {
+    fetch('/api/push?action=notify-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId }),
+    }).catch(() => {});
+  }
+
   return result?.order?.invoice_number || result?.order?.id || '';
 }
 
