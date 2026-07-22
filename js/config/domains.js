@@ -5,6 +5,8 @@
 export const DOMAIN_CONFIG = {
   storefront: {
     hosts: [
+      'shamaadan.ly',
+      'www.shamaadan.ly',
       'store.com',
       'www.store.com',
       'localhost',
@@ -18,6 +20,7 @@ export const DOMAIN_CONFIG = {
 
   admin: {
     hosts: [
+      'admin.shamaadan.ly',
       'admin.store.com',
       'admin.localhost',
     ],
@@ -29,6 +32,7 @@ export const DOMAIN_CONFIG = {
 
   pos: {
     hosts: [
+      'pos.shamaadan.ly',
       'pos.store.com',
       'pos.localhost',
     ],
