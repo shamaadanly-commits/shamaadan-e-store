@@ -649,6 +649,20 @@
   opacity: 0.8;
 }
 
+.shop-footer__email {
+  display: block;
+  margin-top: 0.45rem;
+  font-size: var(--text-small);
+  color: var(--color-gold);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+  transition: opacity 0.2s ease;
+}
+
+.shop-footer__email:hover {
+  opacity: 0.8;
+}
+
 .shop-footer__social {
   display: flex;
   gap: 0.75rem;
