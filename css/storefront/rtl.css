@@ -1,7 +1,8 @@
 /* ── RTL layout overrides for Arabic ─────────────────────────────── */
 .shop[dir='rtl'] {
+  /* Prefer Arabic-capable UI fonts; keep brand font for Latin/display */
   --font-sans: 'Segoe UI', Tahoma, 'Noto Sans Arabic', 'Arial Unicode MS', system-ui, sans-serif;
-  --font-serif: 'Segoe UI', Tahoma, 'Noto Naskh Arabic', Georgia, serif;
+  --font-serif: 'Iwanzaza Personal', 'Segoe UI', Tahoma, 'Noto Naskh Arabic', Georgia, serif;
 }
 
 .shop[dir='rtl'] .shop-nav a::after {

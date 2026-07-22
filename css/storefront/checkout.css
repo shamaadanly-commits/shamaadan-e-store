@@ -16,8 +16,10 @@
   --co-radius-md: 12px;
   --co-radius-pill: 999px;
   --co-ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --co-font-serif: Georgia, 'Times New Roman', serif;
+  --co-font-serif: 'Iwanzaza Personal', Georgia, 'Times New Roman', serif;
+  --co-font-sans: 'Iwanzaza Personal', system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--co-text);
+  font-family: var(--co-font-sans);
 }
 
 .checkout-overlay {
