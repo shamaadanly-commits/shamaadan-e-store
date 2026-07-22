@@ -723,8 +723,16 @@ async function mountRegister(root, staff) {
         return;
       }
       const added = cart.addItem(productCard.dataset.posProduct);
-      if (added) showToast(els.toast, 'Added to ticket');
-      else showToast(els.toast, 'Out of stock');
+      if (added) {
+        showToast(els.toast, 'Added to ticket');
+        const badge = root.querySelector('[data-mtab-cart-count]');
+        badge?.classList.remove('is-pulse');
+        // Force reflow so the pulse replays on rapid taps
+        void badge?.offsetWidth;
+        badge?.classList.add('is-pulse');
+      } else {
+        showToast(els.toast, 'Out of stock');
+      }
       return;
     }
 
@@ -1013,19 +1021,19 @@ function buildShell(categories, staff) {
           ${logoImg({ className: 'pos__brand-logo', size: 'mark', alt: BRAND.name, loading: 'eager' })}
           <span class="pos__brand">${escapeHtml(BRAND.name)}</span>
         </div>
-        <span class="pos__register">Register #1</span>
+        <span class="pos__register pos__desktop-only">Register #1</span>
         <span class="pos__staff" data-staff-name>${escapeHtml(staffName)}</span>
       </div>
       <div class="pos__topbar-meta">
-        <span class="pos__clock" data-clock aria-live="off"></span>
-        <button type="button" class="pos__scan-btn" data-open-scanner>
+        <span class="pos__clock pos__desktop-only" data-clock aria-live="off"></span>
+        <button type="button" class="pos__scan-btn pos__desktop-only" data-open-scanner>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3"/>
             <path d="M7 12h10"/>
           </svg>
           Scan
         </button>
-        <button type="button" class="pos__tickets-btn" data-open-tickets aria-label="Open tickets">
+        <button type="button" class="pos__tickets-btn pos__desktop-only" data-open-tickets aria-label="Open tickets">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
             <path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4V8z"/>
             <path d="M9 8v8M15 8v8"/>
@@ -1036,7 +1044,7 @@ function buildShell(categories, staff) {
         <button type="button" class="pos__refund-btn" data-open-invoice aria-label="Open invoices">
           Invoice
         </button>
-        <button type="button" class="pos__icon-btn" data-toggle-metrics aria-label="Toggle sales metrics">
+        <button type="button" class="pos__icon-btn pos__desktop-only" data-toggle-metrics aria-label="Toggle sales metrics">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
             <path d="M4 19V5M10 19V9M16 19v-6M22 19H2"/>
           </svg>
@@ -1109,7 +1117,7 @@ function buildShell(categories, staff) {
             <button type="button" class="pos__park-btn" data-park-ticket disabled>Park</button>
             <button type="button" class="pos__checkout-btn" data-checkout disabled>Charge</button>
           </div>
-          <p class="pos__checkout-hint">Park reserves stock for the customer · Charge completes the sale</p>
+          <p class="pos__checkout-hint pos__desktop-only">Park reserves stock for the customer · Charge completes the sale</p>
         </footer>
       </aside>
     </div>
