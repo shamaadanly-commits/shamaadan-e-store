@@ -267,19 +267,12 @@ export function buildStorefrontHtml({ products, categories, collections = [], i1
               ${logoImg({ className: 'shop-footer__logo-img', size: 'footer' })}
             </a>
             <p class="shop-footer__tagline">${t('footer.tagline')}</p>
-            <div class="shop-footer__social">
-              <a href="#" aria-label="${t('footer.instagram')}">IG</a>
-              <a href="#" aria-label="${t('footer.tiktok')}">TK</a>
-              <a href="#" aria-label="${t('footer.pinterest')}">PI</a>
-            </div>
           </div>
           <div class="shop-footer__col">
             <h4>${t('footer.shop')}</h4>
             <ul>
               <li><a href="#shop">${t('footer.allProducts')}</a></li>
               <li><a href="#collections">${t('nav.collections')}</a></li>
-              <li><a href="#shop">${t('footer.giftSets')}</a></li>
-              <li><a href="#shop">${t('footer.newArrivals')}</a></li>
             </ul>
           </div>
           <div class="shop-footer__col">
@@ -287,16 +280,6 @@ export function buildStorefrontHtml({ products, categories, collections = [], i1
             <ul>
               <li><a href="#about">${t('footer.ourStory')}</a></li>
               <li><a href="#ritual">${t('footer.theRitual')}</a></li>
-              <li><a href="#">${t('footer.sustainability')}</a></li>
-              <li><a href="#">${t('footer.stockists')}</a></li>
-            </ul>
-          </div>
-          <div class="shop-footer__col">
-            <h4>${t('footer.support')}</h4>
-            <ul>
-              <li><a href="#">${t('footer.shipping')}</a></li>
-              <li><a href="#">${t('footer.returns')}</a></li>
-              <li><a href="#">${t('footer.faq')}</a></li>
             </ul>
           </div>
         </div>

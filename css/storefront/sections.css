@@ -595,7 +595,7 @@
 
 .shop-footer__grid {
   display: grid;
-  grid-template-columns: 1.5fr repeat(3, 1fr);
+  grid-template-columns: 1.5fr repeat(2, 1fr);
   gap: clamp(2rem, 4vw, 3rem);
   margin-bottom: 3rem;
 }
