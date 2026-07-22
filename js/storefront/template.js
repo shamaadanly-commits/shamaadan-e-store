@@ -107,20 +107,20 @@ export function buildStorefrontHtml({ products, categories, collections = [], i1
           <p class="hero__desc" data-animate="fade-up" data-delay="0.2">${t('hero.desc')}</p>
           <div class="hero__actions" data-animate="fade-up" data-delay="0.3">
             <a href="#shop" class="btn btn--primary">${t('hero.ctaShop')}</a>
-            <a href="#ritual" class="btn btn--ghost">${t('hero.ctaRitual')}</a>
+            <a href="#about" class="btn btn--ghost">${t('hero.ctaRitual')}</a>
           </div>
           <div class="hero__stats" data-animate="fade-up" data-delay="0.4">
             <div class="hero__stat">
-              <span class="hero__stat-value">40+</span>
+              <span class="hero__stat-value">2016</span>
+              <span class="hero__stat-label">${t('hero.statSince')}</span>
+            </div>
+            <div class="hero__stat">
+              <span class="hero__stat-value">1ˢᵗ</span>
               <span class="hero__stat-label">${t('hero.statScents')}</span>
             </div>
             <div class="hero__stat">
-              <span class="hero__stat-value">100%</span>
+              <span class="hero__stat-value">Home</span>
               <span class="hero__stat-label">${t('hero.statOils')}</span>
-            </div>
-            <div class="hero__stat">
-              <span class="hero__stat-value">4.9</span>
-              <span class="hero__stat-label">${t('hero.statRating')}</span>
             </div>
           </div>
         </div>
