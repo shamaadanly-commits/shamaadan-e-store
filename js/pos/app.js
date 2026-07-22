@@ -129,6 +129,9 @@ async function mountRegister(root, staff) {
     lines: root.querySelector('[data-line-items]'),
     itemCount: root.querySelector('[data-item-count]'),
     subtotal: root.querySelector('[data-subtotal]'),
+    discountInput: root.querySelector('[data-discount-input]'),
+    discountRow: root.querySelector('[data-discount-row]'),
+    discountAmount: root.querySelector('[data-discount-amount]'),
     grand: root.querySelector('[data-grand-total]'),
     checkout: root.querySelector('[data-checkout]'),
     park: root.querySelector('[data-park-ticket]'),
@@ -246,7 +249,7 @@ async function mountRegister(root, staff) {
       return;
     }
 
-    showParkTicketForm(snapshot.subtotal);
+    showParkTicketForm(snapshot.total);
   }
 
   async function showInvoiceModal() {
@@ -412,8 +415,10 @@ async function mountRegister(root, staff) {
           customer_phone: customerPhone || null,
           customer_location: customerLocation || null,
           downpayment,
-          total_amount: snapshot.subtotal,
-        }, ticketItemsPayload(snapshot.items));
+          total_amount: snapshot.total,
+          subtotal_amount: snapshot.subtotal,
+          discount_amount: snapshot.discount,
+          notes: snapshot.discount > 0 ? `Discount ${snapshot.discount.toFixed(2)} LYD` : null,
 
         modal.remove();
         cart.clear({ restoreStock: false });
@@ -608,7 +613,16 @@ async function mountRegister(root, staff) {
         : 'Empty';
     }
     els.subtotal.textContent = formatLyd(snapshot.subtotal);
-    els.grand.textContent = formatLyd(snapshot.subtotal);
+    if (els.discountAmount) {
+      els.discountAmount.textContent = `−${formatLyd(snapshot.discount)}`;
+    }
+    if (els.discountRow) {
+      els.discountRow.hidden = !(snapshot.discount > 0);
+    }
+    if (els.discountInput && document.activeElement !== els.discountInput) {
+      els.discountInput.value = snapshot.discount > 0 ? String(Number(snapshot.discount.toFixed(2))) : '0';
+    }
+    els.grand.textContent = formatLyd(snapshot.total);
     const empty = snapshot.items.length === 0;
     els.checkout.disabled = empty;
     if (els.park) els.park.disabled = empty || !isSupabaseConfigured();
@@ -617,6 +631,18 @@ async function mountRegister(root, staff) {
     if (cartBadge) {
       cartBadge.hidden = snapshot.itemCount === 0;
       cartBadge.textContent = String(snapshot.itemCount);
+    }
+  });
+
+  els.discountInput?.addEventListener('input', () => {
+    cart.setDiscount(Number(els.discountInput.value) || 0);
+  });
+
+  els.discountInput?.addEventListener('change', () => {
+    cart.setDiscount(Number(els.discountInput.value) || 0);
+    const clamped = cart.getSnapshot().discount;
+    if (els.discountInput) {
+      els.discountInput.value = clamped > 0 ? String(Number(clamped.toFixed(2))) : '0';
     }
   });
 
@@ -862,7 +888,7 @@ async function mountRegister(root, staff) {
 
       els.checkout.disabled = true;
       try {
-        const payment = await promptPaymentMethod(root, snapshot.subtotal);
+        const payment = await promptPaymentMethod(root, snapshot.total);
         if (!payment) {
           els.checkout.disabled = false;
           return;
@@ -873,7 +899,10 @@ async function mountRegister(root, staff) {
           const result = await createOrder({
             source: 'pos',
             status: 'completed',
-            total_amount: snapshot.subtotal,
+            total_amount: snapshot.total,
+            subtotal_amount: snapshot.subtotal,
+            discount_amount: snapshot.discount,
+            notes: snapshot.discount > 0 ? `Discount ${snapshot.discount.toFixed(2)} LYD` : null,
             staff_user_id: staff.id,
             staff_name: staff.displayName || staff.username,
             payment_method: payment.payment_method,
@@ -1046,6 +1075,24 @@ function buildShell(categories, staff) {
           <div class="pos__totals-row">
             <span>Subtotal</span>
             <span data-subtotal>${formatLyd(0)}</span>
+          </div>
+          <label class="pos__discount-row">
+            <span>Discount (LYD)</span>
+            <input
+              type="number"
+              class="pos__discount-input"
+              data-discount-input
+              min="0"
+              step="0.01"
+              value="0"
+              inputmode="decimal"
+              placeholder="0"
+              aria-label="Discount amount in LYD"
+            >
+          </label>
+          <div class="pos__totals-row pos__totals-row--discount" data-discount-row hidden>
+            <span>Discount</span>
+            <span data-discount-amount>−${formatLyd(0)}</span>
           </div>
           <div class="pos__totals-row pos__totals-row--grand">
             <span>Total</span>

@@ -156,8 +156,13 @@ export function buildReceiptHtml(sale) {
       </tr>
       <tr>
         <td>Subtotal</td>
-        <td class="amt">${formatLyd(sale.revenue)}</td>
+        <td class="amt">${formatLyd(Number(sale.subtotal ?? sale.revenue) || 0)}</td>
       </tr>
+      ${Number(sale.discount) > 0 ? `
+      <tr>
+        <td>Discount</td>
+        <td class="amt">−${formatLyd(Number(sale.discount) || 0)}</td>
+      </tr>` : ''}
       <tr class="grand">
         <td>TOTAL</td>
         <td class="amt">${formatLyd(sale.revenue)}</td>

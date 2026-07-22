@@ -753,6 +753,7 @@ export async function createOrder(orderData, itemsArray) {
     payment_status: orderData?.payment_status ? String(orderData.payment_status) : null,
     payment_reference: orderData?.payment_reference ? String(orderData.payment_reference).trim() : null,
     payment_date: orderData?.payment_date ? String(orderData.payment_date).slice(0, 10) : null,
+    discount_amount: Math.max(0, Number(orderData?.discount_amount) || 0),
     updated_at: now,
   };
 
@@ -767,9 +768,9 @@ export async function createOrder(orderData, itemsArray) {
     .single();
 
   if (orderError) {
-    if (/payment_reference|payment_date|column/i.test(orderError.message)) {
+    if (/payment_reference|payment_date|discount_amount|column/i.test(orderError.message)) {
       throw new Error(
-        'Payment columns missing. Run sql/pos_payments_refunds.sql in the Supabase SQL Editor.',
+        'Order columns missing. Run sql/pos_payments_refunds.sql in the Supabase SQL Editor.',
       );
     }
     throw new Error(`Order failed: ${orderError.message}`);
@@ -854,6 +855,8 @@ export async function saveOpenTicket(meta, items) {
     ticket_label: meta?.ticket_label || meta?.customer_name,
     notes: meta?.notes,
     total_amount: meta?.total_amount,
+    subtotal_amount: meta?.subtotal_amount,
+    discount_amount: meta?.discount_amount,
     customer_name: meta?.customer_name,
     customer_phone: meta?.customer_phone,
     customer_location: meta?.customer_location,
@@ -1101,7 +1104,7 @@ export async function getSalesOrdersForReport(range) {
 
   const { data, error } = await getSupabase()
     .from('orders')
-    .select('id, source, status, total_amount, subtotal_amount, shipping_amount, payment_method, created_at, completed_at, updated_at, invoice_number, order_items(product_id, product_name, quantity, unit_price, wholesale_cost, refunded_quantity)')
+    .select('id, source, status, total_amount, subtotal_amount, discount_amount, shipping_amount, payment_method, created_at, completed_at, updated_at, invoice_number, order_items(product_id, product_name, quantity, unit_price, wholesale_cost, refunded_quantity)')
     .in('source', ['pos', 'online'])
     .gte('created_at', fromIso)
     .lt('created_at', toIso)
@@ -1112,8 +1115,8 @@ export async function getSalesOrdersForReport(range) {
     if (/Could not find the table|schema cache/i.test(error.message)) {
       throw new Error('Orders table not ready. Run the orders SQL scripts in Supabase.');
     }
-    // Older DBs without refunded_quantity — retry without it
-    if (/refunded_quantity|column/i.test(error.message)) {
+    // Older DBs without refunded_quantity / discount_amount — retry without them
+    if (/refunded_quantity|discount_amount|column/i.test(error.message)) {
       const retry = await getSupabase()
         .from('orders')
         .select('id, source, status, total_amount, subtotal_amount, shipping_amount, payment_method, created_at, completed_at, updated_at, invoice_number, order_items(product_id, product_name, quantity, unit_price, wholesale_cost)')

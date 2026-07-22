@@ -15,3 +15,8 @@ alter table public.order_items
   add column if not exists refunded_quantity numeric(12, 2) not null default 0;
 
 comment on column public.order_items.refunded_quantity is 'Quantity already refunded from this line (partial refunds).';
+
+alter table public.orders
+  add column if not exists discount_amount numeric(12, 2) not null default 0;
+
+comment on column public.orders.discount_amount is 'Fixed POS discount in LYD (not percent).';

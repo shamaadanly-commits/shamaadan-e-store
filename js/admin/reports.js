@@ -94,23 +94,26 @@ export function buildSalesSummary(orders, range, compareRange = null) {
     const key = orderDayKey(order);
     if (!key || !byDate.has(key)) continue;
     const bucket = byDate.get(key);
-    const amount = Math.abs(Number(order.total_amount) || 0);
+    const discount = Math.max(0, Number(order.discount_amount) || 0);
+    const net = Math.abs(Number(order.total_amount) || 0);
+    const gross = Math.abs(Number(order.subtotal_amount) || 0) || (net + discount);
     const status = String(order.status || '').toLowerCase();
     const cost = orderCost(order);
 
     if (status === 'refunded' || status === 'cancelled') {
-      bucket.refunds += amount;
+      bucket.refunds += net;
       continue;
     }
 
     // Count completed / paid / pending paid as sales
     if (!['completed', 'paid', 'pending'].includes(status) && status !== 'open' && status !== 'parked') {
       // still include unknown statuses with positive totals as sales
-      if (!(amount > 0)) continue;
+      if (!(net > 0 || gross > 0)) continue;
     }
     if (status === 'open' || status === 'parked') continue;
 
-    bucket.grossSales += amount;
+    bucket.grossSales += gross;
+    bucket.discounts += discount;
     bucket.costOfGoods += cost;
     bucket.receiptCount += 1;
   }

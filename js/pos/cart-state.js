@@ -31,6 +31,9 @@ export function createCartState(initialCatalog) {
   /** @type {Map<string, LineItem>} */
   const lines = new Map();
 
+  /** Fixed discount in LYD (not percent). */
+  let discountAmount = 0;
+
   const listeners = new Set();
 
   function notify() {
@@ -43,15 +46,29 @@ export function createCartState(initialCatalog) {
     const subtotal = items.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
     const totalCost = items.reduce((sum, line) => sum + line.unitCost * line.quantity, 0);
     const itemCount = items.reduce((sum, line) => sum + line.quantity, 0);
+    const discount = Math.min(Math.max(0, Number(discountAmount) || 0), subtotal);
+    const total = Math.max(0, subtotal - discount);
 
     return {
       items,
       itemCount,
       subtotal,
+      discount,
+      total,
       totalCost,
-      grossProfit: subtotal - totalCost,
+      grossProfit: total - totalCost,
       catalog: Array.from(inventory.values()),
     };
+  }
+
+  /**
+   * Set a fixed LYD discount (clamped to the current subtotal).
+   * @param {number} amount
+   */
+  function setDiscount(amount) {
+    const raw = Number(amount);
+    discountAmount = Number.isFinite(raw) && raw > 0 ? raw : 0;
+    notify();
   }
 
   /**
@@ -115,6 +132,7 @@ export function createCartState(initialCatalog) {
       }
     }
     lines.clear();
+    discountAmount = 0;
     notify();
   }
 
@@ -198,7 +216,7 @@ export function createCartState(initialCatalog) {
    * @returns {{ revenue: number, cost: number, profit: number, units: number, lines: Array<{ productId: string, title: string, quantity: number, unitPrice: number, unit_cost_at_sale: number }> }}
    */
   function checkout() {
-    const { subtotal, totalCost, grossProfit, itemCount, items } = getSnapshot();
+    const { subtotal, discount, total, totalCost, grossProfit, itemCount, items } = getSnapshot();
     const saleLines = items.map((line) => ({
       productId: line.productId,
       title: line.name,
@@ -206,8 +224,17 @@ export function createCartState(initialCatalog) {
       unitPrice: line.unitPrice,
       unit_cost_at_sale: line.unitCost,
     }));
-    const sale = { revenue: subtotal, cost: totalCost, profit: grossProfit, units: itemCount, lines: saleLines };
+    const sale = {
+      revenue: total,
+      subtotal,
+      discount,
+      cost: totalCost,
+      profit: grossProfit,
+      units: itemCount,
+      lines: saleLines,
+    };
     lines.clear();
+    discountAmount = 0;
     notify();
     return sale;
   }
@@ -256,6 +283,7 @@ export function createCartState(initialCatalog) {
     addByBarcode,
     findByBarcode,
     adjustQuantity,
+    setDiscount,
     clear,
     syncCatalogStock,
     resetCatalog,
