@@ -1006,7 +1006,7 @@ export async function getSalesOrdersForReport(range) {
 
   const { data, error } = await getSupabase()
     .from('orders')
-    .select('id, source, status, total_amount, subtotal_amount, shipping_amount, created_at, completed_at, updated_at, invoice_number, order_items(quantity, unit_price, wholesale_cost)')
+    .select('id, source, status, total_amount, subtotal_amount, shipping_amount, created_at, completed_at, updated_at, invoice_number, order_items(product_id, product_name, quantity, unit_price, wholesale_cost)')
     .in('source', ['pos', 'online'])
     .gte('created_at', fromIso)
     .lt('created_at', toIso)

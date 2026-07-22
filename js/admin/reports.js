@@ -414,11 +414,17 @@ export function buildSalesByItem(orders, range, productIndex = {}) {
       const net = qty * unit;
       const cogs = qty * cost;
       const productId = line.product_id ? String(line.product_id) : '';
-      const name = String(line.product_name || lookup.get(productId)?.title || lookup.get(productId)?.name || 'Untitled').trim() || 'Untitled';
+      const product = productId ? lookup.get(productId) : null;
+      const name = String(
+        line.product_name
+        || product?.title
+        || product?.name
+        || 'Untitled',
+      ).trim() || 'Untitled';
       const key = productId || `name:${name.toLowerCase()}`;
       const category = String(
-        lookup.get(productId)?.category
-        || lookup.get(productId)?.collectionName
+        product?.category
+        || product?.collectionName
         || '—',
       );
 
