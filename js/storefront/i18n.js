@@ -35,7 +35,6 @@ const MESSAGES = {
       scroll: 'Scroll',
     },
     marquee: [
-      'Free shipping over 75 LYD',
       'Hand-poured in small batches',
       'Sustainably sourced oud',
       'Complimentary gift wrapping',
@@ -214,7 +213,6 @@ const MESSAGES = {
       scroll: 'مرر',
     },
     marquee: [
-      'شحن مجاني فوق ٧٥ د.ل',
       'صب يدوي بدفعات صغيرة',
       'عود مستدام المصدر',
       'تغليف هدايا مجاني',
