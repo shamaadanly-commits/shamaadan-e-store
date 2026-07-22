@@ -853,6 +853,12 @@ export function buildAdminShell() {
             </span>
             <span class="dash-nav__label">Waste</span>
           </button>
+          <button type="button" class="dash-nav__link" data-nav="credentials" data-view="credentials">
+            <span class="dash-nav__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+            </span>
+            <span class="dash-nav__label">Passwords &amp; PINs</span>
+          </button>
           <a href="/?app=storefront" class="dash-nav__link dash-nav__link--external" data-nav="website" target="_blank" rel="noopener">
             <span class="dash-nav__icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
@@ -1042,6 +1048,89 @@ export function buildAdminShell() {
                   <h2>Record Waste</h2>
                 </header>
                 <div class="dash-panel__body" data-waste-form-host></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="dash-view" data-panel="credentials" aria-label="Passwords and PINs" hidden>
+            <div class="dash-catalog-intro">
+              <p>Reset credentials for the <strong>Admin / Dashboard</strong> login, the <strong>POS</strong> unlock PIN, and the <strong>Admin PIN</strong> used to confirm invoice refunds. Changes are saved to the users table in Supabase.</p>
+            </div>
+            <div class="dash-panels-row dash-credentials">
+              <article class="dash-panel">
+                <header class="dash-panel__header">
+                  <h2>Admin / Dashboard password</h2>
+                </header>
+                <div class="dash-panel__body">
+                  <form class="dash-form" data-cred-admin-password autocomplete="off">
+                    <input type="hidden" name="username" data-cred-admin-username value="">
+                    <div class="dash-field dash-field--full">
+                      <label for="cred-admin-current">Current password</label>
+                      <input id="cred-admin-current" name="currentPassword" type="password" required autocomplete="current-password">
+                    </div>
+                    <div class="dash-field">
+                      <label for="cred-admin-new">New password</label>
+                      <input id="cred-admin-new" name="newPassword" type="password" required minlength="6" autocomplete="new-password">
+                    </div>
+                    <div class="dash-field">
+                      <label for="cred-admin-confirm">Confirm new password</label>
+                      <input id="cred-admin-confirm" name="confirmPassword" type="password" required minlength="6" autocomplete="new-password">
+                    </div>
+                    <p class="dash-field__hint">Used to sign in to Admin / Accounting dashboard.</p>
+                    <button type="submit" class="dash-btn dash-btn--primary">Update password</button>
+                    <p class="dash-form__status" data-cred-admin-password-status hidden></p>
+                  </form>
+                </div>
+              </article>
+
+              <article class="dash-panel">
+                <header class="dash-panel__header">
+                  <h2>POS unlock PIN</h2>
+                </header>
+                <div class="dash-panel__body">
+                  <form class="dash-form" data-cred-pos-pin autocomplete="off">
+                    <div class="dash-field dash-field--full">
+                      <label for="cred-pos-admin-pass">Admin password (confirm)</label>
+                      <input id="cred-pos-admin-pass" name="adminPassword" type="password" required autocomplete="current-password">
+                    </div>
+                    <div class="dash-field">
+                      <label for="cred-pos-new">New POS PIN (4–8 digits)</label>
+                      <input id="cred-pos-new" name="newPin" type="password" inputmode="numeric" pattern="[0-9]{4,8}" required minlength="4" maxlength="8" autocomplete="off">
+                    </div>
+                    <div class="dash-field">
+                      <label for="cred-pos-confirm">Confirm POS PIN</label>
+                      <input id="cred-pos-confirm" name="confirmPin" type="password" inputmode="numeric" pattern="[0-9]{4,8}" required minlength="4" maxlength="8" autocomplete="off">
+                    </div>
+                    <p class="dash-field__hint">Used by staff to unlock the POS register.</p>
+                    <button type="submit" class="dash-btn dash-btn--primary">Update POS PIN</button>
+                    <p class="dash-form__status" data-cred-pos-pin-status hidden></p>
+                  </form>
+                </div>
+              </article>
+
+              <article class="dash-panel">
+                <header class="dash-panel__header">
+                  <h2>Admin confirmation PIN</h2>
+                </header>
+                <div class="dash-panel__body">
+                  <form class="dash-form" data-cred-admin-pin autocomplete="off">
+                    <div class="dash-field dash-field--full">
+                      <label for="cred-admin-pin-pass">Admin password (confirm)</label>
+                      <input id="cred-admin-pin-pass" name="adminPassword" type="password" required autocomplete="current-password">
+                    </div>
+                    <div class="dash-field">
+                      <label for="cred-admin-pin-new">New admin PIN (4–8 digits)</label>
+                      <input id="cred-admin-pin-new" name="newPin" type="password" inputmode="numeric" pattern="[0-9]{4,8}" required minlength="4" maxlength="8" autocomplete="off">
+                    </div>
+                    <div class="dash-field">
+                      <label for="cred-admin-pin-confirm">Confirm admin PIN</label>
+                      <input id="cred-admin-pin-confirm" name="confirmPin" type="password" inputmode="numeric" pattern="[0-9]{4,8}" required minlength="4" maxlength="8" autocomplete="off">
+                    </div>
+                    <p class="dash-field__hint">Used on POS when opening Invoices / refunds.</p>
+                    <button type="submit" class="dash-btn dash-btn--primary">Update admin PIN</button>
+                    <p class="dash-form__status" data-cred-admin-pin-status hidden></p>
+                  </form>
+                </div>
               </article>
             </div>
           </section>

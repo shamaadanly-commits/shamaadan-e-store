@@ -6,7 +6,7 @@
  *
  * Also accepts action in JSON body for POST requests.
  */
-import { authenticateAdmin, authenticatePosPin, authenticateAdminPin } from '../server/lib/users.js';
+import { authenticateAdmin, authenticatePosPin, authenticateAdminPin, changeAdminPassword, changePosPin, changeAdminPin } from '../server/lib/users.js';
 import { hashSecret } from '../server/lib/password.js';
 import {
   createSessionToken,
@@ -89,6 +89,55 @@ async function handleVerifyAdminPin(req, res, body) {
   return res.status(200).json({ ok: true, user: result.user, source: result.source });
 }
 
+function requireAdminSession(req, res) {
+  const session = getSessionFromRequest(req, 'admin');
+  if (!session) {
+    res.status(401).json({ ok: false, error: 'Admin sign-in required' });
+    return null;
+  }
+  return session;
+}
+
+async function handleChangeAdminPassword(req, res, body) {
+  const session = requireAdminSession(req, res);
+  if (!session) return undefined;
+
+  const result = await changeAdminPassword({
+    username: body.username || session.username,
+    currentPassword: body.currentPassword,
+    newPassword: body.newPassword,
+  });
+  if (!result.ok) return res.status(400).json(result);
+  return res.status(200).json({ ok: true, message: 'Admin / dashboard password updated.' });
+}
+
+async function handleChangePosPin(req, res, body) {
+  const session = requireAdminSession(req, res);
+  if (!session) return undefined;
+
+  const result = await changePosPin({
+    adminUsername: body.adminUsername || session.username,
+    adminPassword: body.adminPassword || body.currentPassword,
+    newPin: body.newPin,
+    staffName: body.staffName,
+  });
+  if (!result.ok) return res.status(400).json(result);
+  return res.status(200).json({ ok: true, message: 'POS unlock PIN updated.' });
+}
+
+async function handleChangeAdminPin(req, res, body) {
+  const session = requireAdminSession(req, res);
+  if (!session) return undefined;
+
+  const result = await changeAdminPin({
+    adminUsername: body.adminUsername || session.username,
+    adminPassword: body.adminPassword || body.currentPassword,
+    newPin: body.newPin,
+  });
+  if (!result.ok) return res.status(400).json(result);
+  return res.status(200).json({ ok: true, message: 'Admin confirmation PIN updated.' });
+}
+
 function handleLogout(req, res, body) {
   const scope = body.scope === 'admin' || body.scope === 'pos' ? body.scope : 'both';
   const cookies = [];
@@ -155,7 +204,7 @@ export default async function handler(req, res) {
     if (!action) {
       return res.status(400).json({
         ok: false,
-        error: 'Missing action. Use ?action=login|pin|logout|session|hash|verify-admin-pin',
+        error: 'Missing action. Use ?action=login|pin|logout|session|hash|verify-admin-pin|change-admin-password|change-pos-pin|change-admin-pin',
       });
     }
 
@@ -179,6 +228,12 @@ export default async function handler(req, res) {
         return await handlePin(req, res, body);
       case 'verify-admin-pin':
         return await handleVerifyAdminPin(req, res, body);
+      case 'change-admin-password':
+        return await handleChangeAdminPassword(req, res, body);
+      case 'change-pos-pin':
+        return await handleChangePosPin(req, res, body);
+      case 'change-admin-pin':
+        return await handleChangeAdminPin(req, res, body);
       case 'logout':
         return handleLogout(req, res, body);
       case 'hash':
@@ -186,7 +241,7 @@ export default async function handler(req, res) {
       default:
         return res.status(400).json({
           ok: false,
-          error: `Unknown action "${action}". Use login|pin|logout|session|hash|verify-admin-pin`,
+          error: `Unknown action "${action}". Use login|pin|logout|session|hash|verify-admin-pin|change-admin-password|change-pos-pin|change-admin-pin`,
         });
     }
   } catch (err) {

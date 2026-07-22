@@ -195,6 +195,48 @@ export async function verifyAdminPin(pin) {
 }
 
 /**
+ * Change admin / dashboard password (requires signed-in admin session).
+ * @param {{ username?: string, currentPassword: string, newPassword: string }} input
+ */
+export async function changeAdminPasswordClient(input) {
+  const { res, data, unreachable } = await apiSafe('/api/auth?action=change-admin-password', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  if (unreachable || !res) return { ok: false, error: 'Auth server unreachable' };
+  if (res.ok && data?.ok) return { ok: true, message: data.message };
+  return { ok: false, error: data?.error || 'Could not update password' };
+}
+
+/**
+ * Change POS unlock PIN.
+ * @param {{ adminPassword: string, newPin: string, staffName?: string }} input
+ */
+export async function changePosPinClient(input) {
+  const { res, data, unreachable } = await apiSafe('/api/auth?action=change-pos-pin', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  if (unreachable || !res) return { ok: false, error: 'Auth server unreachable' };
+  if (res.ok && data?.ok) return { ok: true, message: data.message };
+  return { ok: false, error: data?.error || 'Could not update POS PIN' };
+}
+
+/**
+ * Change admin confirmation PIN (invoice refunds).
+ * @param {{ adminPassword: string, newPin: string }} input
+ */
+export async function changeAdminPinClient(input) {
+  const { res, data, unreachable } = await apiSafe('/api/auth?action=change-admin-pin', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  if (unreachable || !res) return { ok: false, error: 'Auth server unreachable' };
+  if (res.ok && data?.ok) return { ok: true, message: data.message };
+  return { ok: false, error: data?.error || 'Could not update admin PIN' };
+}
+
+/**
  * @param {'admin' | 'pos' | 'both'} [scope]
  */
 export async function logout(scope = 'both') {

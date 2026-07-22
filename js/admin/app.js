@@ -5,7 +5,7 @@
  */
 import { getSharedDashboardState, LEDGER_METRICS } from '../dashboard.js';
 import { formatLyd } from '../shared/format.js';
-import { fetchSession, loginAdmin, logout } from '../shared/auth-client.js';
+import { fetchSession, loginAdmin, logout, changeAdminPasswordClient, changePosPinClient, changeAdminPinClient } from '../shared/auth-client.js';
 import { isLiveDbId } from '../shared/ids.js';
 import { bindImageUploader } from './image-upload.js';
 import {
@@ -862,7 +862,130 @@ export async function mount(root) {
       await saveWasteFromForm(wasteForm);
       return;
     }
+
+    const adminPassForm = event.target.closest('[data-cred-admin-password]');
+    if (adminPassForm) {
+      event.preventDefault();
+      await submitAdminPasswordForm(adminPassForm);
+      return;
+    }
+
+    const posPinForm = event.target.closest('[data-cred-pos-pin]');
+    if (posPinForm) {
+      event.preventDefault();
+      await submitPosPinForm(posPinForm);
+      return;
+    }
+
+    const adminPinForm = event.target.closest('[data-cred-admin-pin]');
+    if (adminPinForm) {
+      event.preventDefault();
+      await submitAdminPinForm(adminPinForm);
+      return;
+    }
   });
+
+  function setCredStatus(selector, message, ok) {
+    const el = root.querySelector(selector);
+    if (!el) return;
+    el.hidden = !message;
+    el.textContent = message || '';
+    el.dataset.tone = ok ? 'ok' : 'error';
+  }
+
+  async function submitAdminPasswordForm(form) {
+    const data = new FormData(form);
+    const currentPassword = String(data.get('currentPassword') || '');
+    const newPassword = String(data.get('newPassword') || '');
+    const confirmPassword = String(data.get('confirmPassword') || '');
+    const username = String(data.get('username') || currentUser?.username || '').trim();
+
+    if (newPassword !== confirmPassword) {
+      setCredStatus('[data-cred-admin-password-status]', 'New passwords do not match.', false);
+      return;
+    }
+
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
+    setCredStatus('[data-cred-admin-password-status]', 'Saving…', true);
+    try {
+      const result = await changeAdminPasswordClient({ username, currentPassword, newPassword });
+      if (!result.ok) {
+        setCredStatus('[data-cred-admin-password-status]', result.error || 'Update failed.', false);
+        return;
+      }
+      form.reset();
+      if (currentUser?.username) {
+        const hidden = form.querySelector('[data-cred-admin-username]');
+        if (hidden) hidden.value = currentUser.username;
+      }
+      setCredStatus('[data-cred-admin-password-status]', result.message || 'Password updated.', true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function submitPosPinForm(form) {
+    const data = new FormData(form);
+    const adminPassword = String(data.get('adminPassword') || '');
+    const newPin = String(data.get('newPin') || '').replace(/\D/g, '');
+    const confirmPin = String(data.get('confirmPin') || '').replace(/\D/g, '');
+
+    if (newPin !== confirmPin) {
+      setCredStatus('[data-cred-pos-pin-status]', 'PINs do not match.', false);
+      return;
+    }
+
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
+    setCredStatus('[data-cred-pos-pin-status]', 'Saving…', true);
+    try {
+      const result = await changePosPinClient({
+        adminUsername: currentUser?.username,
+        adminPassword,
+        newPin,
+      });
+      if (!result.ok) {
+        setCredStatus('[data-cred-pos-pin-status]', result.error || 'Update failed.', false);
+        return;
+      }
+      form.reset();
+      setCredStatus('[data-cred-pos-pin-status]', result.message || 'POS PIN updated.', true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function submitAdminPinForm(form) {
+    const data = new FormData(form);
+    const adminPassword = String(data.get('adminPassword') || '');
+    const newPin = String(data.get('newPin') || '').replace(/\D/g, '');
+    const confirmPin = String(data.get('confirmPin') || '').replace(/\D/g, '');
+
+    if (newPin !== confirmPin) {
+      setCredStatus('[data-cred-admin-pin-status]', 'PINs do not match.', false);
+      return;
+    }
+
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
+    setCredStatus('[data-cred-admin-pin-status]', 'Saving…', true);
+    try {
+      const result = await changeAdminPinClient({
+        adminUsername: currentUser?.username,
+        adminPassword,
+        newPin,
+      });
+      if (!result.ok) {
+        setCredStatus('[data-cred-admin-pin-status]', result.error || 'Update failed.', false);
+        return;
+      }
+      form.reset();
+      setCredStatus('[data-cred-admin-pin-status]', result.message || 'Admin PIN updated.', true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
 
   // Never wipe open forms on background ledger/catalog updates.
   state.subscribe((snapshot) => renderAll(snapshot, { withForms: false }));
@@ -1035,6 +1158,10 @@ export async function mount(root) {
     if (els.adminUser && currentUser) {
       els.adminUser.hidden = false;
       els.adminUser.textContent = currentUser.displayName || currentUser.username;
+    }
+    const adminUserInput = root.querySelector('[data-cred-admin-username]');
+    if (adminUserInput && currentUser?.username) {
+      adminUserInput.value = currentUser.username;
     }
     renderCatalogForm();
     renderTaxonomyForms();
@@ -1212,6 +1339,7 @@ export async function mount(root) {
       taxonomy: 'Collections & Categories',
       valuation: 'Inventory Valuation',
       waste: 'Waste — Damaged & Lost Stock',
+      credentials: 'Passwords & PINs',
     };
     if (els.pageTitle) els.pageTitle.textContent = titles[view] ?? 'Main Dashboard';
     if (view === 'dashboard') refreshPosPayments();

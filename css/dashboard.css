@@ -2315,3 +2315,29 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Passwords & PINs */
+.dash-credentials {
+  align-items: start;
+}
+
+.dash-form__status {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+}
+
+.dash-form__status[data-tone='ok'] {
+  color: var(--dash-profit);
+}
+
+.dash-form__status[data-tone='error'] {
+  color: var(--dash-danger);
+}
+
+.dash-nav__link[data-nav='credentials'] { --nav-item-color: #5c6bc0; }
+
+@media (max-width: 900px) {
+  .dash-credentials {
+    grid-template-columns: 1fr;
+  }
+}
