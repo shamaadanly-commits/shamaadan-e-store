@@ -140,7 +140,7 @@ const MESSAGES = {
     footer: {
       tagline: 'Luxury fragrance & home rituals — composed in Libya, delivered nationwide.',
       visit: 'Visit us',
-      location: 'Benghazi, Venice Street, My Home intersection — directly opposite the mosque, next to Cafe Della Palma, below World of Skewers Restaurant.',
+      location: 'Benghazi, Venice Street, My Home intersection directly opposite the mosque, next to Cafe Della Palma, below World of Skewers Restaurant.',
       phone: '091-0229971',
       phoneLabel: 'Call us',
       shop: 'Shop',
