@@ -35,6 +35,9 @@ import {
   buildSalesSummary,
   salesSummaryHtml,
   downloadSalesCsv,
+  buildSalesByItem,
+  salesByItemHtml,
+  downloadSalesByItemCsv,
 } from './reports.js';
 import {
   buildInventoryValuation,
@@ -85,6 +88,9 @@ export async function mount(root) {
   let reportMetric = 'grossSales';
   /** @type {ReturnType<typeof buildSalesSummary> | null} */
   let reportSummary = null;
+  /** @type {ReturnType<typeof buildSalesByItem> | null} */
+  let salesByItemSummary = null;
+  let itemReportRange = defaultReportRange();
   let valuationCategory = 'All';
   let valuationAsOf = new Date().toISOString().slice(0, 10);
   /** @type {ReturnType<typeof buildInventoryValuation> | null} */
@@ -109,6 +115,7 @@ export async function mount(root) {
     wasteFormHost: root.querySelector('[data-waste-form-host]'),
     websiteOrdersHost: root.querySelector('[data-website-orders-host]'),
     reportsHost: root.querySelector('[data-reports-host]'),
+    salesByItemHost: root.querySelector('[data-sales-by-item-host]'),
     valuationHost: root.querySelector('[data-valuation-host]'),
     orderModal: root.querySelector('[data-order-modal]'),
     formHost: root.querySelector('[data-form-host]'),
@@ -266,6 +273,21 @@ export async function mount(root) {
       return;
     }
 
+    if (target.matches('[data-sbi-from], [data-sbi-to]')) {
+      if (!(target instanceof HTMLInputElement)) return;
+      const host = target.closest('[data-sales-by-item-root]') || els.salesByItemHost;
+      const nextFrom = host?.querySelector('[data-sbi-from]')?.value || itemReportRange.from;
+      const nextTo = host?.querySelector('[data-sbi-to]')?.value || itemReportRange.to;
+      if (!nextFrom || !nextTo) return;
+      if (nextFrom > nextTo) {
+        window.alert('From date must be on or before the To date.');
+        return;
+      }
+      itemReportRange = { from: nextFrom, to: nextTo };
+      await refreshSalesByItem();
+      return;
+    }
+
     if (target.matches('[data-val-category]')) {
       valuationCategory = /** @type {HTMLSelectElement} */ (target).value || 'All';
       renderInventoryValuation();
@@ -374,6 +396,13 @@ export async function mount(root) {
       return;
     }
 
+    const sbiShift = target.closest('[data-sbi-shift]');
+    if (sbiShift) {
+      itemReportRange = shiftReportRange(itemReportRange, Number(sbiShift.dataset.sbiShift) || -1);
+      await refreshSalesByItem();
+      return;
+    }
+
     const rptMetricBtn = target.closest('[data-rpt-metric]');
     if (rptMetricBtn) {
       reportMetric = rptMetricBtn.dataset.rptMetric || 'grossSales';
@@ -385,6 +414,22 @@ export async function mount(root) {
 
     if (target.matches('[data-rpt-export]')) {
       if (reportSummary) downloadSalesCsv(reportSummary);
+      return;
+    }
+
+    if (target.matches('[data-sbi-export]')) {
+      if (salesByItemSummary) downloadSalesByItemCsv(salesByItemSummary);
+      return;
+    }
+
+    const navToggle = target.closest('[data-nav-toggle]');
+    if (navToggle) {
+      const group = navToggle.closest('[data-nav-group]');
+      if (group) {
+        const open = !group.classList.contains('is-open');
+        group.classList.toggle('is-open', open);
+        navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
       return;
     }
 
@@ -1033,6 +1078,8 @@ export async function mount(root) {
       await refreshWebsiteOrders();
       const reportsPanel = root.querySelector('[data-panel="reports"]');
       if (reportsPanel && !reportsPanel.hidden) await refreshReports();
+      const sbiPanel = root.querySelector('[data-panel="sales-by-item"]');
+      if (sbiPanel && !sbiPanel.hidden) await refreshSalesByItem();
     } catch (err) {
       console.warn('[admin] auto-refresh skipped:', err?.message || err);
     }
@@ -1071,6 +1118,20 @@ export async function mount(root) {
       }
     });
 
+    // Highlight Reports parent when any report sub-page is open
+    const reportsGroup = root.querySelector('[data-nav-group="reports"]');
+    if (reportsGroup) {
+      const reportViews = ['reports', 'sales-by-item'];
+      const inReports = reportViews.includes(view);
+      reportsGroup.classList.toggle('is-section-active', inReports);
+      if (inReports) reportsGroup.classList.add('is-open');
+      const parent = reportsGroup.querySelector('[data-nav-toggle="reports"]');
+      if (parent) {
+        parent.classList.toggle('is-active', inReports);
+        parent.setAttribute('aria-expanded', reportsGroup.classList.contains('is-open') ? 'true' : 'false');
+      }
+    }
+
     els.views.forEach((panel) => {
       const active = panel.dataset.panel === view;
       panel.classList.toggle('is-active', active);
@@ -1078,7 +1139,8 @@ export async function mount(root) {
     });
 
     const titles = {
-      reports: 'Reports — Sales summary',
+      reports: 'Sales summary',
+      'sales-by-item': 'Sales by item',
       dashboard: 'Accounting Dashboard',
       catalog: 'Products',
       'website-orders': 'Website Orders',
@@ -1090,6 +1152,7 @@ export async function mount(root) {
     if (els.pageTitle) els.pageTitle.textContent = titles[view] ?? 'Main Dashboard';
     if (view === 'website-orders') refreshWebsiteOrders();
     if (view === 'reports') refreshReports();
+    if (view === 'sales-by-item') refreshSalesByItem();
     if (view === 'valuation') renderInventoryValuation();
   }
 
@@ -1216,6 +1279,37 @@ export async function mount(root) {
       els.reportsHost.innerHTML = salesSummaryHtml(
         buildSalesSummary([], reportRange),
         { error: err?.message || 'Failed to load sales summary.' },
+      );
+    }
+  }
+
+  async function refreshSalesByItem() {
+    if (!els.salesByItemHost) return;
+    if (!isSupabaseReady()) {
+      els.salesByItemHost.innerHTML = salesByItemHtml(
+        buildSalesByItem([], itemReportRange),
+        { error: 'Supabase not configured — sales by item unavailable.' },
+      );
+      return;
+    }
+
+    els.salesByItemHost.innerHTML = salesByItemHtml(
+      buildSalesByItem([], itemReportRange),
+      { loading: true },
+    );
+
+    try {
+      const orders = await getSalesOrdersForReport(itemReportRange);
+      const productIndex = new Map(
+        (state.getSnapshot().products || []).map((p) => [String(p.id), p]),
+      );
+      salesByItemSummary = buildSalesByItem(orders, itemReportRange, productIndex);
+      els.salesByItemHost.innerHTML = salesByItemHtml(salesByItemSummary);
+    } catch (err) {
+      console.error('[admin] sales by item failed:', err);
+      els.salesByItemHost.innerHTML = salesByItemHtml(
+        buildSalesByItem([], itemReportRange),
+        { error: err?.message || 'Failed to load sales by item.' },
       );
     }
   }

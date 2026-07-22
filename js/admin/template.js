@@ -804,12 +804,19 @@ export function buildAdminShell() {
           </div>
         </div>
         <nav class="dash-nav" aria-label="Admin sections">
-          <button type="button" class="dash-nav__link" data-nav="reports" data-view="reports">
-            <span class="dash-nav__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
-            </span>
-            <span class="dash-nav__label">Reports</span>
-          </button>
+          <div class="dash-nav__group is-open" data-nav-group="reports">
+            <button type="button" class="dash-nav__link dash-nav__parent" data-nav="reports" data-nav-toggle="reports" aria-expanded="true">
+              <span class="dash-nav__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
+              </span>
+              <span class="dash-nav__label">Reports</span>
+              <span class="dash-nav__chevron" aria-hidden="true">▾</span>
+            </button>
+            <div class="dash-nav__sub" data-nav-sub="reports">
+              <button type="button" class="dash-nav__sublink" data-view="reports">Sales summary</button>
+              <button type="button" class="dash-nav__sublink" data-view="sales-by-item">Sales by item</button>
+            </div>
+          </div>
           <button type="button" class="dash-nav__link is-active" data-nav="accounting" data-view="dashboard" aria-current="page">
             <span class="dash-nav__icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M3 13h2v8H3v-8zm4-6h2v14H7V7zm4-4h2v18h-2V3zm4 8h2v10h-2V11zm4-5h2v15h-2V6z"/></svg>
@@ -897,6 +904,12 @@ export function buildAdminShell() {
           <section class="dash-view" data-panel="reports" aria-label="Sales summary reports" hidden>
             <div data-reports-host>
               <p class="dash-empty">Loading sales summary…</p>
+            </div>
+          </section>
+
+          <section class="dash-view" data-panel="sales-by-item" aria-label="Sales by item report" hidden>
+            <div data-sales-by-item-host>
+              <p class="dash-empty">Loading sales by item…</p>
             </div>
           </section>
 

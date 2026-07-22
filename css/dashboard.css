@@ -2185,3 +2185,115 @@
     margin-bottom: 0;
   }
 }
+
+/* Reports submenu */
+.dash-nav__group {
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-nav__parent {
+  width: 100%;
+}
+
+.dash-nav__chevron {
+  margin-inline-start: auto;
+  font-size: 0.7rem;
+  color: var(--dash-text-dim);
+  transition: transform 0.15s var(--dash-ease);
+}
+
+.dash-nav__group.is-open > .dash-nav__parent .dash-nav__chevron {
+  transform: rotate(0deg);
+}
+
+.dash-nav__group:not(.is-open) > .dash-nav__parent .dash-nav__chevron {
+  transform: rotate(-90deg);
+}
+
+.dash-nav__sub {
+  display: none;
+  flex-direction: column;
+  padding: 0.15rem 0 0.35rem 2.35rem;
+  gap: 0.05rem;
+}
+
+.dash-nav__group.is-open > .dash-nav__sub {
+  display: flex;
+}
+
+.dash-nav__sublink {
+  border: none;
+  background: transparent;
+  text-align: start;
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--dash-radius-sm);
+  color: var(--dash-text-muted);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.dash-nav__sublink:hover {
+  background: var(--nav-hover-bg);
+  color: var(--dash-text);
+}
+
+.dash-nav__sublink.is-active {
+  color: var(--nav-reports);
+  font-weight: 500;
+  background: var(--nav-active-bg);
+}
+
+.dash-nav__group.is-section-active > .dash-nav__parent {
+  color: var(--nav-reports);
+}
+
+.rpt-split {
+  display: grid;
+  grid-template-columns: minmax(14rem, 18rem) 1fr;
+  gap: 1rem;
+}
+
+.rpt-top {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.rpt-top__item {
+  display: grid;
+  grid-template-columns: 0.65rem 1fr auto;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.rpt-top__dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+}
+
+.rpt-top__name {
+  font-size: 0.85rem;
+  color: var(--dash-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rpt-top__value {
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--dash-text);
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .rpt-split {
+    grid-template-columns: 1fr;
+  }
+}
