@@ -565,10 +565,70 @@ export async function upsertProductRow(product) {
 }
 
 /**
- * Permanently delete a product from Supabase.
+ * Collect image URLs from a product row for storage cleanup.
+ * @param {object | null} existing
+ * @returns {string[]}
+ */
+function collectProductImageUrls(existing) {
+  const imageUrls = [];
+  if (!existing) return imageUrls;
+  if (Array.isArray(existing.image_urls)) {
+    for (const u of existing.image_urls) {
+      if (u && typeof u === 'string' && !u.startsWith('data:')) imageUrls.push(u);
+    }
+  }
+  if (existing.image_url && typeof existing.image_url === 'string' && !existing.image_url.startsWith('data:')) {
+    if (!imageUrls.includes(existing.image_url)) imageUrls.push(existing.image_url);
+  }
+  return imageUrls;
+}
+
+/**
+ * True when Postgres/PostgREST refused delete due to foreign-key / RESTRICT.
+ * @param {{ code?: string, message?: string } | null | undefined} error
+ */
+function isProductDeleteFkBlocked(error) {
+  if (!error) return false;
+  if (error.code === '23503') return true;
+  return /foreign key|violates foreign key|restrict|still referenced/i.test(String(error.message || ''));
+}
+
+/**
+ * Soft-remove a product that cannot be hard-deleted (sales/inventory history).
+ * Hides it from POS, website, and admin catalog while preserving history FKs.
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} id
+ */
+async function softRemoveProductRow(supabase, id) {
+  const base = {
+    is_active: false,
+    show_on_website: false,
+    stock_quantity: 0,
+    image_url: null,
+    updated_at: new Date().toISOString(),
+  };
+
+  let { error } = await supabase
+    .from('products')
+    .update({ ...base, image_urls: [], current_stock: 0 })
+    .eq('id', id);
+
+  if (error && /image_urls|current_stock|column/i.test(error.message)) {
+    ({ error } = await supabase.from('products').update(base).eq('id', id));
+  }
+
+  if (error) {
+    console.error('[shared/supabase] softRemoveProductRow failed:', error);
+    throw new Error(error.message);
+  }
+}
+
+/**
+ * Delete a product from Supabase (hard delete when possible).
+ * If inventory/sales history blocks the delete, soft-removes instead.
  * Returns image URLs that should be cleaned from storage.
  * @param {string} productId
- * @returns {Promise<{ ok: true, id: string, imageUrls: string[] }>}
+ * @returns {Promise<{ ok: true, id: string, imageUrls: string[], softDeleted?: boolean }>}
  */
 export async function deleteProductRow(productId) {
   const id = isLiveDbId(productId) ? String(productId).trim() : '';
@@ -601,28 +661,25 @@ export async function deleteProductRow(productId) {
       }
     }
 
-    const imageUrls = [];
-    if (existing) {
-      if (Array.isArray(existing.image_urls)) {
-        for (const u of existing.image_urls) {
-          if (u && typeof u === 'string' && !u.startsWith('data:')) imageUrls.push(u);
-        }
-      }
-      if (existing.image_url && typeof existing.image_url === 'string' && !existing.image_url.startsWith('data:')) {
-        if (!imageUrls.includes(existing.image_url)) imageUrls.push(existing.image_url);
-      }
-    }
+    const imageUrls = collectProductImageUrls(existing);
 
     const { error } = await supabase
       .from('products')
       .delete()
       .eq('id', id);
 
-    if (error) {
-      console.error('[shared/supabase] deleteProductRow failed:', error);
-      throw new Error(error.message);
+    if (!error) {
+      return { ok: true, id, imageUrls, softDeleted: false };
     }
-    return { ok: true, id, imageUrls };
+
+    if (isProductDeleteFkBlocked(error)) {
+      console.info('[shared/supabase] deleteProductRow: FK blocked, soft-removing', id);
+      await softRemoveProductRow(supabase, id);
+      return { ok: true, id, imageUrls, softDeleted: true };
+    }
+
+    console.error('[shared/supabase] deleteProductRow failed:', error);
+    throw new Error(error.message);
   } catch (err) {
     throw mapSupabaseNetworkError(err, 'deleting product');
   }

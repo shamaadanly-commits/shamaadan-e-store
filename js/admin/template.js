@@ -149,10 +149,10 @@ function catalogRowHtml(product) {
       <td class="dash-table__num">${formatNum(cost)} LD</td>
       <td class="dash-table__num">${margin.toFixed(2).replace('.', ',')}%</td>
       <td class="dash-table__num">${stockStatusCellHtml(product.stockQuantity, product.minStockAlert)}</td>
-      <td>
+      <td data-stop-row-edit>
         <div class="dash-table__actions">
           <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-edit-catalog="${escapeAttr(product.id)}">Edit</button>
-          <button type="button" class="dash-btn dash-btn--danger dash-btn--sm" data-id="${escapeAttr(product.id)}" data-delete-catalog="${escapeAttr(product.id)}">Remove</button>
+          <button type="button" class="dash-btn dash-btn--danger dash-btn--sm" data-id="${escapeAttr(product.id)}" data-delete-catalog="${escapeAttr(product.id)}">Delete</button>
         </div>
       </td>
     </tr>
@@ -326,6 +326,9 @@ export function catalogFormHtml(product = null, collections = [], categories = [
       <div class="dash-form__actions">
         <button type="submit" class="dash-btn dash-btn--primary">${isEdit ? 'Save item' : 'Add item'}</button>
         <button type="button" class="dash-btn dash-btn--ghost" data-cancel-catalog-edit>Cancel</button>
+        ${isEdit && product?.id
+          ? `<button type="button" class="dash-btn dash-btn--danger" data-id="${escapeAttr(product.id)}" data-delete-catalog="${escapeAttr(product.id)}">Delete</button>`
+          : ''}
       </div>
       <p class="dash-form__note">Collection and category are optional. Check “Push to Website” to show this item in the online store.</p>
     </form>

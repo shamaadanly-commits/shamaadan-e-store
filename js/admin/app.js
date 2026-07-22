@@ -758,15 +758,8 @@ export async function mount(root) {
       return;
     }
 
-    const editCatalog = target.closest('[data-edit-catalog]');
-    if (editCatalog) {
-      editingCatalogId = editCatalog.dataset.editCatalog;
-      catalogFormVisible = true;
-      renderCatalogForm(state.getSnapshot().products.find((p) => p.id === editingCatalogId));
-      switchView('catalog');
-      return;
-    }
-
+    // Delete must run before edit: the whole product row has data-edit-catalog,
+    // so Remove would otherwise open the edit form via closest().
     const deleteCatalog = target.closest('[data-delete-catalog]');
     if (deleteCatalog) {
       let id = '';
@@ -778,20 +771,28 @@ export async function mount(root) {
         return;
       }
 
-      if (confirm('Remove this product from inventory? It will also disappear from the website if it was published there.')) {
+      if (confirm('Remove this product from inventory and the website? Products with sales history are hidden instead of permanently deleted.')) {
         try {
           await persistDeleteProduct(id);
+          editingCatalogId = null;
+          catalogFormVisible = false;
           await refreshFromSupabase();
+          renderCatalogForm();
         } catch (err) {
           console.error('[admin] deleteProduct failed:', err);
           window.alert(err?.message || 'Failed to delete product in Supabase.');
           await refreshFromSupabase();
         }
-        if (editingCatalogId === id) {
-          editingCatalogId = null;
-          renderCatalogForm();
-        }
       }
+      return;
+    }
+
+    const editCatalog = target.closest('[data-edit-catalog]');
+    if (editCatalog) {
+      editingCatalogId = editCatalog.dataset.editCatalog;
+      catalogFormVisible = true;
+      renderCatalogForm(state.getSnapshot().products.find((p) => p.id === editingCatalogId));
+      switchView('catalog');
       return;
     }
 

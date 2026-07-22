@@ -64,18 +64,21 @@ export async function fetchAdminCatalog() {
     const categoryById = new Map(categories.map((c) => [c.id, c.name]));
     const collectionById = new Map(collections.map((c) => [c.id, c.name]));
 
-    const products = (rawProducts || []).map((row) => {
-      const mapped = mapProductFromDb(row);
-      mapped.category_id = row.category_id ? String(row.category_id) : null;
-      mapped.collection_id = row.collection_id ? String(row.collection_id) : null;
-      if (row.category_id && categoryById.has(String(row.category_id))) {
-        mapped.category = categoryById.get(String(row.category_id));
-      }
-      if (row.collection_id && collectionById.has(String(row.collection_id))) {
-        mapped.collectionName = collectionById.get(String(row.collection_id));
-      }
-      return mapped;
-    });
+    // Soft-removed products stay in DB for sales/inventory history but leave the catalog UI.
+    const products = (rawProducts || [])
+      .filter((row) => row.is_active !== false)
+      .map((row) => {
+        const mapped = mapProductFromDb(row);
+        mapped.category_id = row.category_id ? String(row.category_id) : null;
+        mapped.collection_id = row.collection_id ? String(row.collection_id) : null;
+        if (row.category_id && categoryById.has(String(row.category_id))) {
+          mapped.category = categoryById.get(String(row.category_id));
+        }
+        if (row.collection_id && collectionById.has(String(row.collection_id))) {
+          mapped.collectionName = collectionById.get(String(row.collection_id));
+        }
+        return mapped;
+      });
 
     return { products, categories, collections };
   } catch (err) {
