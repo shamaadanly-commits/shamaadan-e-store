@@ -1,9 +1,41 @@
 /**
- * Shamaadan service worker — installable PWA, network-first cache, Web Push.
+ * Shamaadan service worker — offline shell for Admin + POS, Web Push.
+ * First open online caches assets; later visits work offline.
  */
-const CACHE = 'shamaadan-v2';
+const CACHE = 'shamaadan-v3-offline';
 
-self.addEventListener('install', () => {
+const PRECACHE = [
+  '/',
+  '/index.html',
+  '/manifest.webmanifest',
+  '/css/base.css',
+  '/css/dashboard.css',
+  '/css/pos.css',
+  '/css/mobile-perf.css',
+  '/css/storefront/fonts.css',
+  '/js/router.js',
+  '/js/config/domains.js',
+  '/js/config/supabase.js',
+  '/js/shared/offline.js',
+  '/js/shared/auth-client.js',
+  '/js/shared/format.js',
+  '/js/shared/brand.js',
+  '/js/shared/ids.js',
+  '/js/shared/barcode.js',
+  '/js/shared/stock-status.js',
+  '/js/dashboard.js',
+  '/assets/images/logo.png',
+  '/assets/images/iwanzazapersonal-Regular.otf',
+];
+
+function isEsmCdn(url) {
+  return url.hostname === 'esm.sh' || url.hostname.endsWith('.esm.sh');
+}
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => cache.addAll(PRECACHE).catch(() => undefined)),
+  );
   self.skipWaiting();
 });
 
@@ -16,25 +48,88 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+/**
+ * @param {Request} request
+ * @param {Response} response
+ */
+function putCache(request, response) {
+  if (!response || !response.ok) return;
+  const copy = response.clone();
+  caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => undefined);
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith('/api/')) return;
 
-  event.respondWith(
-    fetch(request)
+  // Cache CDN modules (Supabase client, scanner libs) for offline boots
+  if (isEsmCdn(url)) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE);
+      const cached = await cache.match(request);
+      try {
+        const response = await fetch(request);
+        if (response.ok) await cache.put(request, response.clone());
+        return response;
+      } catch (err) {
+        if (cached) return cached;
+        throw err;
+      }
+    })());
+    return;
+  }
+
+  if (url.origin !== self.location.origin) return;
+
+  // Auth / mutating APIs stay network-only
+  if (url.pathname.startsWith('/api/') && url.pathname !== '/api/env.js') return;
+
+  // App shell navigations
+  if (request.mode === 'navigate') {
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(request);
+        putCache(request, response);
+        putCache(new Request('/'), response.clone());
+        return response;
+      } catch {
+        return (await caches.match('/index.html'))
+          || (await caches.match('/'))
+          || Response.error();
+      }
+    })());
+    return;
+  }
+
+  // Static assets + env: stale-while-revalidate
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE);
+    const cached = await cache.match(request);
+    const networkPromise = fetch(request)
       .then((response) => {
-        if (response && response.ok && response.type === 'basic') {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
+        if (response && response.ok && (response.type === 'basic' || response.type === 'cors')) {
+          cache.put(request, response.clone()).catch(() => undefined);
         }
         return response;
       })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match('/'))),
-  );
+      .catch(() => null);
+
+    if (cached) {
+      networkPromise.catch(() => undefined);
+      return cached;
+    }
+
+    const network = await networkPromise;
+    if (network) return network;
+
+    if (url.pathname.startsWith('/js/') || url.pathname.startsWith('/css/')) {
+      return (await caches.match('/index.html')) || Response.error();
+    }
+
+    return Response.error();
+  })());
 });
 
 self.addEventListener('push', (event) => {

@@ -7,6 +7,12 @@ import { getSharedDashboardState, LEDGER_METRICS } from '../dashboard.js';
 import { formatLyd } from '../shared/format.js';
 import { fetchSession, loginAdmin, logout, changeAdminPasswordClient, changePosPinClient, changeAdminPinClient } from '../shared/auth-client.js';
 import { isLiveDbId } from '../shared/ids.js';
+import {
+  bindConnectivity,
+  isOnline,
+  loadOfflineCatalog,
+  persistEnv,
+} from '../shared/offline.js';
 import { bindImageUploader } from './image-upload.js';
 import {
   fetchAdminCatalog,
@@ -146,6 +152,13 @@ export async function mount(root) {
   };
 
   const session = await fetchSession('admin');
+  persistEnv();
+  bindConnectivity(root, {
+    onOnline: async () => {
+      if (currentUser) await refreshFromSupabase();
+    },
+  });
+
   if (session.authenticated && session.user) {
     currentUser = session.user;
     unlock();
@@ -217,7 +230,7 @@ export async function mount(root) {
    * Prefer this over calling hydrateCatalog directly after mutations.
    */
   async function refreshFromSupabase() {
-    if (!isSupabaseReady()) {
+    if (!isSupabaseReady() && !loadOfflineCatalog()) {
       console.warn('[admin] Supabase not configured — using local catalog only');
       renderAll(state.getSnapshot(), { withForms: false });
       return;
@@ -238,9 +251,17 @@ export async function mount(root) {
         renderCatalogForm();
         renderWasteForm();
       }
-      refreshWebsiteOrders();
+      if (catalog.source !== 'offline' && isOnline()) {
+        refreshWebsiteOrders();
+      }
     } catch (err) {
       console.error('[admin] refreshFromSupabase failed:', err);
+      const cached = loadOfflineCatalog();
+      if (cached) {
+        if (typeof state.hydrateCatalog === 'function') state.hydrateCatalog(cached);
+        renderAll(state.getSnapshot(), { withForms: false });
+        return;
+      }
       window.alert(err?.message || 'Failed to sync catalog from Supabase.');
       renderAll(state.getSnapshot(), { withForms: false });
     }

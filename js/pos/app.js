@@ -18,6 +18,15 @@ import { getSharedDashboardState, toPosCatalogRow } from '../dashboard.js';
 import { formatLyd } from '../shared/format.js';
 import { BRAND, logoImg } from '../shared/brand.js';
 import { fetchSession, loginPosPin, logout, verifyAdminPin } from '../shared/auth-client.js';
+import {
+  bindConnectivity,
+  enqueueOfflineSale,
+  flushOfflineSalesQueue,
+  isOnline,
+  loadOfflineCatalog,
+  persistEnv,
+  saveOfflineCatalog,
+} from '../shared/offline.js';
 import { createCartState } from './cart-state.js';
 import { createDashboard, renderDashboard } from './dashboard.js';
 import { createBarcodeScanner } from './scanner.js';
@@ -109,9 +118,42 @@ async function mountRegister(root, staff) {
           stockQuantity: Number(row.stock_quantity ?? row.stock ?? 0),
           imageUrls: row.image_urls ?? (row.image_url ? [row.image_url] : []),
         }));
+        saveOfflineCatalog({
+          products: catalog.map((p) => ({
+            id: p.id,
+            barcode: p.barcode,
+            title: p.name,
+            name: p.name,
+            category: p.category,
+            collectionName: p.category,
+            retailPrice: p.price,
+            costPrice: p.cost,
+            stockQuantity: p.stock,
+            imageUrls: p.image ? [p.image] : [],
+          })),
+          categories: [],
+          collections: [],
+        });
       }
     } catch {
-      // Use shared dashboard catalog
+      // Use shared dashboard catalog / offline cache below
+    }
+  }
+
+  if (!catalog.length) {
+    const cached = loadOfflineCatalog();
+    if (cached?.products?.length) {
+      catalog = cached.products.map((row) => toPosCatalogRow({
+        id: row.id,
+        barcode: row.barcode,
+        title: row.title || row.name,
+        collectionName: row.collectionName || row.category || 'General',
+        category: row.category || 'General',
+        retailPrice: Number(row.retailPrice ?? row.price ?? 0),
+        costPrice: Number(row.costPrice ?? row.cost ?? 0),
+        stockQuantity: Number(row.stockQuantity ?? row.stock ?? 0),
+        imageUrls: row.imageUrls ?? (row.image_url ? [row.image_url] : []),
+      }));
     }
   }
 
@@ -121,6 +163,7 @@ async function mountRegister(root, staff) {
   /** @type {string | null} */
   let activeOpenTicketId = null;
 
+  persistEnv();
   root.innerHTML = buildShell(categories, staff);
 
   const els = {
@@ -161,6 +204,22 @@ async function mountRegister(root, staff) {
     });
   }
 
+  async function flushOfflinePosSales() {
+    if (!isOnline() || !isSupabaseConfigured()) return;
+    const result = await flushOfflineSalesQueue(async (entry) => {
+      try {
+        await createOrder(entry.order, entry.items);
+        return true;
+      } catch (err) {
+        console.warn('[pos] offline sale sync failed:', err?.message || err);
+        return false;
+      }
+    });
+    if (result.synced > 0) {
+      showToast(els.toast, `Synced ${result.synced} offline sale${result.synced === 1 ? '' : 's'}`);
+    }
+  }
+
   async function fetchLiveCatalogRows() {
     if (!supabase) return [];
     try {
@@ -199,6 +258,15 @@ async function mountRegister(root, staff) {
   function refreshCatalog() {
     renderProductGrid(els.grid, cart.getSnapshot().catalog, searchQuery, activeCategory);
   }
+
+  bindConnectivity(root, {
+    onOnline: async () => {
+      await flushOfflinePosSales();
+      await syncCartStockFromServer();
+      refreshCatalog();
+    },
+  });
+  flushOfflinePosSales().catch(() => undefined);
 
   function handleBarcode(code) {
     const result = cart.addByBarcode(code);
@@ -908,22 +976,56 @@ async function mountRegister(root, staff) {
         }
 
         let invoiceNo = '';
-        if (isSupabaseConfigured()) {
-          const result = await createOrder({
-            source: 'pos',
-            status: 'completed',
-            total_amount: snapshot.total,
-            subtotal_amount: snapshot.subtotal,
-            discount_amount: snapshot.discount,
-            notes: snapshot.discount > 0 ? `Discount ${snapshot.discount.toFixed(2)} LYD` : null,
-            staff_user_id: staff.id,
-            staff_name: staff.displayName || staff.username,
-            payment_method: payment.payment_method,
-            payment_status: payment.payment_status,
-            payment_reference: payment.payment_reference,
-            payment_date: payment.payment_date,
-          }, ticketItemsPayload(snapshot.items));
-          invoiceNo = result?.order?.invoice_number || '';
+        let offlineQueued = false;
+        if (isSupabaseConfigured() && isOnline()) {
+          try {
+            const result = await createOrder({
+              source: 'pos',
+              status: 'completed',
+              total_amount: snapshot.total,
+              subtotal_amount: snapshot.subtotal,
+              discount_amount: snapshot.discount,
+              notes: snapshot.discount > 0 ? `Discount ${snapshot.discount.toFixed(2)} LYD` : null,
+              staff_user_id: staff.id,
+              staff_name: staff.displayName || staff.username,
+              payment_method: payment.payment_method,
+              payment_status: payment.payment_status,
+              payment_reference: payment.payment_reference,
+              payment_date: payment.payment_date,
+            }, ticketItemsPayload(snapshot.items));
+            invoiceNo = result?.order?.invoice_number || '';
+          } catch (err) {
+            console.warn('[pos] online charge failed — queueing offline:', err?.message || err);
+            offlineQueued = true;
+          }
+        } else if (isSupabaseConfigured()) {
+          offlineQueued = true;
+        }
+
+        if (offlineQueued) {
+          const offlineId = `OFF-${Date.now().toString(36).toUpperCase()}`;
+          enqueueOfflineSale({
+            id: offlineId,
+            order: {
+              source: 'pos',
+              status: 'completed',
+              total_amount: snapshot.total,
+              subtotal_amount: snapshot.subtotal,
+              discount_amount: snapshot.discount,
+              notes: [
+                snapshot.discount > 0 ? `Discount ${snapshot.discount.toFixed(2)} LYD` : null,
+                'Queued offline',
+              ].filter(Boolean).join(' · ') || 'Queued offline',
+              staff_user_id: staff.id,
+              staff_name: staff.displayName || staff.username,
+              payment_method: payment.payment_method,
+              payment_status: payment.payment_status,
+              payment_reference: payment.payment_reference,
+              payment_date: payment.payment_date,
+            },
+            items: ticketItemsPayload(snapshot.items),
+          });
+          invoiceNo = offlineId;
         }
 
         const sale = cart.checkout();
@@ -939,6 +1041,7 @@ async function mountRegister(root, staff) {
             paymentMethod: payment.payment_method,
             paymentReference: payment.payment_reference || null,
             paymentDate: payment.payment_date || null,
+            offline: offlineQueued,
           };
           centralState.recordPosSale({
             ...sale,
@@ -948,6 +1051,9 @@ async function mountRegister(root, staff) {
           });
           dashboard.refresh();
           showSaleComplete(root, receiptSale, els.toast);
+          if (offlineQueued) {
+            showToast(els.toast, 'Saved offline — will sync when online');
+          }
           root.classList.remove('pos--m-ticket');
           setActiveMTab('products');
           await refreshOpenTicketBadge();

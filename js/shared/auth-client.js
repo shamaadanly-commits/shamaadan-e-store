@@ -1,7 +1,12 @@
 /**
  * Client auth helpers — talks to unified /api/auth?action=…
- * Falls back to offline demo when serverless routes are unavailable.
+ * Falls back to remembered offline credentials when the network is down.
  */
+import {
+  rememberOfflineLogin,
+  tryOfflineAdminLogin,
+  tryOfflinePosLogin,
+} from './offline.js';
 
 const LOCAL_ADMIN_KEY = 'shamaadan_admin_session_local';
 const LOCAL_POS_KEY = 'shamaadan_pos_session_local';
@@ -40,6 +45,13 @@ async function apiSafe(path, init = {}) {
   } catch {
     return { res: null, data: null, unreachable: true };
   }
+}
+
+function saveLocalSession(key, user, hours) {
+  sessionStorage.setItem(key, JSON.stringify({
+    user,
+    exp: new Date(Date.now() + hours * 60 * 60 * 1000).toISOString(),
+  }));
 }
 
 function demoAdminCredentials() {
@@ -95,11 +107,22 @@ export async function loginAdmin(username, password) {
   if (!unreachable && res) {
     if (res.ok && data?.ok) {
       sessionStorage.removeItem(LOCAL_ADMIN_KEY);
+      await rememberOfflineLogin('admin', {
+        username,
+        password,
+        user: data.user,
+      });
       return { ok: true, user: data.user, source: data.source || 'server' };
     }
     if (res.status === 401 || res.status === 400) {
       return { ok: false, error: data?.error || 'Invalid username or password' };
     }
+  }
+
+  const offline = await tryOfflineAdminLogin(username, password);
+  if (offline.ok) {
+    saveLocalSession(LOCAL_ADMIN_KEY, offline.user, 12);
+    return offline;
   }
 
   const demo = demoAdminCredentials();
@@ -110,14 +133,12 @@ export async function loginAdmin(username, password) {
       role: 'admin',
       displayName: 'Administrator',
     };
-    sessionStorage.setItem(LOCAL_ADMIN_KEY, JSON.stringify({
-      user,
-      exp: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
-    }));
+    saveLocalSession(LOCAL_ADMIN_KEY, user, 12);
+    await rememberOfflineLogin('admin', { username, password, user });
     return { ok: true, user, source: 'local' };
   }
 
-  return { ok: false, error: 'Invalid username or password' };
+  return { ok: false, error: offline.error || 'Invalid username or password' };
 }
 
 /**
@@ -133,11 +154,21 @@ export async function loginPosPin(pin) {
   if (!unreachable && res) {
     if (res.ok && data?.ok) {
       sessionStorage.removeItem(LOCAL_POS_KEY);
+      await rememberOfflineLogin('pos', {
+        pin: digits,
+        user: data.user,
+      });
       return { ok: true, user: data.user, source: data.source || 'server' };
     }
     if (res.status === 401 || res.status === 400) {
       return { ok: false, error: data?.error || 'Invalid PIN' };
     }
+  }
+
+  const offline = await tryOfflinePosLogin(digits);
+  if (offline.ok) {
+    saveLocalSession(LOCAL_POS_KEY, offline.user, 16);
+    return offline;
   }
 
   if (digits === demoStaffPin()) {
@@ -147,14 +178,12 @@ export async function loginPosPin(pin) {
       role: 'staff',
       displayName: demoStaffName(),
     };
-    sessionStorage.setItem(LOCAL_POS_KEY, JSON.stringify({
-      user,
-      exp: new Date(Date.now() + 16 * 60 * 60 * 1000).toISOString(),
-    }));
+    saveLocalSession(LOCAL_POS_KEY, user, 16);
+    await rememberOfflineLogin('pos', { pin: digits, user });
     return { ok: true, user, source: 'local' };
   }
 
-  return { ok: false, error: 'Invalid PIN' };
+  return { ok: false, error: offline.error || 'Invalid PIN' };
 }
 
 /**
@@ -204,7 +233,16 @@ export async function changeAdminPasswordClient(input) {
     body: JSON.stringify(input),
   });
   if (unreachable || !res) return { ok: false, error: 'Auth server unreachable' };
-  if (res.ok && data?.ok) return { ok: true, message: data.message };
+  if (res.ok && data?.ok) {
+    if (input?.newPassword) {
+      await rememberOfflineLogin('admin', {
+        username: input.username,
+        password: input.newPassword,
+        user: { id: 'admin', username: String(input.username || 'admin').toLowerCase(), role: 'admin', displayName: 'Administrator' },
+      });
+    }
+    return { ok: true, message: data.message };
+  }
   return { ok: false, error: data?.error || 'Could not update password' };
 }
 
@@ -218,7 +256,20 @@ export async function changePosPinClient(input) {
     body: JSON.stringify(input),
   });
   if (unreachable || !res) return { ok: false, error: 'Auth server unreachable' };
-  if (res.ok && data?.ok) return { ok: true, message: data.message };
+  if (res.ok && data?.ok) {
+    if (input?.newPin) {
+      await rememberOfflineLogin('pos', {
+        pin: input.newPin,
+        user: {
+          id: 'staff',
+          username: 'cashier',
+          role: 'staff',
+          displayName: input.staffName || 'Cashier',
+        },
+      });
+    }
+    return { ok: true, message: data.message };
+  }
   return { ok: false, error: data?.error || 'Could not update POS PIN' };
 }
 

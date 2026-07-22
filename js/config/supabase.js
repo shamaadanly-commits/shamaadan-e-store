@@ -2,7 +2,7 @@
  * Shared Supabase client — single source of truth for both Storefront and POS.
  * Credentials are injected at runtime via window.__ENV__ (see /api/env.js).
  */
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
+import { createClient } from '@supabase/supabase-js';
 
 let client = null;
 

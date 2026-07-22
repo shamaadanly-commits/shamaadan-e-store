@@ -37,7 +37,29 @@
 
   <!-- Blocking /api/env.js so window.__ENV__ is ready before ES modules boot -->
   <script>window.__ENV__ = window.__ENV__ || {};</script>
+  <script>
+    try {
+      const cached = JSON.parse(localStorage.getItem('shamaadan_offline_env_v1') || 'null');
+      if (cached?.env) window.__ENV__ = { ...window.__ENV__, ...cached.env };
+    } catch (_) {}
+  </script>
   <script src="/api/env.js"></script>
+  <script>
+    try {
+      if (window.__ENV__ && Object.keys(window.__ENV__).length) {
+        const slim = {};
+        for (const [k, v] of Object.entries(window.__ENV__)) {
+          if (v == null || v === '') continue;
+          if (/SERVICE_ROLE|SECRET|PRIVATE/i.test(k)) continue;
+          slim[k] = String(v);
+        }
+        localStorage.setItem('shamaadan_offline_env_v1', JSON.stringify({
+          env: slim,
+          savedAt: new Date().toISOString(),
+        }));
+      }
+    } catch (_) {}
+  </script>
   <script type="module" src="/js/router.js"></script>
   <script>
     if ('serviceWorker' in navigator) {

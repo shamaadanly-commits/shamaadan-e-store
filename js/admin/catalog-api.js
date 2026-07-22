@@ -20,6 +20,7 @@ import {
   isSupabaseConfigured,
   mapSupabaseNetworkError,
 } from '../../shared/supabase.js';
+import { loadOfflineCatalog, saveOfflineCatalog, isOnline } from '../shared/offline.js';
 
 function assertLiveSupabase() {
   if (!isSupabaseConfigured()) {
@@ -34,9 +35,15 @@ function assertLiveSupabase() {
  * Pull live catalog from Supabase into dashboard-friendly shapes.
  */
 export async function fetchAdminCatalog() {
-  assertLiveSupabase();
+  if (!isSupabaseConfigured() || !isOnline()) {
+    const cached = loadOfflineCatalog();
+    if (cached) return { ...cached, source: 'offline' };
+    if (!isSupabaseConfigured()) assertLiveSupabase();
+    throw new Error('Offline and no cached catalog yet. Open Admin once while online.');
+  }
 
   try {
+    assertLiveSupabase();
     const [rawProducts, rawCategories, rawCollections] = await Promise.all([
       getProducts(),
       getCategories().catch((err) => {
@@ -80,8 +87,15 @@ export async function fetchAdminCatalog() {
         return mapped;
       });
 
-    return { products, categories, collections };
+    const catalog = { products, categories, collections, source: 'live' };
+    saveOfflineCatalog(catalog);
+    return catalog;
   } catch (err) {
+    const cached = loadOfflineCatalog();
+    if (cached) {
+      console.warn('[catalog-api] live catalog failed — using offline cache:', err?.message || err);
+      return { ...cached, source: 'offline' };
+    }
     throw mapSupabaseNetworkError(err, 'loading catalog');
   }
 }

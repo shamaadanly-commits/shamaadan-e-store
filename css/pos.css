@@ -68,6 +68,20 @@
   color: var(--pos-bg);
 }
 
+.offline-banner {
+  grid-column: 1 / -1;
+  z-index: 40;
+  padding: 0.45rem 0.85rem;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #1a1208;
+  background: linear-gradient(90deg, #e0b34d, #c9a84c);
+  border-bottom: 1px solid rgb(0 0 0 / 20%);
+}
+
 /* ── Top bar ─────────────────────────────────────────────────────── */
 .pos__topbar {
   display: flex;
