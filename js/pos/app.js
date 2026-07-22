@@ -419,6 +419,7 @@ async function mountRegister(root, staff) {
           subtotal_amount: snapshot.subtotal,
           discount_amount: snapshot.discount,
           notes: snapshot.discount > 0 ? `Discount ${snapshot.discount.toFixed(2)} LYD` : null,
+        }, ticketItemsPayload(snapshot.items));
 
         modal.remove();
         cart.clear({ restoreStock: false });
