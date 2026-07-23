@@ -1,11 +1,10 @@
 /**
  * Order confirmation email via Resend.
  *
- * Env:
- *   RESEND_API_KEY     — required to send
- *   RESEND_FROM_EMAIL  — e.g. "Shamaadan <orders@shamaadan.ly>"
- *                        (domain must be verified in Resend)
- *   ORDER_NOTIFY_EMAIL — optional shop copy (default info@shamaadan.ly)
+ * Env (set in Vercel — never commit secrets):
+ *   RESEND_API_KEY       — Resend API key (re_…)
+ *   RESEND_FROM_EMAIL    — Shamaadan <orders@orders.shamaadan.ly>
+ *   ORDER_NOTIFY_EMAIL   — info@shamaadan.ly (BCC shop copy)
  */
 
 function pickEnv(...keys) {
@@ -131,13 +130,14 @@ export async function sendOrderConfirmationEmail(order) {
     return { ok: false, skipped: true, error: 'Customer email missing' };
   }
 
-  const from = pickEnv('RESEND_FROM_EMAIL') || 'Shamaadan <onboarding@resend.dev>';
+  const from = pickEnv('RESEND_FROM_EMAIL') || 'Shamaadan <orders@orders.shamaadan.ly>';
   const notify = pickEnv('ORDER_NOTIFY_EMAIL', 'SHOP_NOTIFY_EMAIL') || 'info@shamaadan.ly';
   const invoice = String(order.invoiceNumber || 'order').trim();
 
   const payload = {
     from,
     to: [to],
+    reply_to: notify,
     subject: `Shamaadan order ${invoice}`,
     html: buildOrderEmailHtml(order),
   };
