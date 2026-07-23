@@ -1,7 +1,7 @@
 /**
  * Printable website order invoice — Arabic, brand font + logo.
  */
-import { formatLyd } from '../shared/format.js';
+import { formatLyd, formatPhoneArabic } from '../shared/format.js';
 import { BRAND, printAssetUrls, printFontFaceCss } from '../shared/brand.js';
 
 function escapeHtml(value) {
@@ -232,7 +232,7 @@ export function buildWebsiteOrderPrintHtml(order, items = []) {
       <div class="card">
         <h2>العميل</h2>
         <p><strong>${escapeHtml(order?.customer_name || '—')}</strong></p>
-        <p><span class="label">الهاتف</span> ${escapeHtml(order?.customer_phone || '—')}</p>
+        <p><span class="label">الهاتف</span> ${escapeHtml(formatPhoneArabic(order?.customer_phone))}</p>
         <p><span class="label">البريد</span> ${escapeHtml(order?.customer_email || '—')}</p>
       </div>
       <div class="card">
@@ -265,7 +265,7 @@ export function buildWebsiteOrderPrintHtml(order, items = []) {
 
     <div class="footer">
       <div>شمعدان · بنغازي، شارع البندقية، تقاطع ماي هوم</div>
-      <div>هاتف 091-0229971 · info@shamaadan.ly</div>
+      <div>هاتف ${escapeHtml(formatPhoneArabic(BRAND.phone))} · ${escapeHtml(BRAND.email)}</div>
     </div>
   </div>
   <script>

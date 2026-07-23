@@ -28,6 +28,29 @@ export function formatLyd(amount) {
   return formatCurrency(amount, 'LYD');
 }
 
+/**
+ * Convert Western digits 0-9 to Arabic-Indic digits ٠-٩ (for print labels).
+ * Keeps separators like + - ( ) and spaces.
+ * @param {string|number|null|undefined} value
+ * @returns {string}
+ */
+export function toArabicDigits(value) {
+  const western = '0123456789';
+  const arabic = '٠١٢٣٤٥٦٧٨٩';
+  return String(value ?? '').replace(/[0-9]/g, (d) => arabic[western.indexOf(d)] ?? d);
+}
+
+/**
+ * Format a phone number with Arabic-Indic digits for printed receipts.
+ * @param {string|number|null|undefined} phone
+ * @returns {string}
+ */
+export function formatPhoneArabic(phone) {
+  const raw = String(phone ?? '').trim();
+  if (!raw) return '—';
+  return toArabicDigits(raw);
+}
+
 export function formatCount(value) {
   return new Intl.NumberFormat('en-US').format(value);
 }

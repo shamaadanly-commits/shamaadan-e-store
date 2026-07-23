@@ -6,6 +6,8 @@ import { PRINT_LOGO_DATA_URI, PRINT_FONT_DATA_URI } from './print-assets.js';
 export const BRAND = {
   name: 'Shamaadan',
   nameAr: 'شمعدان',
+  phone: '091-0229971',
+  email: 'info@shamaadan.ly',
   logo: '/assets/images/logo.png',
   font: '/assets/images/iwanzazapersonal-Regular.otf',
   logoWidth: 1080,

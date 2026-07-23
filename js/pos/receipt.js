@@ -1,8 +1,9 @@
 /**
  * POS receipt printing — Arabic thermal-friendly receipt with brand font + logo.
  */
-import { formatLyd } from '../shared/format.js';
+import { formatLyd, formatPhoneArabic } from '../shared/format.js';
 import { BRAND, printAssetUrls, printFontFaceCss } from '../shared/brand.js';
+
 
 /**
  * @typedef {object} ReceiptLine
@@ -233,6 +234,7 @@ export function buildReceiptHtml(sale) {
     ${payDate ? `<p class="pay"><strong>تاريخ التحويل:</strong> ${escapeHtml(payDate)}</p>` : ''}
     ` : ''}
     <p class="thanks">شكراً لتسوقكم من شمعدان</p>
+    <p class="muted center" style="margin-top:8px;">هاتف ${escapeHtml(formatPhoneArabic(BRAND.phone))}</p>
     <div class="actions">
       <button type="button" onclick="window.print()">طباعة الإيصال</button>
       <button type="button" class="secondary" onclick="window.close()">إغلاق</button>
@@ -461,6 +463,7 @@ export function buildRefundReceiptHtml(refund) {
     <p class="pay"><strong>طريقة الدفع الأصلية:</strong> ${escapeHtml(payLabel)}</p>
     ` : ''}
     <p class="thanks">تم إرجاع المبلغ للعميل</p>
+    <p class="muted center" style="margin-top:8px;">هاتف ${escapeHtml(formatPhoneArabic(BRAND.phone))}</p>
     <div class="actions">
       <button type="button" onclick="window.print()">طباعة فاتورة المرتجع</button>
       <button type="button" class="secondary" onclick="window.close()">إغلاق</button>
