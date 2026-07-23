@@ -80,6 +80,7 @@ import {
   websiteOrdersTableHtml,
   websiteOrderDetailHtml,
 } from './template.js';
+import { printWebsiteOrder } from './order-print.js';
 
 /**
  * @param {HTMLElement} root
@@ -572,6 +573,18 @@ export async function mount(root) {
       return;
     }
 
+    if (target.closest('[data-print-web-order]')) {
+      const id = target.closest('[data-print-web-order]').getAttribute('data-print-web-order');
+      if (!id) return;
+      try {
+        const { order, items } = await getWebsiteOrderDetail(id);
+        printWebsiteOrder(order, items);
+      } catch (err) {
+        window.alert(err?.message || 'Could not load order for printing.');
+      }
+      return;
+    }
+
     const webOrderRow = target.closest('[data-view-web-order]');
     if (webOrderRow) {
       await openOrderModal(webOrderRow.getAttribute('data-view-web-order'));
@@ -593,11 +606,12 @@ export async function mount(root) {
 
     if (target.closest('[data-cancel-web-order]')) {
       const id = target.closest('[data-cancel-web-order]').getAttribute('data-cancel-web-order');
-      if (!id || !confirm('Cancel this website order?')) return;
+      if (!id || !confirm('Cancel this website order? Stock will be returned to inventory.')) return;
       try {
         await updateWebsiteOrderStatus(id, 'cancelled');
         closeOrderModal();
         await refreshWebsiteOrders();
+        await refreshFromSupabase();
       } catch (err) {
         window.alert(err?.message || 'Could not cancel order.');
       }

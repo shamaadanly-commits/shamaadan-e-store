@@ -817,6 +817,31 @@ export async function logInventoryTransaction(tx) {
 }
 
 /**
+ * Insert inventory rows that put stock back (void / cancel / refund).
+ * Falls back to type `restock` if the DB check constraint does not allow
+ * `refund` / `park_void` yet.
+ * @param {Array<{ product_id: string, quantity_changed: number, type: string, source?: string, notes?: string }>} rows
+ */
+async function insertInventoryRestoreRows(rows) {
+  const list = (rows || []).filter(
+    (row) => row?.product_id && Number(row.quantity_changed) > 0,
+  );
+  if (!list.length) return;
+
+  const { error } = await getSupabase().from('inventory_transactions').insert(list);
+  if (!error) return;
+
+  if (/type_check|refund|park_void|inventory_transactions_type/i.test(error.message)) {
+    const fallback = list.map((row) => ({ ...row, type: 'restock' }));
+    const retry = await getSupabase().from('inventory_transactions').insert(fallback);
+    if (!retry.error) return;
+    throw new Error(`Could not restore stock: ${retry.error.message}`);
+  }
+
+  throw new Error(`Could not restore stock: ${error.message}`);
+}
+
+/**
  * Create a sale: orders → order_items → inventory_transactions (stock via trigger).
  * Pass status: 'open' | 'parked' to park a ticket (still reserves stock).
  * @param {{
@@ -1104,21 +1129,13 @@ export async function cancelOpenTicket(orderId) {
   const items = (ticket.order_items || []).filter((item) => item.product_id && Number(item.quantity) > 0);
 
   if (items.length) {
-    const restoreRows = items.map((item) => ({
+    await insertInventoryRestoreRows(items.map((item) => ({
       product_id: item.product_id,
       quantity_changed: Math.abs(Number(item.quantity)),
       type: 'park_void',
       source: 'pos',
       notes: `Voided parked ticket ${ticket.id}`,
-    }));
-
-    const { error: inventoryError } = await getSupabase()
-      .from('inventory_transactions')
-      .insert(restoreRows);
-
-    if (inventoryError) {
-      throw new Error(`Could not restore stock: ${inventoryError.message}`);
-    }
+    })));
   }
 
   const now = new Date().toISOString();
@@ -1323,26 +1340,13 @@ export async function refundPosOrder(orderId, opts = {}) {
   if (!targets.length) throw new Error('Nothing left to refund on this invoice.');
 
   const invoice = order.invoice_number || order.id;
-  const restoreRows = targets.map(({ item, qty }) => ({
+  await insertInventoryRestoreRows(targets.map(({ item, qty }) => ({
     product_id: item.product_id,
     quantity_changed: Math.abs(qty),
     type: 'refund',
     source: 'pos',
     notes: `Refund ${invoice}${orderItemId ? ` · line ${item.product_name || item.id}` : ''}`,
-  }));
-
-  const { error: inventoryError } = await getSupabase()
-    .from('inventory_transactions')
-    .insert(restoreRows);
-
-  if (inventoryError) {
-    if (/refund|inventory_transactions_type_check/i.test(inventoryError.message)) {
-      throw new Error(
-        'Refund blocked by database rules. Run sql/pos_refund.sql in the Supabase SQL Editor.',
-      );
-    }
-    throw new Error(`Could not restore stock: ${inventoryError.message}`);
-  }
+  })));
 
   const now = new Date().toISOString();
   let refundAmount = 0;
@@ -1396,7 +1400,24 @@ export async function refundPosOrder(orderId, opts = {}) {
 
   if (error) throw new Error(error.message);
   if (!data) throw new Error('Sale could not be updated (already refunded?).');
-  return data;
+
+  return {
+    order: data,
+    refund: {
+      invoiceNumber: invoice,
+      amount: refundAmount,
+      partial: Boolean(orderItemId) || !fullyRefunded,
+      fullyRefunded,
+      refundedAt: now,
+      paymentMethod: order.payment_method || null,
+      cashier: order.staff_name || null,
+      lines: targets.map(({ item, qty }) => ({
+        title: item.product_name || 'Item',
+        quantity: qty,
+        unitPrice: Number(item.unit_price) || 0,
+      })),
+    },
+  };
 }
 
 // ── Website orders (online storefront) ──────────────────────────────
@@ -1447,6 +1468,7 @@ export async function getWebsiteOrderDetail(orderId) {
 
 /**
  * Update status on a website order (pending → completed / cancelled).
+ * Cancelling restores inventory for orders that already deducted stock.
  * @param {string} orderId
  * @param {'pending'|'paid'|'completed'|'cancelled'} status
  */
@@ -1456,6 +1478,31 @@ export async function updateWebsiteOrderStatus(orderId, status) {
   if (!id) throw new Error('Order id is required.');
   if (!['pending', 'paid', 'completed', 'cancelled'].includes(next)) {
     throw new Error('Invalid order status.');
+  }
+
+  const { order, items } = await getWebsiteOrderDetail(id);
+  const current = String(order?.status || '').trim();
+
+  if (next === 'cancelled') {
+    if (current === 'cancelled') return order;
+
+    // Website checkout deducts stock for pending / paid / completed.
+    const stockAlreadyTaken = ['pending', 'paid', 'completed'].includes(current);
+    if (stockAlreadyTaken) {
+      const restoreItems = (items || []).filter(
+        (item) => item.product_id && Number(item.quantity) > 0,
+      );
+      if (restoreItems.length) {
+        const invoice = order.invoice_number || order.id;
+        await insertInventoryRestoreRows(restoreItems.map((item) => ({
+          product_id: item.product_id,
+          quantity_changed: Math.abs(Number(item.quantity)),
+          type: 'refund',
+          source: 'online',
+          notes: `Cancelled website order ${invoice}`,
+        })));
+      }
+    }
   }
 
   const now = new Date().toISOString();

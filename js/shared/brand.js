@@ -3,10 +3,43 @@
  */
 export const BRAND = {
   name: 'Shamaadan',
+  nameAr: 'شمعدان',
   logo: '/assets/images/logo.png',
+  font: '/assets/images/iwanzazapersonal-Regular.otf',
   logoWidth: 1080,
   logoHeight: 1080,
 };
+
+/**
+ * Absolute asset URLs for print windows (about:blank has no base path).
+ * @returns {{ logo: string, font: string, origin: string }}
+ */
+export function printAssetUrls() {
+  const origin = typeof window !== 'undefined' && window.location?.origin
+    ? window.location.origin
+    : '';
+  return {
+    origin,
+    logo: `${origin}${BRAND.logo}`,
+    font: `${origin}${BRAND.font}`,
+  };
+}
+
+/**
+ * @font-face CSS for Iwanzaza Personal in print documents.
+ * @param {string} fontUrl
+ */
+export function printFontFaceCss(fontUrl) {
+  return `
+    @font-face {
+      font-family: 'Iwanzaza Personal';
+      src: url('${fontUrl}') format('opentype');
+      font-weight: 400;
+      font-style: normal;
+      font-display: block;
+    }
+  `;
+}
 
 /**
  * Render the brand logo image with explicit dimensions to prevent CLS.
@@ -15,12 +48,14 @@ export const BRAND = {
  * @param {'header' | 'footer' | 'hero' | 'ritual' | 'mark'} [opts.size]
  * @param {string} [opts.alt]
  * @param {'eager' | 'lazy'} [opts.loading]
+ * @param {string} [opts.src]
  */
 export function logoImg({
   className = '',
   size = 'header',
   alt = BRAND.name,
   loading = 'lazy',
+  src = BRAND.logo,
 } = {}) {
   const sizes = {
     header: 44,
@@ -33,7 +68,7 @@ export function logoImg({
   const px = sizes[size] ?? sizes.header;
 
   return `<img
-    src="${BRAND.logo}"
+    src="${src}"
     alt="${alt}"
     class="${className}"
     width="${px}"

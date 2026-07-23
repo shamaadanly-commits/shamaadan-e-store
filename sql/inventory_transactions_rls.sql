@@ -24,11 +24,12 @@ create policy "inventory_transactions_delete_all" on public.inventory_transactio
 
 -- ── Allowed transaction types ────────────────────────────────────────
 -- Keep this list in sync with the values the app writes:
---   'sale'       — completed in-store sale        (shared/supabase.js createSale)
---   'park'       — parked ticket reserves stock   (shared/supabase.js createSale)
---   'park_void'  — void parked ticket, restore    (shared/supabase.js cancelOpenTicket)
---   'restock'    — manual +1 stock in dashboard   (dashboard/dashboard.js)
---   'adjustment' — default manual adjustment      (shared/supabase.js addInventoryTransaction)
+--   'sale'       — completed in-store / website sale
+--   'park'       — parked ticket reserves stock
+--   'park_void'  — void parked ticket, restore
+--   'restock'    — manual +1 stock / restore fallback
+--   'adjustment' — default manual adjustment
+--   'refund'     — POS or website cancel/refund restore
 --
 -- Added as NOT VALID so pre-existing rows are never rejected; it is
 -- enforced for all new inserts/updates. Run the VALIDATE line afterwards
@@ -38,7 +39,7 @@ alter table public.inventory_transactions
 
 alter table public.inventory_transactions
   add constraint inventory_transactions_type_check
-  check (type in ('sale', 'park', 'park_void', 'restock', 'adjustment'))
+  check (type in ('sale', 'park', 'park_void', 'restock', 'adjustment', 'refund'))
   not valid;
 
 -- Optional: enforce against existing rows too (will error if any row has

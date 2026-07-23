@@ -30,7 +30,7 @@ import {
 import { createCartState } from './cart-state.js';
 import { createDashboard, renderDashboard } from './dashboard.js';
 import { createBarcodeScanner } from './scanner.js';
-import { printReceipt } from './receipt.js';
+import { printReceipt, printRefundReceipt } from './receipt.js';
 import { pinGateHtml, bindPinGate } from './pin-gate.js';
 import { ticketsPageHtml, ticketsListHtml } from './tickets-page.js';
 import {
@@ -858,6 +858,43 @@ async function mountRegister(root, staff) {
       return;
     }
 
+    if (target.closest('[data-print-refund-invoice]')) {
+      const orderId = target.closest('[data-print-refund-invoice]').getAttribute('data-print-refund-invoice');
+      if (!orderId) return;
+      try {
+        const sale = await getOpenTicket(orderId);
+        const refundedLines = (sale.order_items || [])
+          .filter((line) => (Number(line.refunded_quantity) || 0) > 0)
+          .map((line) => ({
+            title: line.product_name || 'Item',
+            quantity: Number(line.refunded_quantity) || 0,
+            unitPrice: Number(line.unit_price) || 0,
+          }));
+        if (!refundedLines.length) {
+          window.alert('No refunded items on this invoice yet.');
+          return;
+        }
+        const amount = refundedLines.reduce(
+          (sum, line) => sum + line.quantity * line.unitPrice,
+          0,
+        );
+        const fullyRefunded = String(sale.status || '') === 'refunded';
+        printRefundReceipt({
+          invoiceNumber: sale.invoice_number || sale.id,
+          amount,
+          partial: !fullyRefunded,
+          fullyRefunded,
+          refundedAt: sale.updated_at || new Date().toISOString(),
+          paymentMethod: sale.payment_method || null,
+          cashier: sale.staff_name || null,
+          lines: refundedLines,
+        });
+      } catch (err) {
+        window.alert(err?.message || 'Could not print refund invoice.');
+      }
+      return;
+    }
+
     if (target.closest('[data-refund-sale]')) {
       const btn = target.closest('[data-refund-sale]');
       const orderId = btn.dataset.refundSale;
@@ -866,11 +903,12 @@ async function mountRegister(root, staff) {
       btn.disabled = true;
       btn.textContent = 'Refunding…';
       try {
-        await refundPosOrder(orderId);
+        const result = await refundPosOrder(orderId);
         await syncCartStockFromServer();
         root.querySelector('[data-invoice-modal]')?.remove();
         showToast(els.toast, `Refunded ${invoice} · stock restored`);
         refreshCatalog();
+        if (result?.refund) printRefundReceipt(result.refund);
       } catch (err) {
         console.error('[pos] refund failed:', err);
         window.alert(err?.message || 'Refund failed.');
@@ -890,10 +928,11 @@ async function mountRegister(root, staff) {
       btn.disabled = true;
       btn.textContent = '…';
       try {
-        await refundPosOrder(orderId, { orderItemId: itemId });
+        const result = await refundPosOrder(orderId, { orderItemId: itemId });
         await syncCartStockFromServer();
         showToast(els.toast, `Refunded ${label} · stock restored`);
         refreshCatalog();
+        if (result?.refund) printRefundReceipt(result.refund);
         await showInvoiceDetail(orderId);
       } catch (err) {
         console.error('[pos] line refund failed:', err);

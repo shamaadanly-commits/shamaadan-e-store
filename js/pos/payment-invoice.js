@@ -265,6 +265,7 @@ function invoiceRowHtml(sale) {
     : (method === 'bank_transfer' || method === 'bank-transfer' ? 'Bank transfer' : '—');
   const status = String(sale.status || '');
   const canRefund = status === 'completed' && qty > 0;
+  const canOpen = status === 'completed' || status === 'refunded';
 
   return `
     <div class="pos-refund-modal__item" data-invoice-row="${escapeAttr(sale.id)}">
@@ -281,10 +282,10 @@ function invoiceRowHtml(sale) {
       </div>
       <button
         type="button"
-        class="pos-refund-modal__btn ${canRefund ? '' : 'pos-refund-modal__btn--muted'}"
+        class="pos-refund-modal__btn ${canOpen ? '' : 'pos-refund-modal__btn--muted'}"
         data-open-invoice-detail="${escapeAttr(sale.id)}"
-        ${canRefund ? '' : 'disabled'}
-      >${canRefund ? 'Open' : 'Done'}</button>
+        ${canOpen ? '' : 'disabled'}
+      >${canRefund ? 'Open' : (status === 'refunded' ? 'View' : 'Done')}</button>
     </div>`;
 }
 
@@ -327,6 +328,9 @@ export function invoiceDetailHtml(sale) {
     return qty - refunded > 0;
   });
 
+  const refundedLines = lines.filter((line) => (Number(line.refunded_quantity) || 0) > 0);
+  const hasRefunds = refundedLines.length > 0;
+
   return `
     <div class="pos-invoice-detail" data-invoice-detail>
       <button type="button" class="pos-invoice-detail__back" data-invoice-back>← Back to invoices</button>
@@ -344,6 +348,13 @@ export function invoiceDetailHtml(sale) {
         data-refund-invoice="${escapeAttr(invoice)}"
         ${anyLeft ? '' : 'disabled'}
       >Refund full invoice</button>
+      ${hasRefunds ? `
+      <button
+        type="button"
+        class="pos-refund-modal__btn"
+        style="width:100%;margin-top:0.6rem;"
+        data-print-refund-invoice="${escapeAttr(sale.id)}"
+      >Print refund invoice</button>` : ''}
     </div>`;
 }
 

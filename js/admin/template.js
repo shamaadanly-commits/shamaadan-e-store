@@ -573,6 +573,7 @@ export function websiteOrdersTableHtml(rows = []) {
             <th scope="col">Payment</th>
             <th scope="col">Status</th>
             <th scope="col">Total</th>
+            <th scope="col"></th>
           </tr>
         </thead>
         <tbody>
@@ -587,6 +588,9 @@ export function websiteOrdersTableHtml(rows = []) {
               <td>${escapeHtml(String(r.payment_method || '—').toUpperCase())}</td>
               <td>${orderStatusBadge(r.status)}</td>
               <td class="dash-table__num">${formatLyd(Number(r.total_amount || 0))}</td>
+              <td>
+                <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-print-web-order="${escapeAttr(r.id)}">Print</button>
+              </td>
             </tr>
           `).join('')}
         </tbody>
@@ -611,7 +615,7 @@ export function websiteOrderDetailHtml(order, items = []) {
     : '<tr><td colspan="4" class="dash-empty">No line items.</td></tr>';
 
   const canComplete = ['pending', 'paid'].includes(String(order?.status || ''));
-  const canCancel = ['pending', 'paid'].includes(String(order?.status || ''));
+  const canCancel = ['pending', 'paid', 'completed'].includes(String(order?.status || ''));
 
   return `
     <div class="dash-modal__backdrop" data-close-order-modal></div>
@@ -652,7 +656,8 @@ export function websiteOrderDetailHtml(order, items = []) {
       </div>
 
       <div class="dash-modal__actions">
-        ${canComplete ? `<button type="button" class="dash-btn dash-btn--primary dash-btn--sm" data-complete-web-order="${escapeAttr(order.id)}">Mark completed</button>` : ''}
+        <button type="button" class="dash-btn dash-btn--primary dash-btn--sm" data-print-web-order="${escapeAttr(order.id)}">Print order</button>
+        ${canComplete ? `<button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-complete-web-order="${escapeAttr(order.id)}">Mark completed</button>` : ''}
         ${canCancel ? `<button type="button" class="dash-btn dash-btn--danger dash-btn--sm" data-cancel-web-order="${escapeAttr(order.id)}">Cancel order</button>` : ''}
         <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-close-order-modal>Close</button>
       </div>
