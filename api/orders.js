@@ -259,6 +259,31 @@ export default async function handler(req, res) {
       console.warn('[orders] push import failed:', err?.message || err);
     }
 
+    // Fire-and-forget customer order confirmation email via Resend.
+    try {
+      const { sendOrderConfirmationEmail } = await import('../server/lib/order-email.js');
+      sendOrderConfirmationEmail({
+        to: String(customer.email || order.customer_email || '').trim(),
+        invoiceNumber,
+        customerName: order.customer_name || customer.fullName || '',
+        customerPhone: order.customer_phone || customer.phone || '',
+        customerAddress: order.customer_address || customer.address || '',
+        customerCity: order.customer_city || customer.city || '',
+        paymentMethod,
+        paymentStatus,
+        items: lineItems.map((item) => ({
+          name: item.product_name,
+          qty: item.quantity,
+          unitPrice: item.unit_price,
+        })),
+        subtotal: Number(subtotal) || 0,
+        shipping: Number(shipping) || 0,
+        total: Number(total) || Number(order.total_amount) || 0,
+      }).catch((err) => console.warn('[orders] email failed:', err?.message || err));
+    } catch (err) {
+      console.warn('[orders] email import failed:', err?.message || err);
+    }
+
     return res.status(200).json({
       ok: true,
       orderRef: invoiceNumber,

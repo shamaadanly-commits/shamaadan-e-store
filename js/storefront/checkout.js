@@ -360,6 +360,8 @@ async function placeOrderClientSide(payload) {
   }, lineItems);
 
   const orderId = result?.order?.id;
+  const invoiceNumber = result?.order?.invoice_number || result?.order?.id || '';
+
   if (orderId) {
     fetch('/api/push?action=notify-order', {
       method: 'POST',
@@ -368,7 +370,24 @@ async function placeOrderClientSide(payload) {
     }).catch(() => {});
   }
 
-  return result?.order?.invoice_number || result?.order?.id || '';
+  // Same confirmation email path used when /api/orders is unavailable.
+  if (invoiceNumber && customer.email) {
+    fetch('/api/order-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        invoiceNumber,
+        paymentMethod: payload.paymentMethod,
+        customer,
+        items: payload.items,
+        subtotal: payload.subtotal,
+        shipping: payload.shipping,
+        total: payload.total,
+      }),
+    }).catch(() => {});
+  }
+
+  return invoiceNumber;
 }
 
 function validateContact(form, errorEl, t) {
