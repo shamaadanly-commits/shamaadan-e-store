@@ -107,10 +107,14 @@ export function buildWebsiteOrderPrintHtml(order, items = []) {
     }
     .brand-block { display: flex; align-items: center; gap: 0.85rem; }
     .logo {
-      width: 72px;
-      height: 72px;
+      width: auto;
+      max-width: 88px;
+      height: 56px;
       object-fit: contain;
+      object-position: center;
       flex-shrink: 0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .brand { font-size: 1.85rem; letter-spacing: 0.02em; margin: 0; }
     .brand span {
@@ -200,7 +204,7 @@ export function buildWebsiteOrderPrintHtml(order, items = []) {
 
     <div class="top">
       <div class="brand-block">
-        <img class="logo" src="${escapeHtml(logo)}" alt="${escapeHtml(BRAND.nameAr)}" width="72" height="72">
+        <img class="logo" src="${logo}" alt="${escapeHtml(BRAND.nameAr)}" width="72" height="72">
         <div class="brand">
           ${escapeHtml(BRAND.nameAr)}
           <span>طلب من الموقع</span>

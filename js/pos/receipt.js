@@ -109,11 +109,14 @@ export function buildReceiptHtml(sale) {
     .center { text-align: center; }
     .logo {
       display: block;
-      width: 42mm;
-      max-width: 100%;
-      height: auto;
-      margin: 0 auto 6px;
+      width: auto;
+      max-width: 36mm;
+      height: 22mm;
+      margin: 0 auto 8px;
       object-fit: contain;
+      object-position: center;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .brand {
       font-size: 20px;
@@ -179,7 +182,7 @@ export function buildReceiptHtml(sale) {
 <body>
   <div class="receipt">
     <div class="center">
-      <img class="logo" src="${escapeHtml(logo)}" alt="${escapeHtml(BRAND.nameAr)}" width="200" height="200">
+      <img class="logo" src="${logo}" alt="${escapeHtml(BRAND.nameAr)}" width="112" height="112">
       <p class="brand">${escapeHtml(BRAND.nameAr)}</p>
       <p class="muted">عطور ومستلزمات المنزل</p>
       <p class="muted">${escapeHtml(register)}</p>
@@ -330,11 +333,14 @@ export function buildRefundReceiptHtml(refund) {
     .center { text-align: center; }
     .logo {
       display: block;
-      width: 42mm;
-      max-width: 100%;
-      height: auto;
-      margin: 0 auto 6px;
+      width: auto;
+      max-width: 36mm;
+      height: 22mm;
+      margin: 0 auto 8px;
       object-fit: contain;
+      object-position: center;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .brand {
       font-size: 20px;
@@ -404,7 +410,7 @@ export function buildRefundReceiptHtml(refund) {
 <body>
   <div class="receipt">
     <div class="center">
-      <img class="logo" src="${escapeHtml(logo)}" alt="${escapeHtml(BRAND.nameAr)}" width="200" height="200">
+      <img class="logo" src="${logo}" alt="${escapeHtml(BRAND.nameAr)}" width="112" height="112">
       <p class="brand">${escapeHtml(BRAND.nameAr)}</p>
       <p class="badge">فاتورة مرتجع · ${escapeHtml(kind)}</p>
       <p class="muted">عطور ومستلزمات المنزل</p>

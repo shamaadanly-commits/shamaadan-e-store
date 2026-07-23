@@ -1,6 +1,8 @@
 /**
  * Shared brand assets — used across storefront and POS.
  */
+import { PRINT_LOGO_DATA_URI, PRINT_FONT_DATA_URI } from './print-assets.js';
+
 export const BRAND = {
   name: 'Shamaadan',
   nameAr: 'شمعدان',
@@ -11,7 +13,8 @@ export const BRAND = {
 };
 
 /**
- * Absolute asset URLs for print windows (about:blank has no base path).
+ * Asset URLs for print windows.
+ * Uses embedded data URIs so logos/fonts always render in about:blank print docs.
  * @returns {{ logo: string, font: string, origin: string }}
  */
 export function printAssetUrls() {
@@ -20,8 +23,8 @@ export function printAssetUrls() {
     : '';
   return {
     origin,
-    logo: `${origin}${BRAND.logo}`,
-    font: `${origin}${BRAND.font}`,
+    logo: PRINT_LOGO_DATA_URI,
+    font: PRINT_FONT_DATA_URI,
   };
 }
 
