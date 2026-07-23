@@ -301,24 +301,36 @@ export function invoiceDetailHtml(sale) {
     const remaining = Math.max(0, qty - refunded);
     const unit = Number(line.unit_price) || 0;
     const disabled = remaining <= 0;
+    const qtyOptions = Array.from({ length: remaining }, (_, i) => i + 1)
+      .map((n) => `<option value="${n}" ${n === 1 ? 'selected' : ''}>${n}</option>`)
+      .join('');
     return `
-      <div class="pos-invoice-line">
-        <div>
+      <div class="pos-invoice-line" data-invoice-line-row="${escapeAttr(line.id)}">
+        <div class="pos-invoice-line__info">
           <p class="pos-invoice-line__name">${escapeHtml(line.product_name || 'Item')}</p>
           <p class="pos-invoice-line__meta">
             ${remaining} of ${qty} left · ${formatLyd(unit)} each
             ${refunded ? ` · ${refunded} refunded` : ''}
           </p>
         </div>
-        <button
-          type="button"
-          class="pos-refund-modal__btn pos-refund-modal__btn--line"
-          data-refund-line="${escapeAttr(sale.id)}"
-          data-refund-item="${escapeAttr(line.id)}"
-          data-refund-invoice="${escapeAttr(invoice)}"
-          data-refund-label="${escapeAttr(line.product_name || 'Item')}"
-          ${disabled ? 'disabled' : ''}
-        >Refund item</button>
+        <div class="pos-invoice-line__actions">
+          ${disabled ? '<span class="pos-invoice-line__done">Fully refunded</span>' : `
+          <label class="pos-invoice-line__qty">
+            <span>Qty to refund</span>
+            <select data-refund-qty="${escapeAttr(line.id)}" aria-label="How many to refund for ${escapeAttr(line.product_name || 'item')}">
+              ${qtyOptions}
+            </select>
+          </label>
+          <button
+            type="button"
+            class="pos-refund-modal__btn pos-refund-modal__btn--line"
+            data-refund-line="${escapeAttr(sale.id)}"
+            data-refund-item="${escapeAttr(line.id)}"
+            data-refund-invoice="${escapeAttr(invoice)}"
+            data-refund-label="${escapeAttr(line.product_name || 'Item')}"
+            data-refund-max="${escapeAttr(remaining)}"
+          >Refund</button>`}
+        </div>
       </div>`;
   }).join('');
 
@@ -368,7 +380,7 @@ export function invoicesModalHtml(range) {
     <div class="pos-sale-modal__card pos-refund-modal pos-invoice-modal" role="dialog" aria-modal="true" aria-labelledby="pos-invoice-title">
       <p class="pos-sale-modal__badge">Invoices</p>
       <h2 id="pos-invoice-title">POS invoices</h2>
-      <p class="pos-refund-modal__hint">Search by date, open an invoice, then refund the full sale or one item.</p>
+      <p class="pos-refund-modal__hint">Search by date, open an invoice, then refund the full sale or choose a quantity for one item.</p>
       <div class="pos-invoice-filters">
         <label class="pos-pay-modal__field">
           <span>From</span>

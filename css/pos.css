@@ -748,16 +748,23 @@
 .pos-card__stock {
   position: absolute;
   top: 0.45rem;
-  left: 0.45rem;
-  padding: 0.18rem 0.45rem;
+  inset-inline-start: 0.45rem;
+  z-index: 1;
+  padding: 0.22rem 0.5rem;
   border-radius: 999px;
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  background: rgb(18 15 12 / 75%);
+  background: rgb(18 15 12 / 82%);
   color: var(--pos-gold);
   backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 35%);
+}
+
+.pos-card__stock--low {
+  background: rgb(201 168 76 / 95%);
+  color: #1a150f;
 }
 
 .pos-card__stock--out {
@@ -766,13 +773,21 @@
   letter-spacing: 0.03em;
 }
 
-.pos-card__oos {
+.pos-card__oos,
+.pos-card__low {
   margin: 0.15rem 0 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.pos-card__oos {
   color: var(--pos-danger);
+  text-transform: uppercase;
+}
+
+.pos-card__low {
+  color: var(--pos-gold);
 }
 
 .pos-card__info {
@@ -2548,6 +2563,11 @@
   background: var(--pos-bg-elevated);
 }
 
+.pos-invoice-line__info {
+  min-width: 0;
+  flex: 1;
+}
+
 .pos-invoice-line__name {
   margin: 0;
   font-weight: 700;
@@ -2558,6 +2578,43 @@
   margin: 0.2rem 0 0;
   font-size: 0.78rem;
   color: var(--pos-muted);
+}
+
+.pos-invoice-line__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.pos-invoice-line__qty {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pos-muted);
+}
+
+.pos-invoice-line__qty select {
+  min-width: 4.2rem;
+  padding: 0.45rem 0.4rem;
+  border: 1px solid var(--pos-gold);
+  border-radius: 0.45rem;
+  background: var(--pos-bg);
+  color: var(--pos-text);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.pos-invoice-line__done {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--pos-muted);
+  white-space: nowrap;
 }
 
 .pos-refund-modal__btn--line {
@@ -2579,5 +2636,14 @@
 @media (max-width: 520px) {
   .pos-invoice-filters {
     grid-template-columns: 1fr;
+  }
+
+  .pos-invoice-line {
+    flex-wrap: wrap;
+  }
+
+  .pos-invoice-line__actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }

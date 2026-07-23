@@ -924,13 +924,21 @@ async function mountRegister(root, staff) {
       const itemId = btn.dataset.refundItem;
       const invoice = btn.dataset.refundInvoice || orderId;
       const label = btn.dataset.refundLabel || 'item';
-      if (!confirm(`Refund “${label}” from invoice ${invoice}? Stock will be restored.`)) return;
+      const maxQty = Math.max(1, Number(btn.dataset.refundMax) || 1);
+      const row = btn.closest('[data-invoice-line-row]');
+      const qtySelect = row?.querySelector(`[data-refund-qty="${itemId}"]`)
+        || root.querySelector(`[data-refund-qty="${itemId}"]`);
+      let quantity = Math.trunc(Number(qtySelect?.value) || maxQty);
+      if (!Number.isFinite(quantity) || quantity < 1) quantity = 1;
+      if (quantity > maxQty) quantity = maxQty;
+
+      if (!confirm(`Refund ${quantity} × “${label}” from invoice ${invoice}? Stock will be restored.`)) return;
       btn.disabled = true;
       btn.textContent = '…';
       try {
-        const result = await refundPosOrder(orderId, { orderItemId: itemId });
+        const result = await refundPosOrder(orderId, { orderItemId: itemId, quantity });
         await syncCartStockFromServer();
-        showToast(els.toast, `Refunded ${label} · stock restored`);
+        showToast(els.toast, `Refunded ${quantity} × ${label} · stock restored`);
         refreshCatalog();
         if (result?.refund) printRefundReceipt(result.refund);
         await showInvoiceDetail(orderId);
@@ -938,7 +946,7 @@ async function mountRegister(root, staff) {
         console.error('[pos] line refund failed:', err);
         window.alert(err?.message || 'Refund failed.');
         btn.disabled = false;
-        btn.textContent = 'Refund item';
+        btn.textContent = 'Refund';
       }
       return;
     }
@@ -1386,8 +1394,9 @@ function renderProductGrid(container, catalog, query, category) {
 }
 
 function productCardHtml(product) {
-  const outOfStock = product.stock <= 0;
-  const lowStock = !outOfStock && product.stock <= 5;
+  const stock = Math.max(0, Math.trunc(Number(product.stock) || 0));
+  const outOfStock = stock <= 0;
+  const lowStock = !outOfStock && stock <= 5;
   const stockClass = outOfStock
     ? 'pos-card--out-of-stock'
     : lowStock
@@ -1398,14 +1407,17 @@ function productCardHtml(product) {
   const thumb = product.image
     ? `<img class="pos-card__img" src="${escapeAttr(product.image)}" alt="" loading="lazy" decoding="async">`
     : `<span class="pos-card__thumb-fallback">${initial}</span>`;
+  const leftLabel = `${stock} left`;
   const stockBadge = outOfStock
     ? '<span class="pos-card__stock pos-card__stock--out">Out of stock</span>'
     : lowStock
-      ? `<span class="pos-card__stock">${product.stock} left</span>`
+      ? `<span class="pos-card__stock pos-card__stock--low">${escapeHtml(leftLabel)}</span>`
       : '';
   const stockNote = outOfStock
     ? '<p class="pos-card__oos">Out of stock</p>'
-    : '';
+    : lowStock
+      ? `<p class="pos-card__low">${escapeHtml(leftLabel)}</p>`
+      : '';
 
   return `
     <button
@@ -1414,7 +1426,7 @@ function productCardHtml(product) {
       data-pos-product="${product.id}"
       role="listitem"
       ${outOfStock ? 'disabled aria-disabled="true"' : ''}
-      aria-label="${escapeAttr(product.name)}, ${formatLyd(product.price)}${outOfStock ? ', out of stock' : ''}"
+      aria-label="${escapeAttr(product.name)}, ${formatLyd(product.price)}${outOfStock ? ', out of stock' : (lowStock ? `, ${leftLabel}` : '')}"
     >
       <div class="pos-card__thumb" style="--thumb-color:${color}" aria-hidden="true">
         ${thumb}
