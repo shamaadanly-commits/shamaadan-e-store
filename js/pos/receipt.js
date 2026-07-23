@@ -107,12 +107,21 @@ export function buildReceiptHtml(sale) {
       padding: 4mm 2mm 8mm;
     }
     .center { text-align: center; }
+    .logo-mark {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 30mm;
+      height: 30mm;
+      margin: 0 auto 8px;
+      background: #111;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
     .logo {
       display: block;
-      width: auto;
-      max-width: 36mm;
-      height: 22mm;
-      margin: 0 auto 8px;
+      width: 82%;
+      height: 82%;
       object-fit: contain;
       object-position: center;
       -webkit-print-color-adjust: exact;
@@ -182,7 +191,9 @@ export function buildReceiptHtml(sale) {
 <body>
   <div class="receipt">
     <div class="center">
-      <img class="logo" src="${logo}" alt="${escapeHtml(BRAND.nameAr)}" width="112" height="112">
+      <div class="logo-mark">
+        <img class="logo" src="${logo}" alt="${escapeHtml(BRAND.nameAr)}" width="120" height="120">
+      </div>
       <p class="brand">${escapeHtml(BRAND.nameAr)}</p>
       <p class="muted">عطور ومستلزمات المنزل</p>
       <p class="muted">${escapeHtml(register)}</p>
@@ -331,12 +342,21 @@ export function buildRefundReceiptHtml(refund) {
       padding: 4mm 2mm 8mm;
     }
     .center { text-align: center; }
+    .logo-mark {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 30mm;
+      height: 30mm;
+      margin: 0 auto 8px;
+      background: #111;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
     .logo {
       display: block;
-      width: auto;
-      max-width: 36mm;
-      height: 22mm;
-      margin: 0 auto 8px;
+      width: 82%;
+      height: 82%;
       object-fit: contain;
       object-position: center;
       -webkit-print-color-adjust: exact;
@@ -410,7 +430,9 @@ export function buildRefundReceiptHtml(refund) {
 <body>
   <div class="receipt">
     <div class="center">
-      <img class="logo" src="${logo}" alt="${escapeHtml(BRAND.nameAr)}" width="112" height="112">
+      <div class="logo-mark">
+        <img class="logo" src="${logo}" alt="${escapeHtml(BRAND.nameAr)}" width="120" height="120">
+      </div>
       <p class="brand">${escapeHtml(BRAND.nameAr)}</p>
       <p class="badge">فاتورة مرتجع · ${escapeHtml(kind)}</p>
       <p class="muted">عطور ومستلزمات المنزل</p>

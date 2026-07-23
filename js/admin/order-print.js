@@ -106,13 +106,22 @@ export function buildWebsiteOrderPrintHtml(order, items = []) {
       margin-bottom: 1.25rem;
     }
     .brand-block { display: flex; align-items: center; gap: 0.85rem; }
+    .logo-mark {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 72px;
+      height: 72px;
+      flex-shrink: 0;
+      background: #111;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
     .logo {
-      width: auto;
-      max-width: 88px;
-      height: 56px;
+      width: 82%;
+      height: 82%;
       object-fit: contain;
       object-position: center;
-      flex-shrink: 0;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
@@ -204,7 +213,9 @@ export function buildWebsiteOrderPrintHtml(order, items = []) {
 
     <div class="top">
       <div class="brand-block">
-        <img class="logo" src="${logo}" alt="${escapeHtml(BRAND.nameAr)}" width="72" height="72">
+        <div class="logo-mark">
+          <img class="logo" src="${logo}" alt="${escapeHtml(BRAND.nameAr)}" width="72" height="72">
+        </div>
         <div class="brand">
           ${escapeHtml(BRAND.nameAr)}
           <span>طلب من الموقع</span>
