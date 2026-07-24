@@ -502,24 +502,58 @@ export function printRefundReceipt(refund) {
 function openPrintWindow(html, name) {
   const win = window.open('', name, 'width=420,height=720');
 
-  if (!win) {
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const fallback = window.open(url, '_blank');
-    if (!fallback) {
-      alert('اسمح بالنوافذ المنبثقة لطباعة الفاتورة.');
-      URL.revokeObjectURL(url);
-      return null;
+  if (win) {
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    try {
+      win.focus();
+    } catch {
+      /* ignore */
     }
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    return fallback;
+    return win;
   }
 
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
-  win.focus();
-  return win;
+  // Mobile / PWA often block popups — print from a hidden iframe instead.
+  try {
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('title', 'Print');
+    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none;';
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!doc) {
+      document.body.removeChild(iframe);
+      alert('اسمح بالنوافذ المنبثقة لطباعة الفاتورة.');
+      return null;
+    }
+    doc.open();
+    doc.write(html);
+    doc.close();
+    const trigger = () => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch {
+        /* ignore */
+      }
+      setTimeout(() => {
+        try {
+          document.body.removeChild(iframe);
+        } catch {
+          /* ignore */
+        }
+      }, 60_000);
+    };
+    if (doc.fonts?.ready) {
+      doc.fonts.ready.then(trigger).catch(trigger);
+    } else {
+      setTimeout(trigger, 400);
+    }
+    return iframe.contentWindow;
+  } catch {
+    alert('اسمح بالنوافذ المنبثقة لطباعة الفاتورة.');
+    return null;
+  }
 }
 
 function escapeHtml(str) {

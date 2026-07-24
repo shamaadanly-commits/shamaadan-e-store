@@ -196,7 +196,7 @@ async function mountRegister(root, staff) {
 
   /**
    * Highlight the active mobile bottom-tab.
-   * @param {'products' | 'ticket' | 'tickets' | 'scan'} name
+   * @param {'products' | 'ticket' | 'tickets' | 'invoices' | 'scan'} name
    */
   function setActiveMTab(name) {
     root.querySelectorAll('[data-mtab]').forEach((btn) => {
@@ -758,6 +758,10 @@ async function mountRegister(root, staff) {
       if (which === 'products') await showRegisterView('products');
       else if (which === 'ticket') await showRegisterView('ticket');
       else if (which === 'tickets') await showTicketsPage();
+      else if (which === 'invoices') {
+        setActiveMTab('invoices');
+        await showInvoiceModal();
+      }
       else if (which === 'scan') scanner.start();
       return;
     }
@@ -837,6 +841,7 @@ async function mountRegister(root, staff) {
 
     if (target.closest('[data-invoice-close]') || target.matches('[data-invoice-backdrop]')) {
       root.querySelector('[data-invoice-modal]')?.remove();
+      setActiveMTab(root.classList.contains('pos--m-ticket') ? 'ticket' : 'products');
       return;
     }
 
@@ -1194,7 +1199,7 @@ function buildShell(categories, staff) {
           Tickets
           <span class="pos__badge" data-open-tickets-count hidden>0</span>
         </button>
-        <button type="button" class="pos__refund-btn" data-open-invoice aria-label="Open invoices">
+        <button type="button" class="pos__refund-btn pos__desktop-only" data-open-invoice aria-label="Open invoices">
           Invoice
         </button>
         <button type="button" class="pos__icon-btn pos__desktop-only" data-toggle-metrics aria-label="Toggle sales metrics">
@@ -1306,6 +1311,15 @@ function buildShell(categories, staff) {
           <span class="pos__mtab-badge" data-open-tickets-count hidden>0</span>
         </span>
         <span>Parked</span>
+      </button>
+      <button type="button" class="pos__mtab" data-mtab="invoices">
+        <span class="pos__mtab-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M8 3h8a1 1 0 0 1 1 1v16l-3-1.5L11 20l-3-1.5L5 20V4a1 1 0 0 1 1-1z"/>
+            <path d="M9 8h6M9 12h6M9 16h3"/>
+          </svg>
+        </span>
+        <span>Invoice</span>
       </button>
       <button type="button" class="pos__mtab" data-mtab="scan">
         <span class="pos__mtab-icon">
