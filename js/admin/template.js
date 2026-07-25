@@ -975,6 +975,8 @@ export function buildAdminShell() {
               <header class="dash-panel__header dash-panel__header--row items-toolbar">
                 <div class="items-toolbar__actions">
                   <button type="button" class="dash-btn dash-btn--primary" data-add-catalog-item>+ ADD ITEM</button>
+                  <button type="button" class="dash-btn dash-btn--ghost" data-import-catalog title="Import Loyverse Excel/CSV — products stay off the website">IMPORT EXCEL</button>
+                  <input type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" data-import-catalog-file hidden>
                   <button type="button" class="rpt-export" data-export-catalog>EXPORT</button>
                 </div>
                 <div class="dash-panel__header-actions">

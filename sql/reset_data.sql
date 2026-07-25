@@ -1,23 +1,25 @@
 -- ============================================================================
 -- reset_data.sql — Full clean slate for Shamaadan E-Store
 -- ----------------------------------------------------------------------------
--- Wipes ALL business data (products, stock, sales, purchases, taxonomy) and
--- resets identity/serial counters back to 1.
+-- Wipes ALL business / test data:
+--   products, categories, collections, stock batches, sales, orders,
+--   purchases, waste, expenses, push subscriptions, invoice counters
 --
--- KEEPS your login accounts (users, auth_sessions) so you can still sign in.
+-- KEEPS login accounts (users, auth_sessions) so you can still sign in.
 --
--- ⚠️  THIS IS IRREVERSIBLE. Take a Supabase backup / snapshot first if unsure.
+-- ⚠️  THIS IS IRREVERSIBLE. Run only if you want a clean database.
 --
--- Run in: Supabase → SQL Editor → paste → Run.
+-- How to run:
+--   1. Open Supabase Dashboard → SQL Editor → New query
+--   2. Paste this entire file
+--   3. Click Run
 -- ============================================================================
 
 DO $$
 DECLARE
-  -- Order does not matter because we TRUNCATE all together with CASCADE.
-  -- Only tables that actually exist are included, so partial installs are fine.
-  t            text;
-  existing     text[] := ARRAY[]::text[];
-  candidates   text[] := ARRAY[
+  t          text;
+  existing   text[] := ARRAY[]::text[];
+  candidates text[] := ARRAY[
     'inventory_transactions',
     'supplier_invoice_items',
     'supplier_invoices',
@@ -29,7 +31,9 @@ DECLARE
     'orders',
     'products',
     'categories',
-    'collections'
+    'collections',
+    'push_subscriptions',
+    'invoice_counters'
   ];
 BEGIN
   FOREACH t IN ARRAY candidates LOOP

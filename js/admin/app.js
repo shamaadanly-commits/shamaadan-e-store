@@ -14,6 +14,7 @@ import {
   persistEnv,
 } from '../shared/offline.js';
 import { bindImageUploader } from './image-upload.js';
+import { importCatalogFromSpreadsheet } from './catalog-import.js';
 import {
   fetchAdminCatalog,
   persistDeleteCollection,
@@ -146,6 +147,7 @@ export async function mount(root) {
     categoryCount: root.querySelector('[data-category-count]'),
     categoryFormHost: root.querySelector('[data-category-form-host]'),
     catalogFilter: root.querySelector('[data-catalog-filter]'),
+    importCatalogFile: root.querySelector('[data-import-catalog-file]'),
     lastUpdated: root.querySelector('[data-last-updated]'),
     pageTitle: root.querySelector('[data-page-title]'),
     views: root.querySelectorAll('[data-panel]'),
@@ -315,6 +317,68 @@ export async function mount(root) {
   els.catalogFilter?.addEventListener('change', (event) => {
     catalogFilter = event.target.value || 'All';
     renderCatalog(state.getSnapshot());
+  });
+
+  els.importCatalogFile?.addEventListener('change', async (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || !input.files?.length) return;
+    const file = input.files[0];
+    input.value = '';
+
+    const confirmed = window.confirm(
+      `Import "${file.name}"?\n\n`
+        + '• Products and categories will be created/updated automatically\n'
+        + '• Matching barcodes/SKUs will update existing items\n'
+        + '• Nothing will be pushed to the website (Push to Website stays off)',
+    );
+    if (!confirmed) return;
+
+    const statusId = 'catalog-import-status';
+    let statusEl = root.querySelector(`#${statusId}`);
+    if (!statusEl) {
+      statusEl = document.createElement('p');
+      statusEl.id = statusId;
+      statusEl.className = 'dash-form__note';
+      statusEl.style.margin = '0.75rem 1rem';
+      els.catalogHost?.parentElement?.insertBefore(statusEl, els.catalogHost);
+    }
+    statusEl.textContent = 'Reading spreadsheet…';
+
+    try {
+      const existing = (state.getSnapshot().products || []).filter((p) => isLiveDbId(p.id));
+      const result = await importCatalogFromSpreadsheet(file, {
+        existingProducts: existing,
+        onProgress: ({ done, total, title }) => {
+          statusEl.textContent = `Importing ${done + 1} / ${total}: ${title}`;
+        },
+      });
+
+      await refreshFromSupabase();
+
+      const catList = result.categories.length
+        ? `\nCategories: ${result.categories.join(', ')}`
+        : '';
+      const errNote = result.errors.length
+        ? `\n\n${result.errors.length} row(s) failed (first: ${result.errors[0].title} — ${result.errors[0].message})`
+        : '';
+
+      statusEl.textContent = `Import complete: ${result.created} created, ${result.updated} updated.`
+        + (result.errors.length ? ` ${result.errors.length} failed.` : '');
+
+      window.alert(
+        `Import finished.\n\n`
+          + `Created: ${result.created}\n`
+          + `Updated: ${result.updated}\n`
+          + `Total rows: ${result.total}`
+          + catList
+          + '\n\nAll imported items are OFF the website until you enable Push to Website.'
+          + errNote,
+      );
+    } catch (err) {
+      console.error('[admin] catalog import failed:', err);
+      statusEl.textContent = '';
+      window.alert(err?.message || 'Failed to import spreadsheet.');
+    }
   });
 
   root.addEventListener('change', async (event) => {
@@ -779,6 +843,11 @@ export async function mount(root) {
 
     if (target.matches('[data-export-catalog]')) {
       exportCatalogCsv();
+      return;
+    }
+
+    if (target.matches('[data-import-catalog]')) {
+      els.importCatalogFile?.click();
       return;
     }
 
