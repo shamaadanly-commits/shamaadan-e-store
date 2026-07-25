@@ -2,6 +2,11 @@
  * Semantic HTML template for the luxury storefront.
  */
 import { logoImg } from '../shared/brand.js';
+import {
+  groupProductsByName,
+  groupShowsSpecChips,
+  variantChipLabel,
+} from '../shared/catalog-store.js';
 
 const COLLECTION_GRADIENTS = [
   'linear-gradient(160deg, #2a1f14 0%, #1c1914 60%, #242019 100%)',
@@ -146,7 +151,11 @@ export function buildStorefrontHtml({ products, categories, collections = [], i1
           </div>
 
           <div class="shop__grid-products" data-product-grid role="list">
-            ${products.map((p) => productCardHtml(p, i18n)).join('')}
+            ${groupProductsByName(products).map((group) => productCardHtml({
+              ...group.selected,
+              _variants: group.variants,
+              _groupKey: group.key,
+            }, i18n)).join('')}
           </div>
         </div>
       </section>
@@ -335,7 +344,6 @@ export function productCardHtml(product, i18n) {
   const display = i18n.translateProduct(product);
   const gradient = CATEGORY_GRADIENTS[product.category] || CATEGORY_GRADIENTS.General;
   const initial = display.displayName.charAt(0);
-  const imageUrl = product.imageUrls?.[0] || product.image || null;
 
   const stock = Number(
     product.stockQuantity ?? product.stock_quantity ?? product.stock ?? 0,
@@ -353,34 +361,36 @@ export function productCardHtml(product, i18n) {
     badge = `<span class="inventory-badge low-stock">${t('shop.lowStock', { count: stock })}</span>`;
   }
 
-  const media = imageUrl
-    ? `<img class="product-card__image" src="${escapeAttr(imageUrl)}" alt="${escapeAttr(display.displayName)}" loading="lazy" decoding="async">`
-    : `<span class="product-card__monogram" aria-hidden="true">${escapeHtml(initial)}</span>`;
-
   const cartQty = Number(product._cartQty || 0);
+  const variants = Array.isArray(product._variants) ? product._variants : [product];
+  const groupKey = product._groupKey || '';
+  const specsHtml = variantChipsHtml(variants, product.id, groupKey, groupShowsSpecChips({ variants }));
+  const galleryHtml = productGalleryHtml(product, display.displayName, initial);
 
   return `
     <article
       class="product-card${outOfStock ? ' product-card--oos' : ''}${lowStock ? ' product-card--low' : ''}"
       role="listitem"
       data-product-id="${product.id}"
+      data-group-key="${escapeAttr(groupKey)}"
       data-stock="${stock}"
       style="--card-gradient: ${gradient}"
     >
       <div class="product-card__media">
-        <div class="product-card__visual${imageUrl ? ' product-card__visual--photo' : ''}">
-          ${media}
-        </div>
+        ${galleryHtml}
         <div class="product-card__shine" aria-hidden="true"></div>
-        ${badge}
+        <div data-card-badge>${badge}</div>
       </div>
       <div class="product-card__body">
         <p class="product-card__category">${escapeHtml(display.displayCategory)}</p>
         <h3 class="product-card__name">${escapeHtml(display.displayName)}</h3>
-        ${outOfStock ? `<p class="product-card__stock-note product-card__stock-note--oos">${t('shop.outOfStock')}</p>` : ''}
-        ${lowStock && !outOfStock ? `<p class="product-card__stock-note">${stock === 1 ? t('shop.onlyOneLeft') : t('shop.lowStock', { count: stock })}</p>` : ''}
+        ${specsHtml}
+        <div data-card-stock-note>
+          ${outOfStock ? `<p class="product-card__stock-note product-card__stock-note--oos">${t('shop.outOfStock')}</p>` : ''}
+          ${lowStock && !outOfStock ? `<p class="product-card__stock-note">${stock === 1 ? t('shop.onlyOneLeft') : t('shop.lowStock', { count: stock })}</p>` : ''}
+        </div>
         <div class="product-card__footer">
-          <span class="product-card__price" data-price="${product.price}">${i18n.formatPrice(product.price)}</span>
+          <span class="product-card__price" data-card-price data-price="${product.price}">${i18n.formatPrice(product.price)}</span>
           <div class="product-card__cart" data-card-cart="${escapeAttr(product.id)}">
             ${productCardCartControlHtml(product.id, cartQty, outOfStock, i18n)}
           </div>
@@ -388,6 +398,91 @@ export function productCardHtml(product, i18n) {
       </div>
     </article>
   `;
+}
+
+/**
+ * Big main image + left thumbnail strip when a SKU has multiple photos.
+ * @param {object} product
+ * @param {string} alt
+ * @param {string} initial
+ */
+function productGalleryHtml(product, alt, initial) {
+  const urls = Array.isArray(product.imageUrls)
+    ? product.imageUrls.filter(Boolean)
+    : product.image
+      ? [product.image]
+      : [];
+  const mainUrl = urls[0] || null;
+
+  if (!mainUrl) {
+    return `
+      <div class="product-card__gallery product-card__gallery--empty" data-card-gallery>
+        <div class="product-card__visual" data-card-visual>
+          <span class="product-card__monogram" aria-hidden="true">${escapeHtml(initial)}</span>
+        </div>
+      </div>`;
+  }
+
+  const thumbs = urls.length > 1
+    ? `<div class="product-card__thumbs" role="tablist" aria-label="Product photos">
+        ${urls.map((url, index) => `
+          <button
+            type="button"
+            class="product-card__thumb${index === 0 ? ' is-active' : ''}"
+            role="tab"
+            aria-selected="${index === 0 ? 'true' : 'false'}"
+            data-action="select-image"
+            data-image-url="${escapeAttr(url)}"
+            aria-label="Photo ${index + 1}"
+          >
+            <img src="${escapeAttr(url)}" alt="" loading="lazy" decoding="async">
+          </button>`).join('')}
+      </div>`
+    : '';
+
+  return `
+    <div class="product-card__gallery${urls.length > 1 ? ' product-card__gallery--multi' : ''}" data-card-gallery dir="ltr">
+      ${thumbs}
+      <div class="product-card__visual product-card__visual--photo" data-card-visual>
+        <img
+          class="product-card__image"
+          data-card-main-image
+          src="${escapeAttr(mainUrl)}"
+          alt="${escapeAttr(alt)}"
+          loading="lazy"
+          decoding="async"
+        >
+      </div>
+    </div>`;
+}
+
+/**
+ * @param {object[]} variants
+ * @param {string} selectedId
+ * @param {string} groupKey
+ * @param {boolean} show
+ */
+function variantChipsHtml(variants, selectedId, groupKey, show) {
+  if (!show || !variants.length) return '';
+  return `
+    <div class="product-card__specs" role="group" aria-label="Options">
+      ${variants.map((variant, index) => {
+        const stock = Number(variant.stockQuantity ?? variant.stock_quantity ?? variant.stock ?? 0);
+        const selected = String(variant.id) === String(selectedId);
+        const oos = stock <= 0;
+        const label = variantChipLabel(variant, index);
+        return `
+          <button
+            type="button"
+            class="product-card__chip${selected ? ' is-active' : ''}${oos ? ' is-oos' : ''}"
+            data-action="select-variant"
+            data-product-id="${escapeAttr(variant.id)}"
+            data-group-key="${escapeAttr(groupKey)}"
+            ${oos ? 'disabled aria-disabled="true"' : ''}
+            aria-pressed="${selected ? 'true' : 'false'}"
+          >${escapeHtml(label)}</button>`;
+      }).join('')}
+    </div>`;
 }
 
 /**

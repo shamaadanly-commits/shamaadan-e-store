@@ -52,6 +52,8 @@ export async function mount(root) {
   let activeFilter = 'All';
   let lenis = null;
   let navApi = null;
+  /** @type {Map<string, string>} group key → selected product id */
+  const selectedVariantByGroup = new Map();
 
   root.className = 'shop';
   document.body.style.background = '#181510';
@@ -83,7 +85,7 @@ export async function mount(root) {
     activeFilter = filter || 'All';
     const gridEl = root.querySelector('[data-product-grid]');
     const filtered = filterProducts(products, activeFilter);
-    renderProductGrid(gridEl, filtered, i18n, cartQtyMap());
+    renderProductGrid(gridEl, filtered, i18n, cartQtyMap(), selectedVariantByGroup);
     animateProductGrid(gridEl);
 
     root.querySelectorAll('.filter-chip').forEach((chip) => {
@@ -122,6 +124,33 @@ export async function mount(root) {
       const name = collectionLink.dataset.collection;
       if (name) {
         setTimeout(() => applyFilter(name), 0);
+      }
+      return;
+    }
+
+    const selectImage = event.target.closest('[data-action="select-image"]');
+    if (selectImage) {
+      const url = selectImage.dataset.imageUrl;
+      const card = selectImage.closest('[data-product-id]');
+      const main = card?.querySelector('[data-card-main-image]');
+      if (url && main) {
+        main.src = url;
+        card.querySelectorAll('[data-action="select-image"]').forEach((thumb) => {
+          const active = thumb === selectImage;
+          thumb.classList.toggle('is-active', active);
+          thumb.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+      }
+      return;
+    }
+
+    const selectVariant = event.target.closest('[data-action="select-variant"]');
+    if (selectVariant) {
+      const id = selectVariant.dataset.productId;
+      const groupKey = selectVariant.dataset.groupKey;
+      if (id && groupKey) {
+        selectedVariantByGroup.set(groupKey, id);
+        applyFilter(activeFilter);
       }
       return;
     }

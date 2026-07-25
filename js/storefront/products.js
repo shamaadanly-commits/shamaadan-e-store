@@ -8,7 +8,7 @@ import {
   mapProductFromDb,
   mapSupabaseNetworkError,
 } from '../../shared/supabase.js';
-import { normalizeStoreProduct } from '../shared/catalog-store.js';
+import { normalizeStoreProduct, groupProductsByName } from '../shared/catalog-store.js';
 import { productCardHtml } from './template.js';
 
 const COLLECTION_GRADIENTS = [
@@ -174,13 +174,14 @@ export function filterProducts(products, filter) {
 }
 
 /**
- * Re-render the product grid.
+ * Re-render the product grid (one card per product name; variants as chips).
  * @param {HTMLElement} gridEl
  * @param {Array} products
  * @param {ReturnType<import('./i18n.js').createI18n>} i18n
  * @param {Map<string, number>|Record<string, number>} [qtyById]
+ * @param {Map<string, string>|Record<string, string>} [selectedByGroup]
  */
-export function renderProductGrid(gridEl, products, i18n, qtyById = {}) {
+export function renderProductGrid(gridEl, products, i18n, qtyById = {}, selectedByGroup = {}) {
   if (!products.length) {
     gridEl.innerHTML = `<p class="shop__lead">${i18n.t('shop.empty')}</p>`;
     return;
@@ -189,5 +190,11 @@ export function renderProductGrid(gridEl, products, i18n, qtyById = {}) {
     if (qtyById instanceof Map) return Number(qtyById.get(String(id)) || 0);
     return Number(qtyById[id] || qtyById[String(id)] || 0);
   };
-  gridEl.innerHTML = products.map((p) => productCardHtml({ ...p, _cartQty: getQty(p.id) }, i18n)).join('');
+  const groups = groupProductsByName(products, selectedByGroup);
+  gridEl.innerHTML = groups.map((group) => productCardHtml({
+    ...group.selected,
+    _cartQty: getQty(group.selected.id),
+    _variants: group.variants,
+    _groupKey: group.key,
+  }, i18n)).join('');
 }

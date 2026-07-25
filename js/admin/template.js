@@ -140,7 +140,12 @@ function catalogRowHtml(product) {
           ${thumb}
           <div>
             <span class="dash-table__title">${escapeHtml(product.title)}</span>
-            ${product.description ? `<span class="dash-table__sub">${escapeHtml(String(product.description).slice(0, 80))}</span>` : ''}
+            ${(() => {
+              const specs = [product.color, product.scent].filter(Boolean).join(' · ');
+              if (specs) return `<span class="dash-table__sub">${escapeHtml(specs)}</span>`;
+              if (product.description) return `<span class="dash-table__sub">${escapeHtml(String(product.description).slice(0, 80))}</span>`;
+              return '';
+            })()}
           </div>
         </div>
       </td>
@@ -305,6 +310,14 @@ export function catalogFormHtml(product = null, collections = [], categories = [
           </select>
         </div>
         ${barcodeFieldHtml('cat-barcode', product?.barcode ?? '', 'Barcode / SKU')}
+        <div class="dash-field">
+          <label for="cat-color"><span class="dash-field__label-en">Color</span> <span class="dash-field__label-ar" lang="ar">اللون</span></label>
+          <input id="cat-color" name="color" type="text" class="dash-input--bidi" value="${escapeAttr(product?.color ?? '')}" placeholder="Blue">
+        </div>
+        <div class="dash-field">
+          <label for="cat-scent"><span class="dash-field__label-en">Scent / Smell</span> <span class="dash-field__label-ar" lang="ar">الرائحة</span></label>
+          <input id="cat-scent" name="scent" type="text" class="dash-input--bidi" value="${escapeAttr(product?.scent ?? '')}" placeholder="Lavender">
+        </div>
         <div class="dash-field">
           <label for="cat-retail"><span class="dash-field__label-en">Price</span> <span class="dash-field__label-ar" lang="ar">سعر البيع</span></label>
           <input id="cat-retail" name="retailPrice" type="number" min="0" step="0.01" required value="${product?.retailPrice ?? ''}" placeholder="48.00">

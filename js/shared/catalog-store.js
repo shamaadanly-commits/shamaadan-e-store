@@ -142,7 +142,87 @@ export function normalizeStoreProduct(raw) {
     is_active: isActive,
     showOnWebsite: raw.showOnWebsite !== false && raw.show_on_website !== false,
     show_on_website: raw.showOnWebsite !== false && raw.show_on_website !== false,
+    color: raw.color ? String(raw.color).trim() : '',
+    scent: raw.scent ? String(raw.scent).trim() : '',
   };
+}
+
+/**
+ * Color · scent label for a product SKU.
+ * @param {{ color?: string, scent?: string }} product
+ */
+export function formatProductSpecs(product) {
+  return [product?.color, product?.scent]
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/**
+ * @param {string} name
+ */
+export function productGroupKey(name) {
+  return String(name || '').trim().toLowerCase();
+}
+
+/**
+ * Group sellable SKUs that share the same product name (case-insensitive).
+ * @param {Array<object>} products
+ * @param {Record<string, string>|Map<string, string>} [preferredIds] — group key → selected product id
+ * @returns {Array<{ key: string, name: string, variants: object[], selected: object }>}
+ */
+export function groupProductsByName(products = [], preferredIds = {}) {
+  /** @type {Map<string, { key: string, name: string, variants: object[] }>} */
+  const map = new Map();
+
+  for (const product of products) {
+    const name = String(product?.title || product?.name || 'Untitled').trim() || 'Untitled';
+    const key = productGroupKey(name);
+    if (!map.has(key)) {
+      map.set(key, { key, name, variants: [] });
+    }
+    map.get(key).variants.push(product);
+  }
+
+  const getPreferred = (key) => {
+    if (preferredIds instanceof Map) return preferredIds.get(key);
+    return preferredIds?.[key];
+  };
+
+  return [...map.values()].map((group) => {
+    const preferredId = getPreferred(group.key);
+    let selected = preferredId
+      ? group.variants.find((v) => String(v.id) === String(preferredId))
+      : null;
+    if (!selected) {
+      selected = group.variants.find((v) => Number(v.stockQuantity ?? v.stock ?? 0) > 0)
+        || group.variants[0];
+    }
+    return { ...group, selected };
+  });
+}
+
+/**
+ * Whether a name-group should show selectable spec chips.
+ * @param {{ variants: object[] }} group
+ */
+export function groupShowsSpecChips(group) {
+  if (!group?.variants?.length) return false;
+  if (group.variants.length > 1) return true;
+  return group.variants.some((v) => Boolean(formatProductSpecs(v)));
+}
+
+/**
+ * Chip label for a variant (specs, else barcode, else Option N).
+ * @param {object} product
+ * @param {number} [index]
+ */
+export function variantChipLabel(product, index = 0) {
+  const specs = formatProductSpecs(product);
+  if (specs) return specs;
+  const barcode = String(product?.barcode || product?.sku || '').trim();
+  if (barcode) return barcode;
+  return `Option ${index + 1}`;
 }
 
 /**

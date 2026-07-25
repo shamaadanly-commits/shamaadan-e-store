@@ -1061,6 +1061,8 @@ export async function mount(root) {
       retailPrice: Number(data.get('retailPrice')),
       stockQuantity: Number(data.get('stockQuantity')),
       barcode: String(data.get('barcode')),
+      color: String(data.get('color') || '').trim(),
+      scent: String(data.get('scent') || '').trim(),
       imageUrls,
       showOnWebsite: data.has('pushToWebsite'),
     };

@@ -665,6 +665,7 @@
   touch-action: manipulation;
   min-height: 188px;
   animation: pos-card-in 380ms var(--pos-ease) both;
+  cursor: pointer;
 }
 
 @keyframes pos-card-in {
@@ -698,7 +699,6 @@
 }
 
 .pos-card--out-of-stock {
-  pointer-events: none;
   cursor: not-allowed;
   filter: grayscale(0.45);
 }
@@ -809,6 +809,45 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   color: var(--pos-text);
+}
+
+.pos-card__specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.15rem 0 0.1rem;
+}
+
+.pos-card__chip {
+  appearance: none;
+  border: 1px solid rgb(201 168 76 / 35%);
+  background: transparent;
+  color: var(--pos-muted, #9a8b72);
+  font-size: 0.65rem;
+  letter-spacing: 0.03em;
+  padding: 0.22rem 0.42rem;
+  border-radius: 2px;
+  cursor: pointer;
+  line-height: 1.2;
+  touch-action: manipulation;
+}
+
+.pos-card__chip:hover:not(:disabled) {
+  border-color: rgb(201 168 76 / 70%);
+  color: var(--pos-text);
+}
+
+.pos-card__chip.is-active {
+  border-color: var(--pos-gold);
+  color: var(--pos-text);
+  background: rgb(201 168 76 / 14%);
+}
+
+.pos-card__chip.is-oos,
+.pos-card__chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  text-decoration: line-through;
 }
 
 .pos-card__price {

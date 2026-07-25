@@ -16,6 +16,11 @@ import {
 } from '../../shared/supabase.js';
 import { getSharedDashboardState, toPosCatalogRow } from '../dashboard.js';
 import { formatLyd } from '../shared/format.js';
+import {
+  groupProductsByName,
+  groupShowsSpecChips,
+  variantChipLabel,
+} from '../shared/catalog-store.js';
 import { BRAND, logoImg } from '../shared/brand.js';
 import { fetchSession, loginPosPin, logout, verifyAdminPin } from '../shared/auth-client.js';
 import {
@@ -117,6 +122,8 @@ async function mountRegister(root, staff) {
           costPrice: Number(row.wholesale_cost ?? row.cost ?? 0),
           stockQuantity: Number(row.stock_quantity ?? row.stock ?? 0),
           imageUrls: row.image_urls ?? (row.image_url ? [row.image_url] : []),
+          color: row.color || '',
+          scent: row.scent || '',
         }));
         saveOfflineCatalog({
           products: catalog.map((p) => ({
@@ -130,6 +137,8 @@ async function mountRegister(root, staff) {
             costPrice: p.cost,
             stockQuantity: p.stock,
             imageUrls: p.image ? [p.image] : [],
+            color: p.color || '',
+            scent: p.scent || '',
           })),
           categories: [],
           collections: [],
@@ -153,6 +162,8 @@ async function mountRegister(root, staff) {
         costPrice: Number(row.costPrice ?? row.cost ?? 0),
         stockQuantity: Number(row.stockQuantity ?? row.stock ?? 0),
         imageUrls: row.imageUrls ?? (row.image_url ? [row.image_url] : []),
+        color: row.color || '',
+        scent: row.scent || '',
       }));
     }
   }
@@ -191,6 +202,8 @@ async function mountRegister(root, staff) {
 
   let searchQuery = '';
   let activeCategory = 'All';
+  /** @type {Map<string, string>} group key → selected product id */
+  const selectedVariantByGroup = new Map();
   /** @type {'register' | 'tickets'} */
   let activeView = 'register';
 
@@ -238,6 +251,8 @@ async function mountRegister(root, staff) {
         costPrice: Number(row.wholesale_cost ?? row.cost ?? 0),
         stockQuantity: Number(row.stock_quantity ?? row.stock ?? 0),
         imageUrls: row.image_urls ?? (row.image_url ? [row.image_url] : []),
+        color: row.color || '',
+        scent: row.scent || '',
       }));
     } catch {
       return [];
@@ -256,7 +271,7 @@ async function mountRegister(root, staff) {
   });
 
   function refreshCatalog() {
-    renderProductGrid(els.grid, cart.getSnapshot().catalog, searchQuery, activeCategory);
+    renderProductGrid(els.grid, cart.getSnapshot().catalog, searchQuery, activeCategory, selectedVariantByGroup);
   }
 
   bindConnectivity(root, {
@@ -749,6 +764,17 @@ async function mountRegister(root, staff) {
   }
   window.setInterval(autoRefreshPos, 30_000);
 
+  root.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const card = event.target.closest('[data-pos-product]');
+    if (!card || event.target.closest('[data-pos-variant]')) return;
+    if (card !== event.target && !card.contains(event.target)) return;
+    // Only when the card itself (or non-interactive child) is focused
+    if (document.activeElement !== card) return;
+    event.preventDefault();
+    card.click();
+  });
+
   root.addEventListener('click', async (event) => {
     const target = event.target;
 
@@ -788,9 +814,25 @@ async function mountRegister(root, staff) {
       return;
     }
 
+    const variantChip = target.closest('[data-pos-variant]');
+    if (variantChip) {
+      event.preventDefault();
+      event.stopPropagation();
+      const variantId = variantChip.dataset.posVariant;
+      const groupKey = variantChip.dataset.groupKey;
+      if (variantId && groupKey) {
+        selectedVariantByGroup.set(groupKey, variantId);
+        refreshCatalog();
+      }
+      return;
+    }
+
     const productCard = target.closest('[data-pos-product]');
     if (productCard) {
-      if (productCard.disabled || productCard.classList.contains('pos-card--out-of-stock')) {
+      if (
+        productCard.getAttribute('aria-disabled') === 'true'
+        || productCard.classList.contains('pos-card--out-of-stock')
+      ) {
         showToast(els.toast, 'Out of stock');
         return;
       }
@@ -1384,7 +1426,7 @@ function showSaleComplete(root, sale, toastEl) {
   showToast(toastEl, `Sale complete · ${formatLyd(sale.revenue)}`);
 }
 
-function renderProductGrid(container, catalog, query, category) {
+function renderProductGrid(container, catalog, query, category, selectedByGroup = new Map()) {
   let filtered = catalog;
 
   if (category && category !== 'All') {
@@ -1395,7 +1437,9 @@ function renderProductGrid(container, catalog, query, category) {
     filtered = filtered.filter((p) =>
       p.name.toLowerCase().includes(query)
       || String(p.sku || '').toLowerCase().includes(query)
-      || String(p.barcode || '').toLowerCase().includes(query),
+      || String(p.barcode || '').toLowerCase().includes(query)
+      || String(p.color || '').toLowerCase().includes(query)
+      || String(p.scent || '').toLowerCase().includes(query),
     );
   }
 
@@ -1404,10 +1448,32 @@ function renderProductGrid(container, catalog, query, category) {
     return;
   }
 
-  container.innerHTML = filtered.map((p) => productCardHtml(p)).join('');
+  const groups = groupProductsByName(filtered, selectedByGroup);
+
+  if (query) {
+    for (const group of groups) {
+      const match = group.variants.find((v) =>
+        String(v.sku || '').toLowerCase().includes(query)
+        || String(v.barcode || '').toLowerCase().includes(query)
+        || String(v.color || '').toLowerCase().includes(query)
+        || String(v.scent || '').toLowerCase().includes(query),
+      );
+      if (match) {
+        group.selected = match;
+        selectedByGroup.set(group.key, String(match.id));
+      }
+    }
+  }
+
+  container.innerHTML = groups.map((group) => productCardHtml(group)).join('');
 }
 
-function productCardHtml(product) {
+/**
+ * @param {{ key: string, name: string, variants: object[], selected: object }} group
+ */
+function productCardHtml(group) {
+  const product = group.selected;
+  const variants = group.variants || [product];
   const stock = Math.max(0, Math.trunc(Number(product.stock) || 0));
   const outOfStock = stock <= 0;
   const lowStock = !outOfStock && stock <= 5;
@@ -1432,14 +1498,34 @@ function productCardHtml(product) {
     : lowStock
       ? `<p class="pos-card__low">${escapeHtml(leftLabel)}</p>`
       : '';
+  const showChips = groupShowsSpecChips(group);
+  const specsHtml = showChips
+    ? `<div class="pos-card__specs" role="group" aria-label="Options">
+        ${variants.map((variant, index) => {
+          const vStock = Math.max(0, Math.trunc(Number(variant.stock) || 0));
+          const selected = String(variant.id) === String(product.id);
+          const oos = vStock <= 0;
+          return `
+            <button
+              type="button"
+              class="pos-card__chip${selected ? ' is-active' : ''}${oos ? ' is-oos' : ''}"
+              data-pos-variant="${escapeAttr(variant.id)}"
+              data-group-key="${escapeAttr(group.key)}"
+              ${oos ? 'disabled aria-disabled="true"' : ''}
+              aria-pressed="${selected ? 'true' : 'false'}"
+            >${escapeHtml(variantChipLabel(variant, index))}</button>`;
+        }).join('')}
+      </div>`
+    : '';
 
   return `
-    <button
-      type="button"
+    <article
       class="pos-card ${stockClass}"
       data-pos-product="${product.id}"
+      data-group-key="${escapeAttr(group.key)}"
       role="listitem"
-      ${outOfStock ? 'disabled aria-disabled="true"' : ''}
+      tabindex="0"
+      ${outOfStock ? 'aria-disabled="true"' : ''}
       aria-label="${escapeAttr(product.name)}, ${formatLyd(product.price)}${outOfStock ? ', out of stock' : (lowStock ? `, ${leftLabel}` : '')}"
     >
       <div class="pos-card__thumb" style="--thumb-color:${color}" aria-hidden="true">
@@ -1448,10 +1534,11 @@ function productCardHtml(product) {
       </div>
       <div class="pos-card__info">
         <p class="pos-card__name">${escapeHtml(product.name)}</p>
+        ${specsHtml}
         <p class="pos-card__price">${formatLyd(product.price)}</p>
         ${stockNote}
       </div>
-    </button>
+    </article>
   `;
 }
 

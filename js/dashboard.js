@@ -90,6 +90,8 @@ export function toPosCatalogRow(product) {
     cost: product.costPrice,
     stock: product.stockQuantity,
     image: product.imageUrls?.[0] ?? null,
+    color: product.color ? String(product.color).trim() : '',
+    scent: product.scent ? String(product.scent).trim() : '',
   };
 }
 

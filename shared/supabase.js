@@ -253,6 +253,8 @@ export function mapProductFromDb(row) {
     show_on_website: row.show_on_website !== false,
     category_id: row.category_id ?? null,
     collection_id: row.collection_id ?? null,
+    color: row.color ? String(row.color) : '',
+    scent: row.scent ? String(row.scent) : '',
   };
 }
 
@@ -499,6 +501,8 @@ export async function upsertProductRow(product) {
     collection: collectionName,
     collection_name: collectionName,
     show_on_website: product.showOnWebsite === true || product.show_on_website === true,
+    color: product.color ? String(product.color).trim() : null,
+    scent: product.scent ? String(product.scent).trim() : null,
   };
 
   const id = isLiveDbId(product.id) ? String(product.id).trim() : '';
