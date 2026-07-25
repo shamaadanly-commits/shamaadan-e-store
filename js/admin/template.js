@@ -315,8 +315,8 @@ export function catalogFormHtml(product = null, collections = [], categories = [
           <input id="cat-color" name="color" type="text" class="dash-input--bidi" value="${escapeAttr(product?.color ?? '')}" placeholder="Blue">
         </div>
         <div class="dash-field">
-          <label for="cat-scent"><span class="dash-field__label-en">Scent / Smell</span> <span class="dash-field__label-ar" lang="ar">الرائحة</span></label>
-          <input id="cat-scent" name="scent" type="text" class="dash-input--bidi" value="${escapeAttr(product?.scent ?? '')}" placeholder="Lavender">
+          <label for="cat-scent"><span class="dash-field__label-en">Specs</span> <span class="dash-field__label-ar" lang="ar">المواصفات</span></label>
+          <input id="cat-scent" name="scent" type="text" class="dash-input--bidi" value="${escapeAttr(product?.scent ?? '')}" placeholder="Large · Lavender">
         </div>
         <div class="dash-field">
           <label for="cat-retail"><span class="dash-field__label-en">Price</span> <span class="dash-field__label-ar" lang="ar">سعر البيع</span></label>

@@ -20,6 +20,7 @@ import {
   groupProductsByName,
   groupShowsSpecChips,
   variantChipLabel,
+  variantsHaveDifferentPrices,
 } from '../shared/catalog-store.js';
 import { BRAND, logoImg } from '../shared/brand.js';
 import { fetchSession, loginPosPin, logout, verifyAdminPin } from '../shared/auth-client.js';
@@ -1499,6 +1500,7 @@ function productCardHtml(group) {
       ? `<p class="pos-card__low">${escapeHtml(leftLabel)}</p>`
       : '';
   const showChips = groupShowsSpecChips(group);
+  const showPriceOnChips = variantsHaveDifferentPrices(variants);
   const specsHtml = showChips
     ? `<div class="pos-card__specs" role="group" aria-label="Options">
         ${variants.map((variant, index) => {
@@ -1513,7 +1515,10 @@ function productCardHtml(group) {
               data-group-key="${escapeAttr(group.key)}"
               ${oos ? 'disabled aria-disabled="true"' : ''}
               aria-pressed="${selected ? 'true' : 'false'}"
-            >${escapeHtml(variantChipLabel(variant, index))}</button>`;
+            >${escapeHtml(variantChipLabel(variant, index, {
+              showPrice: showPriceOnChips,
+              formatPrice: (n) => formatLyd(n),
+            }))}</button>`;
         }).join('')}
       </div>`
     : '';

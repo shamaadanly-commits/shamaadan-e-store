@@ -148,7 +148,7 @@ export function normalizeStoreProduct(raw) {
 }
 
 /**
- * Color · scent label for a product SKU.
+ * Color · specs label for a product SKU.
  * @param {{ color?: string, scent?: string }} product
  */
 export function formatProductSpecs(product) {
@@ -214,15 +214,33 @@ export function groupShowsSpecChips(group) {
 
 /**
  * Chip label for a variant (specs, else barcode, else Option N).
+ * Optionally appends price when variants in the group have different prices.
  * @param {object} product
  * @param {number} [index]
+ * @param {{ showPrice?: boolean, formatPrice?: (n: number) => string }} [opts]
  */
-export function variantChipLabel(product, index = 0) {
+export function variantChipLabel(product, index = 0, opts = {}) {
   const specs = formatProductSpecs(product);
-  if (specs) return specs;
-  const barcode = String(product?.barcode || product?.sku || '').trim();
-  if (barcode) return barcode;
-  return `Option ${index + 1}`;
+  let label = specs;
+  if (!label) {
+    const barcode = String(product?.barcode || product?.sku || '').trim();
+    label = barcode || `Option ${index + 1}`;
+  }
+  if (opts.showPrice && typeof opts.formatPrice === 'function') {
+    const price = Number(product?.retailPrice ?? product?.price ?? 0);
+    label = `${label} · ${opts.formatPrice(price)}`;
+  }
+  return label;
+}
+
+/**
+ * True when variants do not all share the same price.
+ * @param {object[]} variants
+ */
+export function variantsHaveDifferentPrices(variants = []) {
+  if (variants.length < 2) return false;
+  const prices = variants.map((v) => Number(v?.retailPrice ?? v?.price ?? 0).toFixed(2));
+  return new Set(prices).size > 1;
 }
 
 /**

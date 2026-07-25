@@ -6,6 +6,7 @@ import {
   groupProductsByName,
   groupShowsSpecChips,
   variantChipLabel,
+  variantsHaveDifferentPrices,
 } from '../shared/catalog-store.js';
 
 const COLLECTION_GRADIENTS = [
@@ -364,7 +365,7 @@ export function productCardHtml(product, i18n) {
   const cartQty = Number(product._cartQty || 0);
   const variants = Array.isArray(product._variants) ? product._variants : [product];
   const groupKey = product._groupKey || '';
-  const specsHtml = variantChipsHtml(variants, product.id, groupKey, groupShowsSpecChips({ variants }));
+  const specsHtml = variantChipsHtml(variants, product.id, groupKey, groupShowsSpecChips({ variants }), i18n);
   const galleryHtml = productGalleryHtml(product, display.displayName, initial);
 
   return `
@@ -462,15 +463,19 @@ function productGalleryHtml(product, alt, initial) {
  * @param {string} groupKey
  * @param {boolean} show
  */
-function variantChipsHtml(variants, selectedId, groupKey, show) {
+function variantChipsHtml(variants, selectedId, groupKey, show, i18n) {
   if (!show || !variants.length) return '';
+  const showPrice = variantsHaveDifferentPrices(variants);
   return `
     <div class="product-card__specs" role="group" aria-label="Options">
       ${variants.map((variant, index) => {
         const stock = Number(variant.stockQuantity ?? variant.stock_quantity ?? variant.stock ?? 0);
         const selected = String(variant.id) === String(selectedId);
         const oos = stock <= 0;
-        const label = variantChipLabel(variant, index);
+        const label = variantChipLabel(variant, index, {
+          showPrice,
+          formatPrice: (n) => i18n.formatPrice(n),
+        });
         return `
           <button
             type="button"
