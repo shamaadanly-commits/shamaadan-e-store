@@ -255,6 +255,10 @@ export function mapProductFromDb(row) {
     collection_id: row.collection_id ?? null,
     color: row.color ? String(row.color) : '',
     scent: row.scent ? String(row.scent) : '',
+    createdAt: row.created_at || row.createdAt || null,
+    updatedAt: row.updated_at || row.updatedAt || null,
+    created_at: row.created_at || row.createdAt || null,
+    updated_at: row.updated_at || row.updatedAt || null,
   };
 }
 

@@ -93,6 +93,8 @@ export async function mount(root) {
   let editingCollectionId = null;
   let editingCategoryId = null;
   let catalogFilter = 'All';
+  let catalogSearch = '';
+  let catalogSort = 'newest';
   /** @type {{ id: string, username: string, displayName: string, role: string } | null} */
   let currentUser = null;
   let sessionTimer = 0;
@@ -147,6 +149,8 @@ export async function mount(root) {
     categoryCount: root.querySelector('[data-category-count]'),
     categoryFormHost: root.querySelector('[data-category-form-host]'),
     catalogFilter: root.querySelector('[data-catalog-filter]'),
+    catalogSearch: root.querySelector('[data-catalog-search]'),
+    catalogSort: root.querySelector('[data-catalog-sort]'),
     importCatalogFile: root.querySelector('[data-import-catalog-file]'),
     lastUpdated: root.querySelector('[data-last-updated]'),
     pageTitle: root.querySelector('[data-page-title]'),
@@ -317,6 +321,21 @@ export async function mount(root) {
   els.catalogFilter?.addEventListener('change', (event) => {
     catalogFilter = event.target.value || 'All';
     renderCatalog(state.getSnapshot());
+  });
+
+  els.catalogSort?.addEventListener('change', (event) => {
+    catalogSort = event.target.value || 'newest';
+    renderCatalog(state.getSnapshot());
+  });
+
+  let catalogSearchTimer = 0;
+  els.catalogSearch?.addEventListener('input', (event) => {
+    const value = event.target instanceof HTMLInputElement ? event.target.value : '';
+    window.clearTimeout(catalogSearchTimer);
+    catalogSearchTimer = window.setTimeout(() => {
+      catalogSearch = value;
+      renderCatalog(state.getSnapshot());
+    }, 150);
   });
 
   els.importCatalogFile?.addEventListener('change', async (event) => {
@@ -837,12 +856,8 @@ export async function mount(root) {
       editingCatalogId = null;
       catalogFormVisible = true;
       switchView('catalog');
-      renderCatalogForm();
-      requestAnimationFrame(() => {
-        const panel = els.catalogFormPanel;
-        if (!panel || panel.hidden) return;
-        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
+      renderCatalog(state.getSnapshot());
+      renderCatalogForm(null);
       return;
     }
 
@@ -896,20 +911,13 @@ export async function mount(root) {
       editingCatalogId = id;
       catalogFormVisible = true;
       const product = state.getSnapshot().products.find((p) => String(p.id) === id);
-      renderCatalogForm(product || null);
       switchView('catalog');
-
-      // On tablet/phone the form can sit below a long list — bring it into view / overlay.
-      requestAnimationFrame(() => {
-        const panel = els.catalogFormPanel;
-        if (!panel || panel.hidden) return;
-        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        panel.querySelector('input, textarea, select, button')?.focus?.({ preventScroll: true });
-      });
+      renderCatalog(state.getSnapshot());
+      renderCatalogForm(product || null);
       return;
     }
 
-    if (target.matches('[data-cancel-catalog-edit]')) {
+    if (target.closest('[data-cancel-catalog-edit]')) {
       editingCatalogId = null;
       catalogFormVisible = false;
       renderCatalogForm();
@@ -1469,6 +1477,77 @@ export async function mount(root) {
     catalogFormVisible = Boolean(visible);
     if (els.catalogFormPanel) {
       els.catalogFormPanel.hidden = !catalogFormVisible;
+      els.catalogFormPanel.classList.toggle('is-inline', catalogFormVisible);
+    }
+    if (!catalogFormVisible) {
+      restoreCatalogFormPanel();
+      root.querySelectorAll('[data-product-row].is-editing').forEach((row) => {
+        row.classList.remove('is-editing');
+      });
+    }
+  }
+
+  /** Keep the form panel outside the table so catalog re-renders don't destroy it. */
+  function restoreCatalogFormPanel() {
+    const panel = els.catalogFormPanel;
+    const catalogView = root.querySelector('[data-panel="catalog"]');
+    if (!panel || !catalogView) return;
+    if (panel.parentElement !== catalogView) {
+      catalogView.appendChild(panel);
+    }
+    root.querySelectorAll('[data-catalog-inline-dock]').forEach((dock) => dock.remove());
+  }
+
+  /**
+   * Place the edit/add form directly under the selected product (or above the list for Add).
+   * @param {object | null} product
+   */
+  function dockCatalogFormInline(product) {
+    const panel = els.catalogFormPanel;
+    if (!panel || !catalogFormVisible) return;
+
+    restoreCatalogFormPanel();
+    root.querySelectorAll('[data-product-row].is-editing').forEach((row) => {
+      row.classList.remove('is-editing');
+    });
+
+    const productId = product?.id ? String(product.id) : '';
+    const row = productId
+      ? els.catalogHost?.querySelector(`[data-product-row="${CSS.escape(productId)}"]`)
+      : null;
+
+    if (row) {
+      row.classList.add('is-editing');
+      const dock = document.createElement('tr');
+      dock.dataset.catalogInlineDock = '1';
+      dock.className = 'dash-catalog-inline-dock';
+      const cell = document.createElement('td');
+      cell.colSpan = 7;
+      cell.appendChild(panel);
+      dock.appendChild(cell);
+      row.after(dock);
+      panel.hidden = false;
+      panel.classList.add('is-inline');
+      requestAnimationFrame(() => {
+        dock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        panel.querySelector('input, textarea, select, button')?.focus?.({ preventScroll: true });
+      });
+      return;
+    }
+
+    // Add item — show form above the product table
+    const host = els.catalogHost;
+    if (host) {
+      const dock = document.createElement('div');
+      dock.dataset.catalogInlineDock = '1';
+      dock.className = 'dash-catalog-add-dock';
+      dock.appendChild(panel);
+      host.prepend(dock);
+      panel.hidden = false;
+      panel.classList.add('is-inline');
+      requestAnimationFrame(() => {
+        dock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
     }
   }
 
@@ -1476,7 +1555,7 @@ export async function mount(root) {
     if (!els.catalogFormHost) return;
     const snapshot = state.getSnapshot();
     const editing = product ?? (editingCatalogId
-      ? snapshot.products.find((p) => p.id === editingCatalogId)
+      ? snapshot.products.find((p) => String(p.id) === String(editingCatalogId))
       : null);
     const { collections, categories } = liveTaxonomy(snapshot);
 
@@ -1494,6 +1573,9 @@ export async function mount(root) {
       updateBarcodePreview(form);
     }
     setCatalogFormVisible(catalogFormVisible || Boolean(editing));
+    if (catalogFormVisible) {
+      dockCatalogFormInline(editing || null);
+    }
   }
 
   function exportCatalogCsv() {
@@ -1737,6 +1819,9 @@ export async function mount(root) {
   }
 
   function renderCatalog(snapshot) {
+    // Don't destroy the form if it was docked inside the table from a previous edit.
+    restoreCatalogFormPanel();
+
     const { products, collections, categories, managedCollections = [], managedCategories = [] } = snapshot;
 
     const collectionRows = (managedCollections.length ? managedCollections : collections)
@@ -1770,8 +1855,18 @@ export async function mount(root) {
     }
 
     if (els.catalogFilter) {
-      const liveFilters = collectionRows;
-      if (catalogFilter !== 'All' && !liveFilters.some((c) => c.name === catalogFilter)) {
+      // Prefer collections; also include category names so imported Arabic groups appear.
+      const names = new Map();
+      collectionRows.forEach((c) => names.set(c.name, c.name));
+      categoryRows.forEach((c) => {
+        if (!names.has(c.name)) names.set(c.name, c.name);
+      });
+      const liveFilters = [...names.values()].sort((a, b) => a.localeCompare(b, ['ar', 'en'], {
+        sensitivity: 'base',
+        numeric: true,
+      }));
+
+      if (catalogFilter !== 'All' && !liveFilters.includes(catalogFilter)) {
         catalogFilter = 'All';
       }
       const current = catalogFilter;
@@ -1783,8 +1878,8 @@ export async function mount(root) {
       } else {
         els.catalogFilter.innerHTML = `
           <option value="All"${current === 'All' ? ' selected' : ''}>All items</option>
-          ${liveFilters.map((c) => `
-            <option value="${escapeAttr(c.name)}"${c.name === current ? ' selected' : ''}>${escapeHtml(c.name)}</option>
+          ${liveFilters.map((name) => `
+            <option value="${escapeAttr(name)}"${name === current ? ' selected' : ''}>${escapeHtml(name)}</option>
           `).join('')}
         `;
       }
@@ -1794,18 +1889,45 @@ export async function mount(root) {
       els.catalogHost.innerHTML = catalogTableHtml(
         products.filter((p) => isLiveDbId(p.id)),
         catalogFilter,
+        { query: catalogSearch, sort: catalogSort },
       );
     }
 
     if (els.catalogCount) {
       const liveProducts = products.filter((p) => isLiveDbId(p.id));
-      const count = catalogFilter === 'All'
-        ? liveProducts.length
-        : liveProducts.filter((p) => p.collectionName === catalogFilter || p.category === catalogFilter).length;
-      els.catalogCount.textContent = `${count} item${count === 1 ? '' : 's'}`;
+      let visible = catalogFilter === 'All'
+        ? liveProducts
+        : liveProducts.filter((p) => p.collectionName === catalogFilter || p.category === catalogFilter);
+      const q = catalogSearch.trim().toLowerCase();
+      if (q) {
+        visible = visible.filter((p) => {
+          const name = String(p.title || p.name || '').toLowerCase();
+          const barcode = String(p.barcode || p.sku || '').toLowerCase();
+          return name.includes(q) || barcode.includes(q);
+        });
+      }
+      els.catalogCount.textContent = `${visible.length} item${visible.length === 1 ? '' : 's'}`;
+    }
+
+    if (els.catalogSort && els.catalogSort.value !== catalogSort) {
+      els.catalogSort.value = catalogSort;
+    }
+    if (els.catalogSearch && els.catalogSearch.value !== catalogSearch) {
+      // Keep typed text if user is mid-search; only sync when empty mismatch
+      if (!document.activeElement || document.activeElement !== els.catalogSearch) {
+        els.catalogSearch.value = catalogSearch;
+      }
     }
 
     renderTaxonomyForms();
+
+    // Re-dock an open edit form under the same product after table refresh.
+    if (catalogFormVisible) {
+      const editing = editingCatalogId
+        ? products.find((p) => String(p.id) === String(editingCatalogId))
+        : null;
+      dockCatalogFormInline(editing || null);
+    }
   }
 
   function renderAll(snapshot, options = {}) {

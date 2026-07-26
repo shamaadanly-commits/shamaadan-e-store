@@ -144,6 +144,10 @@ export function normalizeStoreProduct(raw) {
     show_on_website: raw.showOnWebsite !== false && raw.show_on_website !== false,
     color: raw.color ? String(raw.color).trim() : '',
     scent: raw.scent ? String(raw.scent).trim() : '',
+    createdAt: raw.createdAt || raw.created_at || null,
+    updatedAt: raw.updatedAt || raw.updated_at || null,
+    created_at: raw.createdAt || raw.created_at || null,
+    updated_at: raw.updatedAt || raw.updated_at || null,
   };
 }
 

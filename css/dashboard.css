@@ -2181,13 +2181,90 @@
   flex-wrap: wrap;
 }
 
+.items-toolbar__search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.75rem 1.15rem 0.85rem;
+  border-bottom: 1px solid var(--dash-border-soft);
+  background: var(--dash-surface);
+}
+
+.items-toolbar__search-input {
+  flex: 1 1 14rem;
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+  border: 1px solid var(--dash-border);
+  border-radius: var(--dash-radius-sm);
+  background: var(--dash-surface-2);
+  color: var(--dash-text);
+  padding: 0.55rem 0.85rem;
+  font-size: 0.95rem;
+}
+
+.items-toolbar__search-input:focus {
+  outline: 2px solid rgb(76 175 80 / 35%);
+  border-color: var(--dash-accent, #4caf50);
+}
+
+.items-toolbar__search .dash-select {
+  flex: 0 1 12rem;
+  min-height: 44px;
+}
+
 .dash-panel--item-form {
-  position: sticky;
-  top: 0.75rem;
   margin-bottom: 1rem;
 }
 
-/* Tablet / phone: keep Edit/Delete on-screen and open the form as an overlay */
+.dash-panel--item-form.is-inline {
+  position: static !important;
+  inset: auto !important;
+  height: auto !important;
+  max-height: none !important;
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+  border: none;
+  background: transparent;
+}
+
+.dash-catalog-inline-dock > td {
+  padding: 0 !important;
+  background: var(--dash-surface-2);
+  border-bottom: 2px solid rgb(76 175 80 / 45%);
+  vertical-align: top;
+}
+
+.dash-catalog-inline-dock .dash-panel--item-form {
+  border: 1px solid var(--dash-border-soft);
+  border-radius: var(--dash-radius-sm);
+  margin: 0.65rem 0.75rem 0.85rem;
+  background: var(--dash-surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 8%);
+}
+
+.dash-catalog-add-dock {
+  margin: 0 0 0.85rem;
+}
+
+.dash-catalog-add-dock .dash-panel--item-form {
+  border: 1px solid var(--dash-border-soft);
+  border-radius: var(--dash-radius-sm);
+  background: var(--dash-surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 8%);
+}
+
+.dash-table tbody tr.is-editing {
+  background: rgb(76 175 80 / 10%);
+}
+
+.dash-table tbody tr.is-editing td {
+  border-bottom-color: transparent;
+}
+
+/* Tablet / phone: keep Edit/Delete on-screen */
 @media (max-width: 1024px) {
   .dash-table th:last-child,
   .dash-table td:last-child {
@@ -2204,6 +2281,10 @@
     background: var(--dash-surface-2);
   }
 
+  .dash-table tbody tr.is-editing td:last-child {
+    background: rgb(76 175 80 / 10%);
+  }
+
   .dash-table__actions {
     gap: 0.4rem;
   }
@@ -2214,40 +2295,9 @@
     padding-inline: 0.85rem;
     font-size: 0.9rem;
   }
-
-  .dash-panel--item-form:not([hidden]) {
-    position: fixed;
-    inset: 0;
-    z-index: 90;
-    top: 0;
-    margin: 0;
-    border-radius: 0;
-    max-height: none;
-    height: 100dvh;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    background: var(--dash-surface);
-    box-shadow: var(--dash-shadow-lg);
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  .dash-panel--item-form .dash-panel__header {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    background: var(--dash-surface);
-  }
 }
 
 @media (min-width: 1025px) {
-  [data-panel='catalog'] {
-    display: grid;
-    grid-template-columns: 1fr minmax(20rem, 24rem);
-    gap: 1rem;
-    align-items: start;
-  }
-
   [data-panel='catalog'][hidden] {
     display: none !important;
   }

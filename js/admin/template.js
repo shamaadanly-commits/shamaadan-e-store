@@ -91,14 +91,31 @@ function ledgerPanelHtml(channel, title, ledger, metrics) {
 /**
  * @param {import('../dashboard.js').ProductRecord[]} products
  * @param {string} [filterCollection]
+ * @param {{ query?: string, sort?: string }} [opts]
  */
-export function catalogTableHtml(products, filterCollection = 'All') {
-  const filtered = filterCollection && filterCollection !== 'All'
+export function catalogTableHtml(products, filterCollection = 'All', opts = {}) {
+  const query = String(opts.query || '').trim().toLowerCase();
+  const sort = String(opts.sort || 'newest');
+
+  let filtered = filterCollection && filterCollection !== 'All'
     ? products.filter((p) => p.collectionName === filterCollection || p.category === filterCollection)
-    : products;
+    : [...products];
+
+  if (query) {
+    filtered = filtered.filter((p) => {
+      const name = String(p.title || p.name || '').toLowerCase();
+      const barcode = String(p.barcode || p.sku || '').toLowerCase();
+      const specs = [p.color, p.scent].filter(Boolean).join(' ').toLowerCase();
+      return name.includes(query) || barcode.includes(query) || specs.includes(query);
+    });
+  }
+
+  filtered = sortCatalogProducts(filtered, sort);
 
   if (!filtered.length) {
-    return '<p class="dash-empty">No products yet. Click <strong>+ ADD ITEM</strong> to create one.</p>';
+    return query
+      ? `<p class="dash-empty">No products match “${escapeHtml(String(opts.query || '').trim())}”.</p>`
+      : '<p class="dash-empty">No products yet. Click <strong>+ ADD ITEM</strong> to create one.</p>';
   }
 
   return `
@@ -121,6 +138,39 @@ export function catalogTableHtml(products, filterCollection = 'All') {
       </table>
     </div>
   `;
+}
+
+/**
+ * Sort products by date or name (Arabic + Latin via localeCompare).
+ * @param {import('../dashboard.js').ProductRecord[]} products
+ * @param {string} sort
+ */
+export function sortCatalogProducts(products, sort = 'newest') {
+  const list = [...products];
+  const nameOf = (p) => String(p.title || p.name || '').trim();
+  const dateOf = (p) => {
+    const raw = p.createdAt || p.created_at || p.updatedAt || p.updated_at || '';
+    const t = Date.parse(raw);
+    return Number.isFinite(t) ? t : 0;
+  };
+  // Arabic-aware alphabetical compare (also handles Latin / mixed names).
+  const byName = (a, b) => nameOf(a).localeCompare(nameOf(b), ['ar', 'en'], {
+    sensitivity: 'base',
+    numeric: true,
+    ignorePunctuation: true,
+  });
+
+  switch (sort) {
+    case 'oldest':
+      return list.sort((a, b) => dateOf(a) - dateOf(b) || byName(a, b));
+    case 'name-asc':
+      return list.sort(byName);
+    case 'name-desc':
+      return list.sort((a, b) => byName(b, a));
+    case 'newest':
+    default:
+      return list.sort((a, b) => dateOf(b) - dateOf(a) || byName(a, b));
+  }
 }
 
 function catalogRowHtml(product) {
@@ -986,6 +1036,25 @@ export function buildAdminShell() {
                   <span class="dash-panel__count" data-catalog-count>0 items</span>
                 </div>
               </header>
+              <div class="items-toolbar__search" role="search">
+                <label class="visually-hidden" for="catalog-search">Search by name or barcode</label>
+                <input
+                  id="catalog-search"
+                  type="search"
+                  class="dash-input items-toolbar__search-input dash-input--bidi"
+                  data-catalog-search
+                  placeholder="Search by name or barcode…"
+                  autocomplete="off"
+                  enterkeyhint="search"
+                >
+                <label class="visually-hidden" for="catalog-sort">Sort products</label>
+                <select id="catalog-sort" class="dash-select" data-catalog-sort aria-label="Sort products">
+                  <option value="newest">Sort: Newest first</option>
+                  <option value="oldest">Sort: Oldest first</option>
+                  <option value="name-asc">Sort: Name A → Z</option>
+                  <option value="name-desc">Sort: Name Z → A</option>
+                </select>
+              </div>
               <div class="dash-panel__body" data-catalog-host></div>
             </article>
 
