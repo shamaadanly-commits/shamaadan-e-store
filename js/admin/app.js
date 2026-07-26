@@ -838,6 +838,11 @@ export async function mount(root) {
       catalogFormVisible = true;
       switchView('catalog');
       renderCatalogForm();
+      requestAnimationFrame(() => {
+        const panel = els.catalogFormPanel;
+        if (!panel || panel.hidden) return;
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
       return;
     }
 
@@ -882,10 +887,25 @@ export async function mount(root) {
 
     const editCatalog = target.closest('[data-edit-catalog]');
     if (editCatalog) {
-      editingCatalogId = editCatalog.dataset.editCatalog;
+      // Ignore taps on Delete inside the actions cell (Delete is handled above).
+      if (target.closest('[data-delete-catalog]')) return;
+
+      const id = String(editCatalog.dataset.editCatalog || '').trim();
+      if (!id) return;
+
+      editingCatalogId = id;
       catalogFormVisible = true;
-      renderCatalogForm(state.getSnapshot().products.find((p) => p.id === editingCatalogId));
+      const product = state.getSnapshot().products.find((p) => String(p.id) === id);
+      renderCatalogForm(product || null);
       switchView('catalog');
+
+      // On tablet/phone the form can sit below a long list — bring it into view / overlay.
+      requestAnimationFrame(() => {
+        const panel = els.catalogFormPanel;
+        if (!panel || panel.hidden) return;
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        panel.querySelector('input, textarea, select, button')?.focus?.({ preventScroll: true });
+      });
       return;
     }
 

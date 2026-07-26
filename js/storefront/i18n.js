@@ -461,7 +461,13 @@ export function createI18n(initialLocale) {
   }
 
   function translateCategory(category) {
-    return t(`categories.${category}`) || category;
+    const name = String(category || '').trim();
+    if (!name || name === 'All') return t('categories.All') || 'All';
+    const key = `categories.${name}`;
+    const translated = t(key);
+    // Unknown/dynamic categories (e.g. from Excel import) — show the name, not the i18n key.
+    if (!translated || translated === key) return name;
+    return translated;
   }
 
   function translateProduct(product) {
@@ -476,7 +482,12 @@ export function createI18n(initialLocale) {
   }
 
   function translateCollection(id) {
-    return t(`collections.${id}`) || id;
+    const name = String(id || '').trim();
+    if (!name) return name;
+    const key = `collections.${name}`;
+    const translated = t(key);
+    if (!translated || translated === key) return name;
+    return translated;
   }
 
   function formatPrice(amount) {

@@ -915,6 +915,10 @@
   gap: 0.25rem;
 }
 
+.dash-table__actions .dash-btn {
+  touch-action: manipulation;
+}
+
 /* ── Product form — Loyverse underline inputs ────────────────────── */
 .dash-form__grid {
   display: grid;
@@ -2181,6 +2185,59 @@
   position: sticky;
   top: 0.75rem;
   margin-bottom: 1rem;
+}
+
+/* Tablet / phone: keep Edit/Delete on-screen and open the form as an overlay */
+@media (max-width: 1024px) {
+  .dash-table th:last-child,
+  .dash-table td:last-child {
+    position: sticky;
+    inset-inline-end: 0;
+    z-index: 3;
+    background: var(--dash-surface);
+    box-shadow: -6px 0 12px rgb(0 0 0 / 6%);
+    white-space: nowrap;
+  }
+
+  .dash-table th:last-child {
+    z-index: 4;
+    background: var(--dash-surface-2);
+  }
+
+  .dash-table__actions {
+    gap: 0.4rem;
+  }
+
+  .dash-table__actions .dash-btn {
+    min-height: 44px;
+    min-width: 4.5rem;
+    padding-inline: 0.85rem;
+    font-size: 0.9rem;
+  }
+
+  .dash-panel--item-form:not([hidden]) {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    top: 0;
+    margin: 0;
+    border-radius: 0;
+    max-height: none;
+    height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: var(--dash-surface);
+    box-shadow: var(--dash-shadow-lg);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .dash-panel--item-form .dash-panel__header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--dash-surface);
+  }
 }
 
 @media (min-width: 1025px) {
