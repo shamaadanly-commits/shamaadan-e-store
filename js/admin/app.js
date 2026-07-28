@@ -14,7 +14,7 @@ import {
   persistEnv,
 } from '../shared/offline.js';
 import { bindImageUploader } from './image-upload.js';
-import { bindColorMultiInput } from './color-multi.js';
+import { bindColorMultiInput, readColorVariantsFromForm } from './color-multi.js';
 import { importCatalogFromSpreadsheet } from './catalog-import.js';
 import {
   fetchAdminCatalog,
@@ -1147,23 +1147,22 @@ export async function mount(root) {
       ? (managedCategories.find((c) => c.id === categoryId)?.name || '')
       : '';
 
-    const colors = String(data.get('colorsList') || data.get('color') || '')
-      .split(/\n|,/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-
     const baseBarcode = String(data.get('barcode') || '').trim();
     const existingId = isLiveDbId(data.get('id')) ? String(data.get('id')) : '';
+    const fallbackPrice = Number(data.get('retailPrice'));
+    const fallbackDescription = String(data.get('description') || '').trim();
+    const colorVariants = readColorVariantsFromForm(data, {
+      fallbackPrice,
+      fallbackDescription,
+    });
 
     const baseProduct = {
       title: String(data.get('title')),
-      description: String(data.get('description') || '').trim(),
       collection_id: isLiveDbId(collectionId) ? collectionId : null,
       category_id: isLiveDbId(categoryId) ? categoryId : null,
       collectionName,
       category,
       costPrice: Number(data.get('costPrice')),
-      retailPrice: Number(data.get('retailPrice')),
       stockQuantity: Number(data.get('stockQuantity')),
       scent: String(data.get('scent') || '').trim(),
       imageUrls,
@@ -1179,12 +1178,14 @@ export async function mount(root) {
 
     try {
       // No colors → save as a single item (color blank).
-      if (!colors.length) {
+      if (!colorVariants.length) {
         await persistUpsertProduct({
           ...baseProduct,
           id: existingId || undefined,
           barcode: baseBarcode,
           color: '',
+          retailPrice: fallbackPrice,
+          description: fallbackDescription,
         });
         await refreshFromSupabase();
         return true;
@@ -1192,31 +1193,40 @@ export async function mount(root) {
 
       // Edit: update this row with the first color; create siblings for any extra colors.
       if (existingId) {
+        const first = colorVariants[0];
         await persistUpsertProduct({
           ...baseProduct,
           id: existingId,
           barcode: baseBarcode,
-          color: colors[0],
+          color: first.color,
+          retailPrice: first.retailPrice,
+          description: first.description,
         });
-        for (let i = 1; i < colors.length; i += 1) {
+        for (let i = 1; i < colorVariants.length; i += 1) {
+          const variant = colorVariants[i];
           await persistUpsertProduct({
             ...baseProduct,
             id: undefined,
-            barcode: barcodeForColor(baseBarcode, i, colors.length),
-            color: colors[i],
+            barcode: barcodeForColor(baseBarcode, i, colorVariants.length),
+            color: variant.color,
+            retailPrice: variant.retailPrice,
+            description: variant.description,
           });
         }
         await refreshFromSupabase();
         return true;
       }
 
-      // Add: one product row per color (same name → grouped chips on storefront/POS).
-      for (let i = 0; i < colors.length; i += 1) {
+      // Add: one product row per color (own price + description).
+      for (let i = 0; i < colorVariants.length; i += 1) {
+        const variant = colorVariants[i];
         await persistUpsertProduct({
           ...baseProduct,
           id: undefined,
-          barcode: barcodeForColor(baseBarcode, i, colors.length),
-          color: colors[i],
+          barcode: barcodeForColor(baseBarcode, i, colorVariants.length),
+          color: variant.color,
+          retailPrice: variant.retailPrice,
+          description: variant.description,
         });
       }
       await refreshFromSupabase();
@@ -1619,7 +1629,11 @@ export async function mount(root) {
     const form = els.catalogFormHost.querySelector('[data-catalog-form]');
     if (form) {
       bindImageUploader(form);
-      bindColorMultiInput(form);
+      bindColorMultiInput(form, {
+        initialColor: editing?.color || '',
+        initialPrice: editing?.retailPrice ?? '',
+        initialDescription: editing?.description || '',
+      });
       populateFormDropdowns(collections, categories, form, {
         collectionId: editing?.collection_id || '',
         categoryId: editing?.category_id || '',

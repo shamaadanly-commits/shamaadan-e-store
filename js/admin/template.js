@@ -362,7 +362,7 @@ export function catalogFormHtml(product = null, collections = [], categories = [
         ${barcodeFieldHtml('cat-barcode', product?.barcode ?? '', 'Barcode / SKU')}
         <div class="dash-field dash-field--full" data-color-multi>
           <label><span class="dash-field__label-en">Colors</span> <span class="dash-field__label-ar" lang="ar">الألوان</span></label>
-          <input type="hidden" name="colorsList" data-colors-value value="${escapeAttr(product?.color ? String(product.color) : '')}">
+          <input type="hidden" name="colorsList" data-colors-value value="">
           <div class="dash-color-chips" data-color-chips></div>
           <div class="dash-color-add">
             <input
@@ -370,14 +370,15 @@ export function catalogFormHtml(product = null, collections = [], categories = [
               type="text"
               class="dash-input--bidi"
               data-color-input
-              placeholder="e.g. Blue"
+              placeholder="Color name — اسم اللون"
               autocomplete="off"
+              enterkeyhint="done"
+              inputmode="text"
             >
-            <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-color-add>+ Add color</button>
+            <button type="button" class="dash-btn dash-btn--ghost" data-color-add>+ Add color / إضافة لون</button>
           </div>
           <p class="dash-field__hint">
-            Add every color this item comes in. Each color is saved as its own barcode/SKU with the same name (shown as selectable chips on the website &amp; POS).
-            ${isEdit ? ' Extra colors added here create new variants; this row keeps the first color.' : ''}
+            Each color can have its own price and description. Same product name → chips on website &amp; POS.
           </p>
         </div>
         <div class="dash-field">
