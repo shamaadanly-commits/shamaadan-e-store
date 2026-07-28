@@ -14,6 +14,7 @@ import {
   persistEnv,
 } from '../shared/offline.js';
 import { bindImageUploader } from './image-upload.js';
+import { bindColorMultiInput } from './color-multi.js';
 import { importCatalogFromSpreadsheet } from './catalog-import.js';
 import {
   fetchAdminCatalog,
@@ -1146,8 +1147,15 @@ export async function mount(root) {
       ? (managedCategories.find((c) => c.id === categoryId)?.name || '')
       : '';
 
-    const product = {
-      id: isLiveDbId(data.get('id')) ? String(data.get('id')) : undefined,
+    const colors = String(data.get('colorsList') || data.get('color') || '')
+      .split(/\n|,/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const baseBarcode = String(data.get('barcode') || '').trim();
+    const existingId = isLiveDbId(data.get('id')) ? String(data.get('id')) : '';
+
+    const baseProduct = {
       title: String(data.get('title')),
       description: String(data.get('description') || '').trim(),
       collection_id: isLiveDbId(collectionId) ? collectionId : null,
@@ -1157,15 +1165,60 @@ export async function mount(root) {
       costPrice: Number(data.get('costPrice')),
       retailPrice: Number(data.get('retailPrice')),
       stockQuantity: Number(data.get('stockQuantity')),
-      barcode: String(data.get('barcode')),
-      color: String(data.get('color') || '').trim(),
       scent: String(data.get('scent') || '').trim(),
       imageUrls,
       showOnWebsite: data.has('pushToWebsite'),
     };
 
+    /** @param {string} barcode @param {number} index @param {number} total */
+    function barcodeForColor(barcode, index, total) {
+      if (!barcode) return '';
+      if (total <= 1) return barcode;
+      return index === 0 ? barcode : `${barcode}-${index + 1}`;
+    }
+
     try {
-      await persistUpsertProduct(product);
+      // No colors → save as a single item (color blank).
+      if (!colors.length) {
+        await persistUpsertProduct({
+          ...baseProduct,
+          id: existingId || undefined,
+          barcode: baseBarcode,
+          color: '',
+        });
+        await refreshFromSupabase();
+        return true;
+      }
+
+      // Edit: update this row with the first color; create siblings for any extra colors.
+      if (existingId) {
+        await persistUpsertProduct({
+          ...baseProduct,
+          id: existingId,
+          barcode: baseBarcode,
+          color: colors[0],
+        });
+        for (let i = 1; i < colors.length; i += 1) {
+          await persistUpsertProduct({
+            ...baseProduct,
+            id: undefined,
+            barcode: barcodeForColor(baseBarcode, i, colors.length),
+            color: colors[i],
+          });
+        }
+        await refreshFromSupabase();
+        return true;
+      }
+
+      // Add: one product row per color (same name → grouped chips on storefront/POS).
+      for (let i = 0; i < colors.length; i += 1) {
+        await persistUpsertProduct({
+          ...baseProduct,
+          id: undefined,
+          barcode: barcodeForColor(baseBarcode, i, colors.length),
+          color: colors[i],
+        });
+      }
       await refreshFromSupabase();
       return true;
     } catch (err) {
@@ -1566,6 +1619,7 @@ export async function mount(root) {
     const form = els.catalogFormHost.querySelector('[data-catalog-form]');
     if (form) {
       bindImageUploader(form);
+      bindColorMultiInput(form);
       populateFormDropdowns(collections, categories, form, {
         collectionId: editing?.collection_id || '',
         categoryId: editing?.category_id || '',
