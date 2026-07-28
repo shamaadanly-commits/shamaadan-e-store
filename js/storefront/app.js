@@ -4,8 +4,9 @@
  */
 import { isSupabaseConfigured } from '../../shared/supabase.js';
 import { createI18n } from './i18n.js';
-import { buildStorefrontHtml, productCardCartControlHtml } from './template.js';
+import { buildStorefrontHtml, productCardCartControlHtml, productDetailHtml } from './template.js';
 import { loadProducts, filterProducts, renderProductGrid } from './products.js';
+import { productGroupKey } from '../shared/catalog-store.js';
 import { createCart, bindCartUI, showToast } from './cart.js';
 import { initCheckout } from './checkout.js';
 import { initNav, bindFilters } from './nav.js';
@@ -54,6 +55,8 @@ export async function mount(root) {
   let navApi = null;
   /** @type {Map<string, string>} group key → selected product id */
   const selectedVariantByGroup = new Map();
+  /** @type {string | null} */
+  let openDetailProductId = null;
 
   root.className = 'shop';
   document.body.style.background = '#181510';
@@ -70,15 +73,62 @@ export async function mount(root) {
 
   function syncCardCartControls() {
     const qtys = cartQtyMap();
-    root.querySelectorAll('[data-card-cart]').forEach((host) => {
-      const id = host.getAttribute('data-card-cart');
+    root.querySelectorAll('[data-card-cart], [data-detail-cart]').forEach((host) => {
+      const id = host.getAttribute('data-card-cart') || host.getAttribute('data-detail-cart');
       if (!id) return;
-      const card = host.closest('[data-stock]');
-      const stock = Number(card?.getAttribute('data-stock') || 0);
+      const panel = host.closest('[data-stock]');
+      const stock = Number(panel?.getAttribute('data-stock') || 0);
       const qty = qtys.get(String(id)) || 0;
       const html = productCardCartControlHtml(id, qty, stock <= 0, i18n);
       if (host.innerHTML !== html) host.innerHTML = html;
     });
+  }
+
+  function getDetailContext(productId) {
+    const product = products.find((p) => String(p.id) === String(productId));
+    if (!product) return null;
+    const key = productGroupKey(product.title || product.name);
+    const preferred = selectedVariantByGroup.get(key);
+    const variants = products.filter(
+      (p) => productGroupKey(p.title || p.name) === key,
+    );
+    const selected = (preferred && variants.find((v) => String(v.id) === String(preferred)))
+      || variants.find((v) => String(v.id) === String(productId))
+      || product;
+    return { product: selected, variants, groupKey: key };
+  }
+
+  function closeProductDetail() {
+    root.querySelector('[data-product-detail]')?.remove();
+    openDetailProductId = null;
+    document.body.classList.remove('product-detail-open');
+  }
+
+  function openProductDetail(productId) {
+    const ctx = getDetailContext(productId);
+    if (!ctx) return;
+
+    selectedVariantByGroup.set(ctx.groupKey, String(ctx.product.id));
+    root.querySelector('[data-product-detail]')?.remove();
+    openDetailProductId = String(ctx.product.id);
+
+    const qty = cartQtyMap().get(String(ctx.product.id)) || 0;
+    root.insertAdjacentHTML(
+      'beforeend',
+      productDetailHtml({
+        product: ctx.product,
+        variants: ctx.variants,
+        groupKey: ctx.groupKey,
+        cartQty: qty,
+        i18n,
+      }),
+    );
+    document.body.classList.add('product-detail-open');
+  }
+
+  function refreshOpenProductDetail() {
+    if (!openDetailProductId) return;
+    openProductDetail(openDetailProductId);
   }
 
   function applyFilter(filter) {
@@ -119,6 +169,11 @@ export async function mount(root) {
       return;
     }
 
+    if (event.target.closest('[data-close-product-detail]')) {
+      closeProductDetail();
+      return;
+    }
+
     const collectionLink = event.target.closest('[data-collection]');
     if (collectionLink) {
       const name = collectionLink.dataset.collection;
@@ -128,14 +183,17 @@ export async function mount(root) {
       return;
     }
 
-    const selectImage = event.target.closest('[data-action="select-image"]');
+    const selectImage = event.target.closest('[data-action="select-image"], [data-action="detail-select-image"]');
     if (selectImage) {
       const url = selectImage.dataset.imageUrl;
-      const card = selectImage.closest('[data-product-id]');
-      const main = card?.querySelector('[data-card-main-image]');
+      const scope = selectImage.closest('[data-card-gallery]')?.parentElement
+        || selectImage.closest('[data-product-detail-panel]')
+        || selectImage.closest('[data-product-id]');
+      const main = scope?.querySelector('[data-card-main-image]');
       if (url && main) {
         main.src = url;
-        card.querySelectorAll('[data-action="select-image"]').forEach((thumb) => {
+        (scope || root).querySelectorAll('[data-action="select-image"], [data-action="detail-select-image"]').forEach((thumb) => {
+          if (!scope?.contains(thumb)) return;
           const active = thumb === selectImage;
           thumb.classList.toggle('is-active', active);
           thumb.setAttribute('aria-selected', active ? 'true' : 'false');
@@ -144,13 +202,18 @@ export async function mount(root) {
       return;
     }
 
-    const selectVariant = event.target.closest('[data-action="select-variant"]');
+    const selectVariant = event.target.closest('[data-action="select-variant"], [data-action="detail-select-variant"]');
     if (selectVariant) {
       const id = selectVariant.dataset.productId;
       const groupKey = selectVariant.dataset.groupKey;
       if (id && groupKey) {
         selectedVariantByGroup.set(groupKey, id);
+        const inDetail = Boolean(selectVariant.closest('[data-product-detail]'));
         applyFilter(activeFilter);
+        if (inDetail) {
+          openDetailProductId = id;
+          refreshOpenProductDetail();
+        }
       }
       return;
     }
@@ -180,42 +243,66 @@ export async function mount(root) {
     }
 
     const btn = event.target.closest('[data-action="add-to-cart"]');
-    if (!btn || btn.disabled) return;
+    if (btn) {
+      if (btn.disabled) return;
 
-    const id = btn.dataset.productId;
-    const product = products.find((p) => String(p.id) === String(id));
-    if (!product) return;
+      const id = btn.dataset.productId;
+      const product = products.find((p) => String(p.id) === String(id));
+      if (!product) return;
 
-    const stock = Number(product.stockQuantity ?? product.stock ?? product.stock_quantity ?? 0);
-    if (stock <= 0) {
-      showToast(root, i18n.t('shop.outOfStock'));
+      const stock = Number(product.stockQuantity ?? product.stock ?? product.stock_quantity ?? 0);
+      if (stock <= 0) {
+        showToast(root, i18n.t('shop.outOfStock'));
+        return;
+      }
+
+      const display = i18n.translateProduct(product);
+      const result = cart.add(product);
+
+      if (!result.added) {
+        showToast(
+          root,
+          result.reason === 'max_stock'
+            ? i18n.t('shop.maxStock', { count: stock })
+            : i18n.t('shop.outOfStock'),
+        );
+        return;
+      }
+
+      showToast(root, i18n.t('shop.addedToast', { name: display.displayName }));
       return;
     }
 
-    const display = i18n.translateProduct(product);
-    const result = cart.add(product);
+    const openCard = event.target.closest('[data-action="open-product"]');
+    if (openCard) {
+      const id = openCard.dataset.productId;
+      if (id) openProductDetail(id);
+    }
+  }
 
-    if (!result.added) {
-      showToast(
-        root,
-        result.reason === 'max_stock'
-          ? i18n.t('shop.maxStock', { count: stock })
-          : i18n.t('shop.outOfStock'),
-      );
+  function onRootKeydown(event) {
+    if (event.key === 'Escape' && openDetailProductId) {
+      closeProductDetail();
       return;
     }
-
-    showToast(root, i18n.t('shop.addedToast', { name: display.displayName }));
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const card = event.target.closest('[data-action="open-product"]');
+    if (!card || event.target !== card) return;
+    event.preventDefault();
+    const id = card.dataset.productId;
+    if (id) openProductDetail(id);
   }
 
   function rerender() {
     const scrollY = window.scrollY;
+    const keepDetailId = openDetailProductId;
 
     root.innerHTML = buildStorefrontHtml({ products, categories, collections, i18n });
     i18n.applyToDocument(root);
     bindInteractions();
 
     applyFilter(activeFilter);
+    if (keepDetailId) openProductDetail(keepDetailId);
 
     const currentLenis = getLenis();
     if (currentLenis) {
@@ -230,6 +317,7 @@ export async function mount(root) {
   }
 
   root.addEventListener('click', onRootClick);
+  root.addEventListener('keydown', onRootKeydown);
   cart.subscribe(() => {
     syncCardCartControls();
     checkout.refresh();

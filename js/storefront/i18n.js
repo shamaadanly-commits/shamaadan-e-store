@@ -79,6 +79,11 @@ const MESSAGES = {
       onlyOneLeft: 'Only 1 left',
       lowStock: 'Only {count} left',
       maxStock: 'Only {count} available',
+      details: 'Product details',
+      closeDetails: 'Close details',
+      description: 'Description',
+      options: 'Options',
+      viewDetails: 'View details',
     },
     checkout: {
       title: 'Checkout',
@@ -265,6 +270,11 @@ const MESSAGES = {
       onlyOneLeft: 'تبقى قطعة واحدة',
       lowStock: 'تبقى {count} فقط',
       maxStock: 'المتوفر {count} فقط',
+      details: 'تفاصيل المنتج',
+      closeDetails: 'إغلاق التفاصيل',
+      description: 'الوصف',
+      options: 'الخيارات',
+      viewDetails: 'عرض التفاصيل',
     },
     checkout: {
       title: 'إتمام الطلب',
