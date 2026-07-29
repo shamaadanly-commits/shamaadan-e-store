@@ -96,8 +96,9 @@ function sanitizePlainField(val, jsonKey) {
       if (typeof parsed === 'string') return parsed || null;
       if (jsonKey && typeof parsed === 'object' && parsed !== null) return String(parsed[jsonKey] || '').trim() || null;
       return null;
-    } catch { /* not JSON, keep as-is */ }
+    } catch { /* not valid JSON as a whole */ }
   }
+  if (/^"[^"]+"\s*:/.test(s)) return null;
   return s;
 }
 

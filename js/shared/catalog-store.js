@@ -107,8 +107,10 @@ export function normalizeStoreProduct(raw) {
         if (typeof parsed === 'string') return parsed;
         if (key && typeof parsed === 'object' && parsed !== null) return String(parsed[key] || '').trim();
         return '';
-      } catch { /* not JSON */ }
+      } catch { /* not valid JSON as a whole */ }
     }
+    // Detect JSON key-value fragments like "retailPrice":30 or "color":"blue"
+    if (/^"[^"]+"\s*:/.test(s)) return '';
     return s;
   };
 
