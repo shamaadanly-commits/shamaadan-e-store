@@ -448,15 +448,28 @@ function productOptionsHtml(products = []) {
 
 /**
  * The "Record Waste" form (product, quantity, reason).
- * @param {Array<object>} products
+ * Product picker is search-driven — wired by bindWasteProductSearch in app.js.
+ * @param {Array<object>} [_products]
  */
-export function wasteFormHtml(products = []) {
-  const options = productOptionsHtml(products);
+export function wasteFormHtml(_products = []) {
   return `
     <form class="dash-form" data-waste-form autocomplete="off">
-      <div class="dash-field">
-        <label for="waste-product">Product</label>
-        <select id="waste-product" name="product_id" data-waste-product required>${options}</select>
+      <div class="dash-field dash-field--full" data-waste-product-picker>
+        <label for="waste-product-search">Product</label>
+        <input
+          id="waste-product-search"
+          type="search"
+          class="dash-input dash-input--bidi"
+          data-waste-product-search
+          placeholder="Search by name or barcode…"
+          autocomplete="off"
+          enterkeyhint="search"
+          inputmode="search"
+        >
+        <input type="hidden" name="product_id" data-waste-product-id value="" required>
+        <div class="dash-waste-selected" data-waste-product-selected hidden></div>
+        <div class="dash-waste-results" data-waste-product-results role="listbox" aria-label="Matching products"></div>
+        <p class="dash-field__hint" data-waste-product-hint>Type a name or barcode to find the product.</p>
       </div>
       <div class="dash-form__grid">
         <div class="dash-field">

@@ -1815,6 +1815,127 @@ export async function mount(root) {
     if (!els.wasteFormHost) return;
     const products = state.getSnapshot().products.filter((p) => isLiveDbId(p.id));
     els.wasteFormHost.innerHTML = wasteFormHtml(products);
+    const form = els.wasteFormHost.querySelector('[data-waste-form]');
+    if (form) bindWasteProductSearch(form, products);
+  }
+
+  /**
+   * Searchable product picker for the waste form.
+   * @param {HTMLFormElement} form
+   * @param {Array<object>} products
+   */
+  function bindWasteProductSearch(form, products = []) {
+    const search = form.querySelector('[data-waste-product-search]');
+    const hidden = form.querySelector('[data-waste-product-id]');
+    const results = form.querySelector('[data-waste-product-results]');
+    const selected = form.querySelector('[data-waste-product-selected]');
+    const hint = form.querySelector('[data-waste-product-hint]');
+    if (!search || !hidden || !results || !selected) return;
+
+    const list = (products || []).filter((p) => p?.id);
+
+    function productLabel(p) {
+      const title = String(p.title || p.name || 'Untitled').trim();
+      const specs = [p.color, p.scent].filter(Boolean).join(' · ');
+      const barcode = String(p.barcode || '').trim();
+      const stock = Number(p.stockQuantity ?? p.stock ?? 0);
+      return { title, specs, barcode, stock };
+    }
+
+    function matchesQuery(p, q) {
+      if (!q) return false;
+      const { title, specs, barcode } = productLabel(p);
+      const hay = `${title} ${specs} ${barcode}`.toLowerCase();
+      return hay.includes(q);
+    }
+
+    function clearSelection() {
+      hidden.value = '';
+      selected.hidden = true;
+      selected.innerHTML = '';
+    }
+
+    function setSelection(p) {
+      const { title, specs, barcode, stock } = productLabel(p);
+      hidden.value = String(p.id);
+      selected.hidden = false;
+      selected.innerHTML = `
+        <div class="dash-waste-selected__row">
+          <div>
+            <strong>${escapeHtml(title)}</strong>
+            ${specs ? `<span class="dash-waste-selected__meta">${escapeHtml(specs)}</span>` : ''}
+            ${barcode ? `<span class="dash-waste-selected__meta">${escapeHtml(barcode)}</span>` : ''}
+            <span class="dash-waste-selected__meta">Stock: ${stock}</span>
+          </div>
+          <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-waste-clear-product>Change</button>
+        </div>`;
+      results.innerHTML = '';
+      results.hidden = true;
+      if (hint) hint.hidden = true;
+      search.value = title;
+    }
+
+    function renderResults(query) {
+      const q = String(query || '').trim().toLowerCase();
+      if (!q) {
+        results.innerHTML = '';
+        results.hidden = true;
+        if (hint && !hidden.value) hint.hidden = false;
+        return;
+      }
+
+      const hits = list.filter((p) => matchesQuery(p, q)).slice(0, 40);
+      if (!hits.length) {
+        results.hidden = false;
+        results.innerHTML = '<p class="dash-waste-results__empty">No products match that search.</p>';
+        if (hint) hint.hidden = true;
+        return;
+      }
+
+      results.hidden = false;
+      if (hint) hint.hidden = true;
+      results.innerHTML = hits.map((p) => {
+        const { title, specs, barcode, stock } = productLabel(p);
+        return `
+          <button
+            type="button"
+            class="dash-waste-results__item"
+            role="option"
+            data-waste-pick-product="${escapeAttr(p.id)}"
+          >
+            <span class="dash-waste-results__title">${escapeHtml(title)}</span>
+            ${specs ? `<span class="dash-waste-results__sub">${escapeHtml(specs)}</span>` : ''}
+            <span class="dash-waste-results__sub">${barcode ? escapeHtml(barcode) + ' · ' : ''}Stock ${stock}</span>
+          </button>`;
+      }).join('');
+    }
+
+    search.addEventListener('input', () => {
+      if (hidden.value) clearSelection();
+      renderResults(search.value);
+    });
+
+    search.addEventListener('focus', () => {
+      if (search.value.trim() && !hidden.value) renderResults(search.value);
+    });
+
+    results.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-waste-pick-product]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-waste-pick-product');
+      const product = list.find((p) => String(p.id) === String(id));
+      if (product) setSelection(product);
+    });
+
+    selected.addEventListener('click', (event) => {
+      if (!event.target.closest('[data-waste-clear-product]')) return;
+      clearSelection();
+      search.value = '';
+      search.focus();
+      if (hint) hint.hidden = false;
+      results.innerHTML = '';
+      results.hidden = true;
+    });
   }
 
   async function refreshWaste() {
