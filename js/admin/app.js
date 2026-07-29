@@ -1191,8 +1191,13 @@ export async function mount(root) {
         return true;
       }
 
-      // Edit: update this row with the first color; create siblings for any extra colors.
+      // Edit: update this row with the first color; reuse existing sibling rows for extra colors.
       if (existingId) {
+        const productTitle = baseProduct.title;
+        const siblings = (state.getSnapshot().products || [])
+          .filter((p) => isLiveDbId(p.id) && String(p.id) !== existingId
+            && String(p.title || p.name || '').trim().toLowerCase() === productTitle.trim().toLowerCase());
+
         const first = colorVariants[0];
         await persistUpsertProduct({
           ...baseProduct,
@@ -1204,10 +1209,12 @@ export async function mount(root) {
         });
         for (let i = 1; i < colorVariants.length; i += 1) {
           const variant = colorVariants[i];
+          const existingSibling = siblings.find((s) =>
+            String(s.color || '').trim().toLowerCase() === variant.color.trim().toLowerCase());
           await persistUpsertProduct({
             ...baseProduct,
-            id: undefined,
-            barcode: barcodeForColor(baseBarcode, i, colorVariants.length),
+            id: existingSibling ? String(existingSibling.id) : undefined,
+            barcode: existingSibling?.barcode || barcodeForColor(baseBarcode, i, colorVariants.length),
             color: variant.color,
             retailPrice: variant.retailPrice,
             description: variant.description,

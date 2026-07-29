@@ -191,9 +191,24 @@ function catalogRowHtml(product) {
           <div>
             <span class="dash-table__title">${escapeHtml(product.title)}</span>
             ${(() => {
-              const specs = [product.color, product.scent].filter(Boolean).join(' · ');
+              let color = String(product.color || '');
+              let scent = String(product.scent || '');
+              // Guard: strip raw JSON that may have been saved by a bug.
+              if (color.startsWith('{') || color.startsWith('[') || color.startsWith('"')) {
+                try { const parsed = JSON.parse(color); color = typeof parsed === 'string' ? parsed : parsed?.color || ''; } catch { color = ''; }
+              }
+              if (scent.startsWith('{') || scent.startsWith('[') || scent.startsWith('"')) {
+                try { const parsed = JSON.parse(scent); scent = typeof parsed === 'string' ? parsed : ''; } catch { scent = ''; }
+              }
+              const specs = [color, scent].filter(Boolean).join(' · ');
               if (specs) return `<span class="dash-table__sub">${escapeHtml(specs)}</span>`;
-              if (product.description) return `<span class="dash-table__sub">${escapeHtml(String(product.description).slice(0, 80))}</span>`;
+              if (product.description) {
+                let desc = String(product.description);
+                if (desc.startsWith('{') || desc.startsWith('[') || desc.startsWith('"')) {
+                  try { const parsed = JSON.parse(desc); desc = typeof parsed === 'string' ? parsed : parsed?.description || ''; } catch { /* keep */ }
+                }
+                if (desc) return `<span class="dash-table__sub">${escapeHtml(desc.slice(0, 80))}</span>`;
+              }
               return '';
             })()}
           </div>

@@ -97,6 +97,21 @@ export function normalizeTaxonomyItem(raw, index = 0) {
  * @returns {StoreProduct}
  */
 export function normalizeStoreProduct(raw) {
+  /** Strip raw JSON accidentally stored in plain-text fields. */
+  const cleanField = (val, key) => {
+    const s = String(val || '').trim();
+    if (!s) return '';
+    if (s.startsWith('{') || s.startsWith('[') || s.startsWith('"')) {
+      try {
+        const parsed = JSON.parse(s);
+        if (typeof parsed === 'string') return parsed;
+        if (key && typeof parsed === 'object' && parsed !== null) return String(parsed[key] || '').trim();
+        return '';
+      } catch { /* not JSON */ }
+    }
+    return s;
+  };
+
   const imageUrls = Array.isArray(raw.imageUrls)
     ? raw.imageUrls.filter(Boolean)
     : Array.isArray(raw.image_urls)
@@ -123,7 +138,7 @@ export function normalizeStoreProduct(raw) {
     barcode,
     name: title,
     title,
-    description: raw.description ? String(raw.description) : '',
+    description: cleanField(raw.description, 'description'),
     category,
     collectionName,
     category_id: raw.category_id ?? raw.categoryId ?? null,
@@ -142,8 +157,8 @@ export function normalizeStoreProduct(raw) {
     is_active: isActive,
     showOnWebsite: raw.showOnWebsite !== false && raw.show_on_website !== false,
     show_on_website: raw.showOnWebsite !== false && raw.show_on_website !== false,
-    color: raw.color ? String(raw.color).trim() : '',
-    scent: raw.scent ? String(raw.scent).trim() : '',
+    color: cleanField(raw.color, 'color'),
+    scent: cleanField(raw.scent),
     createdAt: raw.createdAt || raw.created_at || null,
     updatedAt: raw.updatedAt || raw.updated_at || null,
     created_at: raw.createdAt || raw.created_at || null,

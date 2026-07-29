@@ -86,6 +86,21 @@ export function mapSupabaseNetworkError(err, action = 'talking to Supabase') {
   return err instanceof Error ? err : new Error(raw);
 }
 
+/** Prevent raw JSON from being stored in plain-text fields like color/scent. */
+function sanitizePlainField(val, jsonKey) {
+  const s = String(val || '').trim();
+  if (!s) return null;
+  if (s.startsWith('{') || s.startsWith('[') || s.startsWith('"')) {
+    try {
+      const parsed = JSON.parse(s);
+      if (typeof parsed === 'string') return parsed || null;
+      if (jsonKey && typeof parsed === 'object' && parsed !== null) return String(parsed[jsonKey] || '').trim() || null;
+      return null;
+    } catch { /* not JSON, keep as-is */ }
+  }
+  return s;
+}
+
 function assertConfigured() {
   if (!isSupabaseConfigured()) {
     throw new Error(
@@ -234,7 +249,7 @@ export function mapProductFromDb(row) {
     sku: String(row.sku ?? row.barcode ?? ''),
     name: String(row.name ?? row.title ?? 'Untitled'),
     title: String(row.name ?? row.title ?? 'Untitled'),
-    description: row.description ? String(row.description) : '',
+    description: sanitizePlainField(row.description, 'description') || '',
     category: String(row.category ?? 'General'),
     collectionName: String(row.collection ?? row.collection_name ?? row.category ?? 'General'),
     price: Number(row.retail_price ?? row.price ?? 0),
@@ -253,8 +268,8 @@ export function mapProductFromDb(row) {
     show_on_website: row.show_on_website !== false,
     category_id: row.category_id ?? null,
     collection_id: row.collection_id ?? null,
-    color: row.color ? String(row.color) : '',
-    scent: row.scent ? String(row.scent) : '',
+    color: sanitizePlainField(row.color, 'color') || '',
+    scent: sanitizePlainField(row.scent) || '',
     createdAt: row.created_at || row.createdAt || null,
     updatedAt: row.updated_at || row.updatedAt || null,
     created_at: row.created_at || row.createdAt || null,
@@ -505,8 +520,8 @@ export async function upsertProductRow(product) {
     collection: collectionName,
     collection_name: collectionName,
     show_on_website: product.showOnWebsite === true || product.show_on_website === true,
-    color: product.color ? String(product.color).trim() : null,
-    scent: product.scent ? String(product.scent).trim() : null,
+    color: sanitizePlainField(product.color, 'color'),
+    scent: sanitizePlainField(product.scent),
   };
 
   const id = isLiveDbId(product.id) ? String(product.id).trim() : '';
