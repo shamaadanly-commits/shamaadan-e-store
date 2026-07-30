@@ -55,6 +55,80 @@
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
+}
+
+/* iOS: inputs must be ≥16px or Safari auto-zooms on focus (overrides 14px app base). */
+.dashboard-app input,
+.dashboard-app select,
+.dashboard-app textarea,
+.dashboard-app .dash-select,
+.dashboard-app .dash-upload__urls,
+.dashboard-app .items-toolbar__search-input {
+  font-size: 16px !important;
+}
+
+/* Fixed manual zoom controls (outside CSS transform stage). */
+.dash-zoom-bar {
+  position: fixed;
+  top: max(0.5rem, env(safe-area-inset-top, 0px));
+  inset-inline-end: max(0.5rem, env(safe-area-inset-right, 0px));
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: rgb(33 33 33 / 78%);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 22%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.dash-zoom-bar__btn {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 0.55rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font: 600 1.05rem/1 var(--dash-font, system-ui, sans-serif);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.dash-zoom-bar__btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.dash-zoom-bar__btn:not(:disabled):active {
+  background: rgb(255 255 255 / 16%);
+}
+
+.dash-zoom-bar__reset {
+  min-width: 3.4rem;
+  font-size: 0.78rem !important;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.dash-zoom-stage {
+  --page-zoom: 1;
+  transform-origin: top center;
+  margin-inline: auto;
+  min-height: 100dvh;
+}
+
+/* Only apply transform when zoomed — scale(1) still creates a containing block and
+   can make iPad Safari dismiss the keyboard on every layout/viewport change. */
+.dash-zoom-stage[data-zoomed='1'] {
+  transform: scale(var(--page-zoom));
+  width: calc(100% / var(--page-zoom));
+  will-change: transform;
 }
 
 .dashboard-app *:focus-visible {
@@ -1689,23 +1763,32 @@
   gap: 0.55rem;
   margin-bottom: 0.65rem;
   min-height: 5.5rem;
+  /* Reserve space before images load to avoid layout shift / iOS zoom */
+  aspect-ratio: auto;
 }
 
 .dash-upload__empty {
   grid-column: 1 / -1;
   margin: 0;
   padding: 1.25rem 0.75rem;
+  min-height: 5.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   border: 1px dashed var(--dash-border);
   border-radius: var(--dash-radius-sm);
   color: var(--dash-text-dim);
   font-size: 0.82rem;
   background: var(--dash-surface-2);
+  box-sizing: border-box;
 }
 
 .dash-upload__item {
   position: relative;
-  aspect-ratio: 1;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  min-height: 5.5rem;
   border-radius: var(--dash-radius-sm);
   overflow: hidden;
   border: 1px solid var(--dash-border);
@@ -1715,8 +1798,10 @@
 .dash-upload__item img {
   width: 100%;
   height: 100%;
+  aspect-ratio: 1 / 1;
   object-fit: cover;
   display: block;
+  background: var(--dash-surface-3);
 }
 
 .dash-upload__remove {

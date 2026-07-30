@@ -909,6 +909,14 @@ export function authGateHtml() {
 export function buildAdminShell() {
   return `
     ${authGateHtml()}
+    <div class="dash-zoom-bar" data-page-zoom-controls role="toolbar" aria-label="Page zoom">
+      <button type="button" class="dash-zoom-bar__btn" data-zoom-out aria-label="Zoom out">−</button>
+      <button type="button" class="dash-zoom-bar__btn dash-zoom-bar__reset" data-zoom-reset aria-label="Reset zoom">
+        <span data-zoom-label>100%</span>
+      </button>
+      <button type="button" class="dash-zoom-bar__btn" data-zoom-in aria-label="Zoom in">+</button>
+    </div>
+    <div class="dash-zoom-stage" data-zoom-stage>
     <div class="dash-app" data-dash-app hidden>
       <aside class="dash-sidebar" aria-label="Admin navigation">
         <div class="dash-sidebar__brand">
@@ -1272,6 +1280,7 @@ export function buildAdminShell() {
         </div>
       </div>
       <div class="dash-modal" data-order-modal hidden></div>
+    </div>
     </div>
   `;
 }

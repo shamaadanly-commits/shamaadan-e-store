@@ -56,7 +56,14 @@ export function bindImageUploader(form) {
 
     preview.innerHTML = urls.map((url, index) => `
       <div class="dash-upload__item" data-image-index="${index}">
-        <img src="${escapeAttr(url)}" alt="Product image ${index + 1}" loading="lazy">
+        <img
+          src="${escapeAttr(url)}"
+          alt="Product image ${index + 1}"
+          width="176"
+          height="176"
+          loading="lazy"
+          decoding="async"
+        >
         <button type="button" class="dash-upload__remove" data-remove-image="${index}" aria-label="Remove image">×</button>
       </div>
     `).join('');
@@ -236,7 +243,7 @@ export function imageUploaderHtml(imageUrls = [], fieldId = 'product-images') {
         aria-label="Choose product images from gallery or camera"
       >
 
-      <div class="dash-upload__preview" data-image-preview></div>
+      <div class="dash-upload__preview" data-image-preview style="min-height:5.5rem"></div>
       <p class="dash-upload__status" data-image-status></p>
 
       <label class="sr-only" for="${escapeAttr(fieldId)}">Image URLs</label>

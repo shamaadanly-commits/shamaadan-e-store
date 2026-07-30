@@ -56,13 +56,11 @@ button {
 }
 
 /* ── Global mobile safeguards ─────────────────────────────────────── */
-/* Prevent iOS Safari from auto-zooming when focusing small form fields. */
-@media (max-width: 640px) {
-  input,
-  select,
-  textarea {
-    font-size: 16px;
-  }
+/* Prevent iOS Safari from auto-zooming when focusing form fields (<16px). */
+input,
+select,
+textarea {
+  font-size: 16px;
 }
 
 /* ── Boot screen (shared) ────────────────────────────────────────── */

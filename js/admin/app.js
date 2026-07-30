@@ -14,6 +14,7 @@ import {
   persistEnv,
 } from '../shared/offline.js';
 import { bindImageUploader } from './image-upload.js';
+import { bindPageZoom, lockViewportZoom } from './page-zoom.js';
 import { bindColorMultiInput, readColorVariantsFromForm } from './color-multi.js';
 import { importCatalogFromSpreadsheet } from './catalog-import.js';
 import {
@@ -118,6 +119,8 @@ export async function mount(root) {
 
   root.className = 'dashboard-app';
   root.innerHTML = buildAdminShell();
+  lockViewportZoom();
+  bindPageZoom(root);
 
   const els = {
     authGate: root.querySelector('[data-auth-gate]'),
@@ -857,8 +860,8 @@ export async function mount(root) {
       editingCatalogId = null;
       catalogFormVisible = true;
       switchView('catalog');
-      renderCatalog(state.getSnapshot());
-      renderCatalogForm(null);
+      renderCatalog(state.getSnapshot(), { redockForm: false });
+      renderCatalogForm(null, { focus: true });
       return;
     }
 
@@ -913,8 +916,8 @@ export async function mount(root) {
       catalogFormVisible = true;
       const product = state.getSnapshot().products.find((p) => String(p.id) === id);
       switchView('catalog');
-      renderCatalog(state.getSnapshot());
-      renderCatalogForm(product || null);
+      renderCatalog(state.getSnapshot(), { redockForm: false });
+      renderCatalogForm(product || null, { focus: true });
       return;
     }
 
@@ -1110,8 +1113,11 @@ export async function mount(root) {
     }
   }
 
-  // Never wipe open forms on background ledger/catalog updates.
-  state.subscribe((snapshot) => renderAll(snapshot, { withForms: false }));
+  // Never wipe / re-dock an open product form on background ledger updates (iPad keyboard).
+  state.subscribe((snapshot) => {
+    const skipCatalog = catalogFormVisible || isCatalogFormFocused();
+    renderAll(snapshot, { withForms: false, skipCatalog });
+  });
   state.startTransactionStream(60_000);
 
   async function saveProductFromForm(form) {
@@ -1426,6 +1432,8 @@ export async function mount(root) {
    * not wipe in-progress input or an open modal.
    */
   function isBusyEditing() {
+    // Keep the Add/Edit product form stable the entire time it is open (iPad keyboard).
+    if (catalogFormVisible) return true;
     const ae = document.activeElement;
     if (ae && typeof ae.closest === 'function' && ae.closest('input, textarea, select')) return true;
     if (els.orderModal && !els.orderModal.hidden) return true;
@@ -1440,6 +1448,15 @@ export async function mount(root) {
       if (title || barcode || images) return true;
     }
     return false;
+  }
+
+  function isCatalogFormFocused() {
+    const ae = document.activeElement;
+    return Boolean(
+      ae
+      && typeof ae.closest === 'function'
+      && ae.closest('[data-catalog-form], [data-catalog-form-panel], [data-catalog-inline-dock], [data-catalog-add-dock]'),
+    );
   }
 
   /** Silently pull fresh data and update the read-only views (never the forms). */
@@ -1571,10 +1588,13 @@ export async function mount(root) {
   /**
    * Place the edit/add form directly under the selected product (or above the list for Add).
    * @param {object | null} product
+   * @param {{ focus?: boolean, scroll?: boolean }} [opts]
    */
-  function dockCatalogFormInline(product) {
+  function dockCatalogFormInline(product, opts = {}) {
     const panel = els.catalogFormPanel;
     if (!panel || !catalogFormVisible) return;
+    const shouldFocus = opts.focus === true;
+    const shouldScroll = opts.scroll === true || shouldFocus;
 
     restoreCatalogFormPanel();
     root.querySelectorAll('[data-product-row].is-editing').forEach((row) => {
@@ -1598,10 +1618,16 @@ export async function mount(root) {
       row.after(dock);
       panel.hidden = false;
       panel.classList.add('is-inline');
-      requestAnimationFrame(() => {
-        dock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        panel.querySelector('input, textarea, select, button')?.focus?.({ preventScroll: true });
-      });
+      if (shouldScroll || shouldFocus) {
+        requestAnimationFrame(() => {
+          if (shouldScroll) dock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          // Only focus on intentional open — never on background re-dock (kills iPad keyboard).
+          if (shouldFocus) {
+            const field = panel.querySelector('[name="title"], input, textarea, select');
+            field?.focus?.({ preventScroll: true });
+          }
+        });
+      }
       return;
     }
 
@@ -1615,13 +1641,23 @@ export async function mount(root) {
       host.prepend(dock);
       panel.hidden = false;
       panel.classList.add('is-inline');
-      requestAnimationFrame(() => {
-        dock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      });
+      if (shouldScroll || shouldFocus) {
+        requestAnimationFrame(() => {
+          if (shouldScroll) dock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          if (shouldFocus) {
+            const field = panel.querySelector('[name="title"], input, textarea, select');
+            field?.focus?.({ preventScroll: true });
+          }
+        });
+      }
     }
   }
 
-  function renderCatalogForm(product = null) {
+  /**
+   * @param {object | null} [product]
+   * @param {{ focus?: boolean }} [opts]
+   */
+  function renderCatalogForm(product = null, opts = {}) {
     if (!els.catalogFormHost) return;
     const snapshot = state.getSnapshot();
     const editing = product ?? (editingCatalogId
@@ -1649,7 +1685,10 @@ export async function mount(root) {
     }
     setCatalogFormVisible(catalogFormVisible || Boolean(editing));
     if (catalogFormVisible) {
-      dockCatalogFormInline(editing || null);
+      dockCatalogFormInline(editing || null, {
+        focus: opts.focus === true,
+        scroll: opts.focus === true,
+      });
     }
   }
 
@@ -2014,9 +2053,38 @@ export async function mount(root) {
     renderCategoryForm();
   }
 
-  function renderCatalog(snapshot) {
-    // Don't destroy the form if it was docked inside the table from a previous edit.
-    restoreCatalogFormPanel();
+  /**
+   * @param {ReturnType<typeof state.getSnapshot>} snapshot
+   * @param {{ redockForm?: boolean }} [opts]
+   */
+  function renderCatalog(snapshot, opts = {}) {
+    const allowRedock = opts.redockForm !== false;
+    const formFocused = isCatalogFormFocused();
+
+    // While typing in Add/Edit product, do not move or rebuild anything that owns the form.
+    // Moving a focused <input> in the DOM dismisses the iPad keyboard.
+    if (catalogFormVisible && formFocused) {
+      const { products } = snapshot;
+      if (els.catalogCount) {
+        const liveProducts = (products || []).filter((p) => isLiveDbId(p.id));
+        let visible = catalogFilter === 'All'
+          ? liveProducts
+          : liveProducts.filter((p) => p.collectionName === catalogFilter || p.category === catalogFilter);
+        const q = catalogSearch.trim().toLowerCase();
+        if (q) {
+          visible = visible.filter((p) => {
+            const name = String(p.title || p.name || '').toLowerCase();
+            const barcode = String(p.barcode || p.sku || '').toLowerCase();
+            return name.includes(q) || barcode.includes(q);
+          });
+        }
+        els.catalogCount.textContent = `${visible.length} item${visible.length === 1 ? '' : 's'}`;
+      }
+      return;
+    }
+
+    // Park the form outside the table host before wiping it — never destroy inputs mid-type.
+    if (catalogFormVisible) restoreCatalogFormPanel();
 
     const { products, collections, categories, managedCollections = [], managedCategories = [] } = snapshot;
 
@@ -2117,12 +2185,19 @@ export async function mount(root) {
 
     renderTaxonomyForms();
 
-    // Re-dock an open edit form under the same product after table refresh.
+    // Re-dock only when safe — never move the form DOM while an input has focus (iPad keyboard).
     if (catalogFormVisible) {
-      const editing = editingCatalogId
-        ? products.find((p) => String(p.id) === String(editingCatalogId))
-        : null;
-      dockCatalogFormInline(editing || null);
+      if (formFocused || !allowRedock) {
+        if (els.catalogFormPanel) {
+          els.catalogFormPanel.hidden = false;
+          els.catalogFormPanel.classList.add('is-inline');
+        }
+      } else {
+        const editing = editingCatalogId
+          ? products.find((p) => String(p.id) === String(editingCatalogId))
+          : null;
+        dockCatalogFormInline(editing || null, { focus: false, scroll: false });
+      }
     }
   }
 
@@ -2141,7 +2216,10 @@ export async function mount(root) {
       els.marginHost.innerHTML = marginSummaryHtml(ledgers);
     }
 
-    renderCatalog(snapshot);
+    // Skip catalog remount/re-dock while Add/Edit product form is open (keeps iPad keyboard up).
+    if (!options.skipCatalog) {
+      renderCatalog(snapshot);
+    }
     // Skip form re-render during silent auto-refresh so in-progress edits survive.
     if (options.withForms !== false) renderCatalogForm();
     const valuationPanel = root.querySelector('[data-panel="valuation"]');
