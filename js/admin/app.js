@@ -1416,14 +1416,27 @@ export async function mount(root) {
 
   function startSessionWatch() {
     window.clearInterval(sessionTimer);
+    let hardMisses = 0;
     sessionTimer = window.setInterval(async () => {
       if (!currentUser) return;
       const next = await fetchSession('admin');
-      if (!next.authenticated) {
-        currentUser = null;
-        lock();
-        showAuthError('Session expired. Please sign in again.');
+      if (next.authenticated && next.user) {
+        hardMisses = 0;
+        currentUser = next.user;
+        return;
       }
+      // Soft failures (network / 5xx / temporary cookie glitch) must not kick the user out.
+      if (next.soft) {
+        hardMisses = 0;
+        return;
+      }
+      hardMisses += 1;
+      // Require two hard failures in a row before locking (avoids one flaky 401 blip).
+      if (hardMisses < 2) return;
+      hardMisses = 0;
+      currentUser = null;
+      lock();
+      showAuthError('Session expired. Please sign in again.');
     }, 60_000);
   }
 

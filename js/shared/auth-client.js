@@ -10,6 +10,8 @@ import {
 
 const LOCAL_ADMIN_KEY = 'shamaadan_admin_session_local';
 const LOCAL_POS_KEY = 'shamaadan_pos_session_local';
+const ADMIN_LOCAL_HOURS = 12;
+const POS_LOCAL_HOURS = 16;
 
 /**
  * @param {string} path
@@ -48,10 +50,40 @@ async function apiSafe(path, init = {}) {
 }
 
 function saveLocalSession(key, user, hours) {
+  if (!user) return;
   sessionStorage.setItem(key, JSON.stringify({
     user,
     exp: new Date(Date.now() + hours * 60 * 60 * 1000).toISOString(),
   }));
+}
+
+/**
+ * @param {'admin' | 'pos'} scope
+ * @returns {{ authenticated: true, user: object, source: 'local' } | null}
+ */
+function readLocalSession(scope) {
+  const key = scope === 'admin' ? LOCAL_ADMIN_KEY : LOCAL_POS_KEY;
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.user || (parsed.exp && Date.parse(parsed.exp) <= Date.now())) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return { authenticated: true, user: parsed.user, source: 'local' };
+  } catch {
+    sessionStorage.removeItem(key);
+    return null;
+  }
+}
+
+function localKeyForScope(scope) {
+  return scope === 'admin' ? LOCAL_ADMIN_KEY : LOCAL_POS_KEY;
+}
+
+function localHoursForScope(scope) {
+  return scope === 'admin' ? ADMIN_LOCAL_HOURS : POS_LOCAL_HOURS;
 }
 
 function demoAdminCredentials() {
@@ -71,27 +103,39 @@ function demoStaffName() {
 
 /**
  * @param {'admin' | 'pos'} scope
+ * @returns {Promise<{
+ *   authenticated: boolean,
+ *   user: object | null,
+ *   source?: string,
+ *   soft?: boolean,
+ * }>}
  */
 export async function fetchSession(scope) {
   const { res, data, unreachable } = await apiSafe(`/api/auth?action=session&scope=${scope}`);
+  const local = readLocalSession(scope);
 
-  if (!unreachable && res?.ok && data?.authenticated) {
+  // Network / API down — keep the user signed in from the local backup.
+  if (unreachable) {
+    if (local) return { ...local, soft: true };
+    return { authenticated: false, user: null, soft: true };
+  }
+
+  // Healthy server session — refresh local backup so brief outages don't kick the user.
+  if (res?.ok && data?.authenticated && data?.user) {
+    saveLocalSession(localKeyForScope(scope), data.user, localHoursForScope(scope));
     return { authenticated: true, user: data.user, source: 'server' };
   }
 
-  const key = scope === 'admin' ? LOCAL_ADMIN_KEY : LOCAL_POS_KEY;
-  try {
-    const raw = sessionStorage.getItem(key);
-    if (!raw) return { authenticated: false, user: null };
-    const parsed = JSON.parse(raw);
-    if (!parsed?.user || (parsed.exp && Date.parse(parsed.exp) <= Date.now())) {
-      sessionStorage.removeItem(key);
-      return { authenticated: false, user: null };
-    }
-    return { authenticated: true, user: parsed.user, source: 'local' };
-  } catch {
+  // Explicit unauthenticated from the auth API.
+  if (res?.status === 401 && data?.authenticated === false) {
+    // Prefer a still-valid local backup (covers cookie/secret glitches after a fresh login).
+    if (local) return { ...local, soft: true };
     return { authenticated: false, user: null };
   }
+
+  // 5xx / HTML error / unexpected response — do not treat as logout.
+  if (local) return { ...local, soft: true };
+  return { authenticated: false, user: null, soft: true };
 }
 
 /**
@@ -106,7 +150,8 @@ export async function loginAdmin(username, password) {
 
   if (!unreachable && res) {
     if (res.ok && data?.ok) {
-      sessionStorage.removeItem(LOCAL_ADMIN_KEY);
+      // Keep a local backup even after cookie login — session watch must survive API blips.
+      saveLocalSession(LOCAL_ADMIN_KEY, data.user, ADMIN_LOCAL_HOURS);
       await rememberOfflineLogin('admin', {
         username,
         password,
@@ -121,7 +166,7 @@ export async function loginAdmin(username, password) {
 
   const offline = await tryOfflineAdminLogin(username, password);
   if (offline.ok) {
-    saveLocalSession(LOCAL_ADMIN_KEY, offline.user, 12);
+    saveLocalSession(LOCAL_ADMIN_KEY, offline.user, ADMIN_LOCAL_HOURS);
     return offline;
   }
 
@@ -133,7 +178,7 @@ export async function loginAdmin(username, password) {
       role: 'admin',
       displayName: 'Administrator',
     };
-    saveLocalSession(LOCAL_ADMIN_KEY, user, 12);
+    saveLocalSession(LOCAL_ADMIN_KEY, user, ADMIN_LOCAL_HOURS);
     await rememberOfflineLogin('admin', { username, password, user });
     return { ok: true, user, source: 'local' };
   }
@@ -153,7 +198,7 @@ export async function loginPosPin(pin) {
 
   if (!unreachable && res) {
     if (res.ok && data?.ok) {
-      sessionStorage.removeItem(LOCAL_POS_KEY);
+      saveLocalSession(LOCAL_POS_KEY, data.user, POS_LOCAL_HOURS);
       await rememberOfflineLogin('pos', {
         pin: digits,
         user: data.user,
@@ -167,7 +212,7 @@ export async function loginPosPin(pin) {
 
   const offline = await tryOfflinePosLogin(digits);
   if (offline.ok) {
-    saveLocalSession(LOCAL_POS_KEY, offline.user, 16);
+    saveLocalSession(LOCAL_POS_KEY, offline.user, POS_LOCAL_HOURS);
     return offline;
   }
 
@@ -178,7 +223,7 @@ export async function loginPosPin(pin) {
       role: 'staff',
       displayName: demoStaffName(),
     };
-    saveLocalSession(LOCAL_POS_KEY, user, 16);
+    saveLocalSession(LOCAL_POS_KEY, user, POS_LOCAL_HOURS);
     await rememberOfflineLogin('pos', { pin: digits, user });
     return { ok: true, user, source: 'local' };
   }
