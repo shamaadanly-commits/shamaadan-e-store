@@ -261,7 +261,7 @@
   border: 1px solid var(--co-border-soft);
   border-radius: var(--co-radius-sm);
   color: var(--co-text);
-  font-size: 0.9rem;
+  font-size: 16px; /* prevent iOS Safari auto-zoom on focus */
   outline: none;
   transition: border-color 0.18s var(--co-ease);
 }

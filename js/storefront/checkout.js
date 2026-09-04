@@ -23,7 +23,8 @@ export function initCheckout(shopRoot, cart, i18n) {
 
   cart.subscribe(() => {
     if (overlay.classList.contains('is-open')) {
-      renderCheckoutBody(overlay, cart, i18n);
+      // Soft refresh: update bag lines/totals only — never wipe contact fields mid-typing.
+      renderCheckoutBody(overlay, cart, i18n, { preserveForm: true });
     }
   });
 
@@ -52,7 +53,7 @@ function openCheckout(overlay, cart, i18n) {
   overlay.classList.add('is-open');
   document.body.style.overflow = 'hidden';
   refreshLabels(overlay, i18n);
-  renderCheckoutBody(overlay, cart, i18n);
+  renderCheckoutBody(overlay, cart, i18n, { preserveForm: false });
   overlay.querySelector('[data-checkout-drawer]')?.focus();
 }
 
@@ -68,11 +69,87 @@ function refreshLabels(overlay, i18n) {
   overlay.setAttribute('dir', i18n.getDir());
 }
 
-function renderCheckoutBody(overlay, cart, i18n) {
+/**
+ * Read current contact + payment fields so a cart refresh can restore them.
+ * @param {HTMLElement} overlay
+ */
+function readCheckoutFormState(overlay) {
+  const form = overlay.querySelector('[data-checkout-form]');
+  if (!(form instanceof HTMLFormElement)) return null;
+  const payment = form.querySelector('input[name="paymentMethod"]:checked');
+  return {
+    fullName: String(form.fullName?.value || ''),
+    phone: String(form.phone?.value || ''),
+    email: String(form.email?.value || ''),
+    address: String(form.address?.value || ''),
+    city: String(form.city?.value || ''),
+    paymentMethod: payment instanceof HTMLInputElement ? payment.value : 'cad',
+    activeName: document.activeElement instanceof HTMLElement
+      && form.contains(document.activeElement)
+      ? document.activeElement.getAttribute('name')
+      : null,
+    selectionStart: document.activeElement instanceof HTMLInputElement
+      || document.activeElement instanceof HTMLTextAreaElement
+      ? document.activeElement.selectionStart
+      : null,
+    selectionEnd: document.activeElement instanceof HTMLInputElement
+      || document.activeElement instanceof HTMLTextAreaElement
+      ? document.activeElement.selectionEnd
+      : null,
+  };
+}
+
+/**
+ * @param {HTMLElement} overlay
+ * @param {ReturnType<readCheckoutFormState>} state
+ */
+function restoreCheckoutFormState(overlay, state) {
+  if (!state) return;
+  const form = overlay.querySelector('[data-checkout-form]');
+  if (!(form instanceof HTMLFormElement)) return;
+
+  if (form.fullName) form.fullName.value = state.fullName;
+  if (form.phone) form.phone.value = state.phone;
+  if (form.email) form.email.value = state.email;
+  if (form.address) form.address.value = state.address;
+  if (form.city) form.city.value = state.city;
+
+  const radio = form.querySelector(`input[name="paymentMethod"][value="${CSS.escape(state.paymentMethod || 'cad')}"]`);
+  if (radio instanceof HTMLInputElement) radio.checked = true;
+
+  if (state.activeName) {
+    const field = form.elements.namedItem(state.activeName);
+    if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) {
+      field.focus({ preventScroll: true });
+      if (typeof state.selectionStart === 'number' && typeof state.selectionEnd === 'number') {
+        try {
+          field.setSelectionRange(state.selectionStart, state.selectionEnd);
+        } catch {
+          /* ignore unsupported input types */
+        }
+      }
+    }
+  }
+}
+
+/**
+ * @param {HTMLElement} overlay
+ * @param {ReturnType<import('./cart.js').createCart>} cart
+ * @param {ReturnType<import('./i18n.js').createI18n>} i18n
+ * @param {{ preserveForm?: boolean }} [opts]
+ */
+function renderCheckoutBody(overlay, cart, i18n, opts = {}) {
   const t = i18n.t.bind(i18n);
   const body = overlay.querySelector('[data-checkout-body]');
   const footer = overlay.querySelector('[data-checkout-footer]');
   const { items, subtotal, shipping, total, count } = cart.getSnapshot();
+  const preserveForm = opts.preserveForm === true;
+  const savedForm = preserveForm ? readCheckoutFormState(overlay) : null;
+  const typingInForm = Boolean(
+    document.activeElement
+    && typeof document.activeElement.closest === 'function'
+    && document.activeElement.closest('[data-checkout-form]'),
+  );
 
   if (count === 0) {
     footer.hidden = true;
@@ -87,6 +164,18 @@ function renderCheckoutBody(overlay, cart, i18n) {
   }
 
   footer.hidden = false;
+
+  // While the customer is typing, only refresh line items + totals — keep the form DOM intact.
+  const existingForm = overlay.querySelector('[data-checkout-form]');
+  if (preserveForm && existingForm && typingInForm) {
+    const linesHost = overlay.querySelector('[data-checkout-lines]');
+    if (linesHost) {
+      linesHost.innerHTML = items.map(({ product, qty }) => lineHtml(product, qty, i18n)).join('');
+    }
+    renderCheckoutFooter(footer, i18n, subtotal, shipping, total);
+    return;
+  }
+
   body.innerHTML = `
     <div class="checkout-lines" data-checkout-lines>
       ${items.map(({ product, qty }) => lineHtml(product, qty, i18n)).join('')}
@@ -106,7 +195,7 @@ function renderCheckoutBody(overlay, cart, i18n) {
           </div>
           <div class="checkout-field">
             <label for="co-email">${t('checkout.email')}</label>
-            <input type="email" id="co-email" name="email" required autocomplete="email">
+            <input type="email" id="co-email" name="email" required autocomplete="email" inputmode="email">
           </div>
         </div>
         <div class="checkout-field">
@@ -149,6 +238,20 @@ function renderCheckoutBody(overlay, cart, i18n) {
     </section>
   `;
 
+  renderCheckoutFooter(footer, i18n, subtotal, shipping, total);
+  bindFormEvents(overlay, cart, i18n);
+  if (savedForm) restoreCheckoutFormState(overlay, savedForm);
+}
+
+/**
+ * @param {HTMLElement} footer
+ * @param {ReturnType<import('./i18n.js').createI18n>} i18n
+ * @param {number} subtotal
+ * @param {number} shipping
+ * @param {number} total
+ */
+function renderCheckoutFooter(footer, i18n, subtotal, shipping, total) {
+  const t = i18n.t.bind(i18n);
   footer.innerHTML = `
     <div class="checkout-totals">
       <div class="checkout-totals__row">
@@ -167,8 +270,6 @@ function renderCheckoutBody(overlay, cart, i18n) {
     <p class="checkout-error" data-checkout-error role="alert"></p>
     <button type="submit" form="checkout-form" class="btn btn--primary checkout-submit" data-checkout-submit>${t('checkout.placeOrder')}</button>
   `;
-
-  bindFormEvents(overlay, cart, i18n);
 }
 
 function lineHtml(product, qty, i18n) {
@@ -230,8 +331,10 @@ function bindOverlayEvents(overlay, cart, i18n) {
 
 function bindFormEvents(overlay, cart, i18n) {
   const form = overlay.querySelector('[data-checkout-form]');
+  if (!form || form.dataset.bound === '1') return;
+  form.dataset.bound = '1';
 
-  form?.addEventListener('submit', async (event) => {
+  form.addEventListener('submit', async (event) => {
     event.preventDefault();
     await submitOrder(overlay, cart, i18n, form);
   });

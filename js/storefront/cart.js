@@ -56,23 +56,36 @@ export function createCart() {
   function reconcile(products) {
     if (!Array.isArray(products)) return;
     const byId = new Map(products.map((p) => [String(p.id), p]));
+    let changed = false;
 
     for (const [id, line] of items) {
       const fresh = byId.get(String(id));
       if (!fresh) {
         items.delete(id);
+        changed = true;
         continue;
       }
       const stock = Number(fresh.stockQuantity ?? fresh.stock ?? fresh.stock_quantity ?? Infinity);
       if (stock <= 0) {
         items.delete(id);
+        changed = true;
         continue;
       }
+      const prevQty = line.qty;
+      const prevPrice = line.product?.price;
+      const prevName = line.product?.name || line.product?.title;
       line.product = fresh;
       if (line.qty > stock) line.qty = stock;
+      if (
+        prevQty !== line.qty
+        || prevPrice !== fresh.price
+        || prevName !== (fresh.name || fresh.title)
+      ) {
+        changed = true;
+      }
     }
 
-    notify();
+    if (changed) notify();
   }
 
   function getSnapshot() {
