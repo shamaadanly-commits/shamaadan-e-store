@@ -678,6 +678,32 @@ export async function mount(root) {
       return;
     }
 
+    if (target.closest('[data-prepare-web-order]')) {
+      const id = target.closest('[data-prepare-web-order]').getAttribute('data-prepare-web-order');
+      if (!id) return;
+      try {
+        await updateWebsiteOrderStatus(id, 'prepared');
+        await openOrderModal(id);
+        await refreshWebsiteOrders();
+      } catch (err) {
+        window.alert(err?.message || 'Could not mark order prepared.');
+      }
+      return;
+    }
+
+    if (target.closest('[data-send-web-order]')) {
+      const id = target.closest('[data-send-web-order]').getAttribute('data-send-web-order');
+      if (!id) return;
+      try {
+        await updateWebsiteOrderStatus(id, 'sent');
+        await openOrderModal(id);
+        await refreshWebsiteOrders();
+      } catch (err) {
+        window.alert(err?.message || 'Could not mark order sent.');
+      }
+      return;
+    }
+
     if (target.closest('[data-complete-web-order]')) {
       const id = target.closest('[data-complete-web-order]').getAttribute('data-complete-web-order');
       if (!id || !confirm('Mark this order as completed / fulfilled?')) return;

@@ -1491,16 +1491,17 @@ export async function getWebsiteOrderDetail(orderId) {
 }
 
 /**
- * Update status on a website order (pending → completed / cancelled).
+ * Update status on a website order.
+ * Flow: pending/paid → prepared → sent → completed (or cancelled).
  * Cancelling restores inventory for orders that already deducted stock.
  * @param {string} orderId
- * @param {'pending'|'paid'|'completed'|'cancelled'} status
+ * @param {'pending'|'paid'|'prepared'|'sent'|'completed'|'cancelled'} status
  */
 export async function updateWebsiteOrderStatus(orderId, status) {
   const id = String(orderId || '').trim();
   const next = String(status || '').trim();
   if (!id) throw new Error('Order id is required.');
-  if (!['pending', 'paid', 'completed', 'cancelled'].includes(next)) {
+  if (!['pending', 'paid', 'prepared', 'sent', 'completed', 'cancelled'].includes(next)) {
     throw new Error('Invalid order status.');
   }
 
@@ -1510,8 +1511,8 @@ export async function updateWebsiteOrderStatus(orderId, status) {
   if (next === 'cancelled') {
     if (current === 'cancelled') return order;
 
-    // Website checkout deducts stock for pending / paid / completed.
-    const stockAlreadyTaken = ['pending', 'paid', 'completed'].includes(current);
+    // Website checkout deducts stock for pending / paid / prepared / sent / completed.
+    const stockAlreadyTaken = ['pending', 'paid', 'prepared', 'sent', 'completed'].includes(current);
     if (stockAlreadyTaken) {
       const restoreItems = (items || []).filter(
         (item) => item.product_id && Number(item.quantity) > 0,
@@ -1531,7 +1532,7 @@ export async function updateWebsiteOrderStatus(orderId, status) {
 
   const now = new Date().toISOString();
   const patch = { status: next, updated_at: now };
-  if (next === 'completed') patch.completed_at = now;
+  if (next === 'completed' || next === 'sent') patch.completed_at = order.completed_at || now;
 
   const { data, error } = await getSupabase()
     .from('orders')
@@ -1544,6 +1545,16 @@ export async function updateWebsiteOrderStatus(orderId, status) {
   if (error) throw new Error(error.message);
   if (!data) throw new Error('Order not found or could not be updated.');
   return data;
+}
+
+/**
+ * Website orders still needing POS fulfillment (not sent/completed/cancelled).
+ * @param {number} [limit]
+ * @returns {Promise<object[]>}
+ */
+export async function getActiveWebsiteOrders(limit = 80) {
+  const rows = await getWebsiteOrders(limit);
+  return rows.filter((row) => ['pending', 'paid', 'prepared'].includes(String(row?.status || '').toLowerCase()));
 }
 
 // ── Purchases / landed cost ─────────────────────────────────────────

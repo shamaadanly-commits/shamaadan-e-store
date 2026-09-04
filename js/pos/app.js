@@ -12,6 +12,8 @@ import {
   getPosSalesByDate,
   getOpenTicket,
   refundPosOrder,
+  getActiveWebsiteOrders,
+  updateWebsiteOrderStatus,
   isSupabaseConfigured,
 } from '../../shared/supabase.js';
 import { getSharedDashboardState, toPosCatalogRow } from '../dashboard.js';
@@ -39,6 +41,7 @@ import { createBarcodeScanner } from './scanner.js';
 import { printReceipt, printRefundReceipt } from './receipt.js';
 import { pinGateHtml, bindPinGate } from './pin-gate.js';
 import { ticketsPageHtml, ticketsListHtml } from './tickets-page.js';
+import { onlineOrdersPageHtml, onlineOrdersListHtml } from './online-orders-page.js';
 import {
   promptPaymentMethod,
   promptAdminPin,
@@ -199,18 +202,19 @@ async function mountRegister(root, staff) {
     staffLabel: root.querySelector('[data-staff-name]'),
     registerView: root.querySelector('[data-register-view]'),
     ticketsView: root.querySelector('[data-tickets-view]'),
+    onlineOrdersView: root.querySelector('[data-online-orders-view]'),
   };
 
   let searchQuery = '';
   let activeCategory = 'All';
   /** @type {Map<string, string>} group key → selected product id */
   const selectedVariantByGroup = new Map();
-  /** @type {'register' | 'tickets'} */
+  /** @type {'register' | 'tickets' | 'online-orders'} */
   let activeView = 'register';
 
   /**
    * Highlight the active mobile bottom-tab.
-   * @param {'products' | 'ticket' | 'tickets' | 'invoices' | 'scan'} name
+   * @param {'products' | 'ticket' | 'tickets' | 'orders' | 'invoices' | 'scan'} name
    */
   function setActiveMTab(name) {
     root.querySelectorAll('[data-mtab]').forEach((btn) => {
@@ -316,6 +320,22 @@ async function mountRegister(root, staff) {
       badges.forEach((badge) => {
         badge.hidden = count === 0;
         badge.textContent = String(count);
+      });
+    } catch {
+      badges.forEach((badge) => { badge.hidden = true; });
+    }
+  }
+
+  async function refreshOnlineOrdersBadge() {
+    const badges = root.querySelectorAll('[data-online-orders-count]');
+    if (!badges.length || !isSupabaseConfigured()) return;
+    try {
+      const orders = await getActiveWebsiteOrders(80);
+      const count = orders.length;
+      badges.forEach((badge) => {
+        badge.hidden = count === 0;
+        badge.textContent = String(count);
+        badge.classList.toggle('is-pulse', count > 0);
       });
     } catch {
       badges.forEach((badge) => { badge.hidden = true; });
@@ -547,13 +567,48 @@ async function mountRegister(root, staff) {
 
     activeView = 'tickets';
     if (els.registerView) els.registerView.hidden = true;
+    if (els.onlineOrdersView) {
+      els.onlineOrdersView.hidden = true;
+      els.onlineOrdersView.innerHTML = '';
+    }
     if (els.ticketsView) {
       els.ticketsView.hidden = false;
       els.ticketsView.innerHTML = ticketsPageHtml(tickets);
     }
     root.classList.add('pos--tickets');
+    root.classList.remove('pos--online-orders');
     setActiveMTab('tickets');
     await refreshOpenTicketBadge();
+  }
+
+  async function showOnlineOrdersPage() {
+    if (!isSupabaseConfigured()) {
+      showToast(els.toast, 'Supabase not configured');
+      return;
+    }
+
+    let orders = [];
+    try {
+      orders = await getActiveWebsiteOrders(80);
+    } catch (err) {
+      window.alert(err?.message || 'Could not load website orders.');
+      return;
+    }
+
+    activeView = 'online-orders';
+    if (els.registerView) els.registerView.hidden = true;
+    if (els.ticketsView) {
+      els.ticketsView.hidden = true;
+      els.ticketsView.innerHTML = '';
+    }
+    if (els.onlineOrdersView) {
+      els.onlineOrdersView.hidden = false;
+      els.onlineOrdersView.innerHTML = onlineOrdersPageHtml(orders);
+    }
+    root.classList.add('pos--online-orders');
+    root.classList.remove('pos--tickets');
+    setActiveMTab('orders');
+    await refreshOnlineOrdersBadge();
   }
 
   /**
@@ -565,8 +620,13 @@ async function mountRegister(root, staff) {
       els.ticketsView.hidden = true;
       els.ticketsView.innerHTML = '';
     }
+    if (els.onlineOrdersView) {
+      els.onlineOrdersView.hidden = true;
+      els.onlineOrdersView.innerHTML = '';
+    }
     if (els.registerView) els.registerView.hidden = false;
     root.classList.remove('pos--tickets');
+    root.classList.remove('pos--online-orders');
     if (subview === 'ticket') {
       root.classList.add('pos--m-ticket');
       setActiveMTab('ticket');
@@ -590,6 +650,41 @@ async function mountRegister(root, staff) {
       await refreshOpenTicketBadge();
     } catch (err) {
       window.alert(err?.message || 'Could not refresh tickets.');
+    }
+  }
+
+  async function refreshOnlineOrdersList() {
+    if (!els.onlineOrdersView || activeView !== 'online-orders') return;
+    const list = els.onlineOrdersView.querySelector('[data-online-orders-list]');
+    if (!list) return;
+    try {
+      const orders = await getActiveWebsiteOrders(80);
+      list.innerHTML = onlineOrdersListHtml(orders);
+      const subtitle = els.onlineOrdersView.querySelector('.pos-tickets__subtitle');
+      if (subtitle) subtitle.textContent = `${orders.length} to prepare · mark prepared, then send`;
+      await refreshOnlineOrdersBadge();
+    } catch (err) {
+      window.alert(err?.message || 'Could not refresh website orders.');
+    }
+  }
+
+  /**
+   * @param {string} orderId
+   * @param {'prepared' | 'sent'} nextStatus
+   */
+  async function advanceOnlineOrder(orderId, nextStatus) {
+    const id = String(orderId || '').trim();
+    if (!id) return;
+    try {
+      await updateWebsiteOrderStatus(id, nextStatus);
+      showToast(
+        els.toast,
+        nextStatus === 'prepared' ? 'Order marked prepared' : 'Order marked sent',
+      );
+      await refreshOnlineOrdersList();
+      await refreshOnlineOrdersBadge();
+    } catch (err) {
+      window.alert(err?.message || `Could not mark order as ${nextStatus}.`);
     }
   }
 
@@ -741,15 +836,22 @@ async function mountRegister(root, staff) {
 
   startClock(els.clock);
   refreshOpenTicketBadge();
+  refreshOnlineOrdersBadge();
 
   // Keep catalog stock & open-ticket count current without a manual refresh.
   async function autoRefreshPos() {
     if (document.hidden) return;
     try {
       await refreshOpenTicketBadge();
+      await refreshOnlineOrdersBadge();
 
       if (activeView === 'tickets') {
         await refreshTicketsList();
+        return;
+      }
+
+      if (activeView === 'online-orders') {
+        await refreshOnlineOrdersList();
         return;
       }
 
@@ -785,6 +887,7 @@ async function mountRegister(root, staff) {
       if (which === 'products') await showRegisterView('products');
       else if (which === 'ticket') await showRegisterView('ticket');
       else if (which === 'tickets') await showTicketsPage();
+      else if (which === 'orders') await showOnlineOrdersPage();
       else if (which === 'invoices') {
         setActiveMTab('invoices');
         await showInvoiceModal();
@@ -1014,13 +1117,40 @@ async function mountRegister(root, staff) {
       return;
     }
 
+    if (target.matches('[data-open-online-orders]')) {
+      await showOnlineOrdersPage();
+      return;
+    }
+
     if (target.matches('[data-tickets-back]')) {
+      await showRegisterView();
+      return;
+    }
+
+    if (target.matches('[data-online-orders-back]')) {
       await showRegisterView();
       return;
     }
 
     if (target.matches('[data-tickets-refresh]')) {
       await refreshTicketsList();
+      return;
+    }
+
+    if (target.matches('[data-online-orders-refresh]')) {
+      await refreshOnlineOrdersList();
+      return;
+    }
+
+    const prepareOnline = target.closest('[data-prepare-online-order]');
+    if (prepareOnline) {
+      await advanceOnlineOrder(prepareOnline.getAttribute('data-prepare-online-order'), 'prepared');
+      return;
+    }
+
+    const sendOnline = target.closest('[data-send-online-order]');
+    if (sendOnline) {
+      await advanceOnlineOrder(sendOnline.getAttribute('data-send-online-order'), 'sent');
       return;
     }
 
@@ -1242,6 +1372,14 @@ function buildShell(categories, staff) {
           Tickets
           <span class="pos__badge" data-open-tickets-count hidden>0</span>
         </button>
+        <button type="button" class="pos__tickets-btn pos__desktop-only" data-open-online-orders aria-label="Website orders">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M3 7h18M5 7v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7"/>
+            <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+          Web orders
+          <span class="pos__badge" data-online-orders-count hidden>0</span>
+        </button>
         <button type="button" class="pos__refund-btn pos__desktop-only" data-open-invoice aria-label="Open invoices">
           Invoice
         </button>
@@ -1324,6 +1462,7 @@ function buildShell(categories, staff) {
     </div>
 
     <div class="pos__tickets-host" data-tickets-view hidden></div>
+    <div class="pos__tickets-host" data-online-orders-view hidden></div>
 
     <nav class="pos__mobile-tabbar" aria-label="Register navigation">
       <button type="button" class="pos__mtab is-active" data-mtab="products">
@@ -1354,6 +1493,16 @@ function buildShell(categories, staff) {
           <span class="pos__mtab-badge" data-open-tickets-count hidden>0</span>
         </span>
         <span>Parked</span>
+      </button>
+      <button type="button" class="pos__mtab" data-mtab="orders">
+        <span class="pos__mtab-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M3 7h18M5 7v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7"/>
+            <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+          <span class="pos__mtab-badge" data-online-orders-count hidden>0</span>
+        </span>
+        <span>Orders</span>
       </button>
       <button type="button" class="pos__mtab" data-mtab="invoices">
         <span class="pos__mtab-icon">
