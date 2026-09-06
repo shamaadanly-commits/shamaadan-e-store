@@ -71,10 +71,15 @@ async function openCheckout(overlay, cart, i18n) {
   overlay.classList.add('is-open');
   document.body.style.overflow = 'hidden';
   refreshLabels(overlay, i18n);
-  cachedDeliveryRates = null;
-  await loadDeliveryRates();
+  // Render bag immediately so a slow/failed rates fetch never leaves a blank drawer.
   renderCheckoutBody(overlay, cart, i18n, { preserveForm: false });
   overlay.querySelector('[data-checkout-drawer]')?.focus();
+
+  cachedDeliveryRates = null;
+  await loadDeliveryRates();
+  if (overlay.classList.contains('is-open')) {
+    renderCheckoutBody(overlay, cart, i18n, { preserveForm: true });
+  }
 }
 
 function closeCheckout(overlay) {
@@ -655,6 +660,15 @@ function formatExpiry(value) {
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function escapeAttr(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 }
