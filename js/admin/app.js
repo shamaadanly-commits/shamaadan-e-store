@@ -481,6 +481,17 @@ export async function mount(root) {
     }
   });
 
+  root.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    const priceInput = event.target instanceof Element
+      ? event.target.closest('[data-delivery-price-input]')
+      : null;
+    if (!(priceInput instanceof HTMLInputElement)) return;
+    event.preventDefault();
+    const id = priceInput.getAttribute('data-delivery-price-input');
+    void saveDeliveryPriceInline(id, priceInput.closest('tr'));
+  });
+
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
     if (els.orderModal && !els.orderModal.hidden) {
@@ -577,6 +588,21 @@ export async function mount(root) {
     if (target.matches('[data-delivery-cancel]')) {
       editingDeliveryId = null;
       renderDeliveryForm();
+      renderDeliveryTable();
+      return;
+    }
+
+    const saveDeliveryPrice = target.closest('[data-save-delivery-price]');
+    if (saveDeliveryPrice) {
+      const id = saveDeliveryPrice.getAttribute('data-save-delivery-price');
+      await saveDeliveryPriceInline(id, saveDeliveryPrice.closest('tr'));
+      return;
+    }
+
+    const toggleDeliveryActive = target.closest('[data-toggle-delivery-active]');
+    if (toggleDeliveryActive) {
+      const id = toggleDeliveryActive.getAttribute('data-toggle-delivery-active');
+      await toggleDeliveryActiveInline(id);
       return;
     }
 
@@ -584,6 +610,14 @@ export async function mount(root) {
     if (editDelivery) {
       editingDeliveryId = editDelivery.getAttribute('data-edit-delivery');
       renderDeliveryForm();
+      renderDeliveryTable();
+      const formPanel = root.querySelector('[data-panel="delivery"] .dash-panel--form');
+      formPanel?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      const priceInput = els.deliveryFormHost?.querySelector('#delivery-price');
+      if (priceInput instanceof HTMLInputElement) {
+        priceInput.focus({ preventScroll: true });
+        priceInput.select();
+      }
       return;
     }
 
@@ -596,7 +630,7 @@ export async function mount(root) {
       if (!window.confirm(`Delete delivery rate for “${label}”?\n\nThis does not change inventory.`)) return;
       try {
         await deleteDeliveryRate(id);
-        if (editingDeliveryId === id) editingDeliveryId = null;
+        if (String(editingDeliveryId) === String(id)) editingDeliveryId = null;
         await refreshDeliveryRates();
       } catch (err) {
         window.alert(err?.message || 'Failed to delete delivery rate.');
@@ -2109,7 +2143,7 @@ export async function mount(root) {
       ? deliveryRatesCache.find((r) => String(r.id) === String(editingDeliveryId)) || null
       : null;
     if (els.deliveryFormTitle) {
-      els.deliveryFormTitle.textContent = rate ? 'Edit delivery rate' : 'Add / edit rate';
+      els.deliveryFormTitle.textContent = rate ? 'Edit delivery rate' : 'Add new city';
     }
     els.deliveryFormHost.innerHTML = deliveryRateFormHtml(rate);
   }
@@ -2120,7 +2154,11 @@ export async function mount(root) {
     const keepFocus = document.activeElement === filterEl;
     const selStart = keepFocus && filterEl instanceof HTMLInputElement ? filterEl.selectionStart : null;
     const selEnd = keepFocus && filterEl instanceof HTMLInputElement ? filterEl.selectionEnd : null;
-    els.deliveryHost.innerHTML = deliveryRatesTableHtml(deliveryRatesCache, { filter: deliveryFilter });
+    const priceFocus = document.activeElement?.getAttribute?.('data-delivery-price-input') || null;
+    els.deliveryHost.innerHTML = deliveryRatesTableHtml(deliveryRatesCache, {
+      filter: deliveryFilter,
+      editingId: editingDeliveryId,
+    });
     if (keepFocus) {
       const next = els.deliveryHost.querySelector('[data-delivery-filter]');
       if (next instanceof HTMLInputElement) {
@@ -2129,6 +2167,9 @@ export async function mount(root) {
           try { next.setSelectionRange(selStart, selEnd); } catch { /* ignore */ }
         }
       }
+    } else if (priceFocus) {
+      const nextPrice = els.deliveryHost.querySelector(`[data-delivery-price-input="${CSS.escape(priceFocus)}"]`);
+      if (nextPrice instanceof HTMLInputElement) nextPrice.focus({ preventScroll: true });
     }
   }
 
@@ -2145,6 +2186,56 @@ export async function mount(root) {
     } catch (err) {
       console.error('[admin] delivery rates load failed:', err);
       els.deliveryHost.innerHTML = `<p class="dash-empty">${escapeHtml(err?.message || 'Failed to load delivery rates. Run sql/delivery_rates.sql in Supabase (does not change inventory).')}</p>`;
+    }
+  }
+
+  async function saveDeliveryPriceInline(id, rowEl) {
+    const rateId = String(id || '').trim();
+    const existing = deliveryRatesCache.find((r) => String(r.id) === rateId);
+    if (!existing) {
+      window.alert('Rate not found. Refresh and try again.');
+      return;
+    }
+    const input = rowEl?.querySelector?.('[data-delivery-price-input]')
+      || els.deliveryHost?.querySelector(`[data-delivery-price-input="${CSS.escape(rateId)}"]`);
+    const price = Number(input instanceof HTMLInputElement ? input.value : existing.price_lyd);
+    if (!Number.isFinite(price) || price < 0) {
+      window.alert('Enter a valid price (0 or more).');
+      return;
+    }
+    try {
+      await upsertDeliveryRate({
+        id: rateId,
+        city_ar: existing.city_ar,
+        city_en: existing.city_en || '',
+        zone: existing.zone,
+        price_lyd: price,
+        sort_order: existing.sort_order ?? 0,
+        is_active: existing.is_active !== false,
+      });
+      await refreshDeliveryRates();
+    } catch (err) {
+      window.alert(err?.message || 'Failed to update price.');
+    }
+  }
+
+  async function toggleDeliveryActiveInline(id) {
+    const rateId = String(id || '').trim();
+    const existing = deliveryRatesCache.find((r) => String(r.id) === rateId);
+    if (!existing) return;
+    try {
+      await upsertDeliveryRate({
+        id: rateId,
+        city_ar: existing.city_ar,
+        city_en: existing.city_en || '',
+        zone: existing.zone,
+        price_lyd: Number(existing.price_lyd) || 0,
+        sort_order: existing.sort_order ?? 0,
+        is_active: existing.is_active === false,
+      });
+      await refreshDeliveryRates();
+    } catch (err) {
+      window.alert(err?.message || 'Failed to update active status.');
     }
   }
 

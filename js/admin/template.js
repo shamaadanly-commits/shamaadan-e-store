@@ -543,10 +543,11 @@ export function wasteTableHtml(rows = []) {
 /**
  * Delivery rates table (website checkout only — does not touch inventory).
  * @param {Array<object>} rows
- * @param {{ filter?: string }} [opts]
+ * @param {{ filter?: string, editingId?: string | null }} [opts]
  */
 export function deliveryRatesTableHtml(rows = [], opts = {}) {
   const filter = String(opts.filter || '').trim().toLowerCase();
+  const editingId = opts.editingId != null ? String(opts.editingId) : '';
   const filtered = filter
     ? rows.filter((r) => {
       const hay = `${r.city_ar || ''} ${r.city_en || ''} ${r.zone || ''}`.toLowerCase();
@@ -554,7 +555,6 @@ export function deliveryRatesTableHtml(rows = [], opts = {}) {
     })
     : rows;
 
-  const money = (n) => new Intl.NumberFormat('en-LY', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
   const zoneLabel = (z) => (z === 'inside_benghazi' ? 'Inside Benghazi' : z === 'outside_benghazi' ? 'Outside Benghazi' : z || '—');
 
   if (!rows.length) {
@@ -570,6 +570,7 @@ export function deliveryRatesTableHtml(rows = [], opts = {}) {
       </label>
       <span class="dash-panel__count">${filtered.length} / ${rows.length} cities</span>
     </div>
+    <p class="dash-field__hint" style="margin:0 0 0.75rem">Change a price and press Save, or click Edit to update the full city row.</p>
     ${!filtered.length ? '<p class="dash-empty">No cities match that search.</p>' : `
     <div class="dash-table-wrap">
       <table class="dash-table" data-delivery-table>
@@ -584,19 +585,42 @@ export function deliveryRatesTableHtml(rows = [], opts = {}) {
           </tr>
         </thead>
         <tbody>
-          ${filtered.map((r) => `
-            <tr data-delivery-row="${escapeAttr(r.id)}">
+          ${filtered.map((r) => {
+            const id = String(r.id || '');
+            const isEditing = editingId && id === editingId;
+            return `
+            <tr data-delivery-row="${escapeAttr(id)}" class="${isEditing ? 'is-editing' : ''}">
               <td class="dash-input--bidi"><strong>${escapeHtml(r.city_ar || '—')}</strong></td>
               <td>${escapeHtml(r.city_en || '—')}</td>
               <td>${escapeHtml(zoneLabel(r.zone))}</td>
-              <td class="dash-table__num">${money(r.price_lyd)}</td>
-              <td>${r.is_active === false ? 'Off' : 'On'}</td>
-              <td class="dash-table__actions">
-                <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-edit-delivery="${escapeAttr(r.id)}">Edit</button>
-                <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm " data-delete-delivery="${escapeAttr(r.id)}">Delete</button>
+              <td class="dash-table__num">
+                <div class="dash-delivery-price-edit">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    class="dash-input dash-input--price"
+                    value="${escapeAttr(r.price_lyd ?? 0)}"
+                    aria-label="Price for ${escapeAttr(r.city_en || r.city_ar || 'city')}"
+                    data-delivery-price-input="${escapeAttr(id)}"
+                  >
+                  <button type="button" class="dash-btn dash-btn--primary dash-btn--sm" data-save-delivery-price="${escapeAttr(id)}">Save</button>
+                </div>
               </td>
-            </tr>
-          `).join('')}
+              <td>
+                <button
+                  type="button"
+                  class="dash-btn dash-btn--ghost dash-btn--sm"
+                  data-toggle-delivery-active="${escapeAttr(id)}"
+                  title="Toggle active on website"
+                >${r.is_active === false ? 'Off' : 'On'}</button>
+              </td>
+              <td class="dash-table__actions">
+                <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-edit-delivery="${escapeAttr(id)}">Edit</button>
+                <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-delete-delivery="${escapeAttr(id)}">Delete</button>
+              </td>
+            </tr>`;
+          }).join('')}
         </tbody>
       </table>
     </div>`}
@@ -612,6 +636,7 @@ export function deliveryRateFormHtml(rate = null) {
   return `
     <form class="dash-form" data-delivery-form autocomplete="off">
       <input type="hidden" name="id" value="${escapeAttr(r.id || '')}">
+      ${isEdit ? `<p class="dash-form__note">Editing <strong class="dash-input--bidi">${escapeHtml(r.city_ar || '')}</strong>${r.city_en ? ` / ${escapeHtml(r.city_en)}` : ''}. Change the price or details, then save.</p>` : '<p class="dash-form__note">Add a new city, or click <strong>Edit</strong> on a row to update an existing rate.</p>'}
       <div class="dash-form__grid">
         <div class="dash-field">
           <label for="delivery-city-ar">City (Arabic)</label>
@@ -645,7 +670,7 @@ export function deliveryRateFormHtml(rate = null) {
         </div>
       </div>
       <div class="dash-form__actions">
-        <button type="submit" class="dash-btn dash-btn--primary">${isEdit ? 'Save rate' : 'Add rate'}</button>
+        <button type="submit" class="dash-btn dash-btn--primary">${isEdit ? 'Update rate' : 'Add rate'}</button>
         ${isEdit ? '<button type="button" class="dash-btn dash-btn--ghost" data-delivery-cancel>Cancel</button>' : ''}
       </div>
       <p class="dash-form__note">These prices apply only to website checkout. Inventory and product stock are never changed here.</p>

@@ -1546,6 +1546,25 @@
   margin-bottom: 1rem;
 }
 
+.dash-delivery-price-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.dash-input--price {
+  width: 5.5rem;
+  min-height: 2rem;
+  padding: 0.35rem 0.5rem;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-table tr.is-editing td {
+  background: rgb(125 101 26 / 10%);
+}
+
 .dash-select {
   min-height: 2.1rem;
   font-size: 0.82rem;
