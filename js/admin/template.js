@@ -1349,7 +1349,7 @@ export function buildAdminShell() {
             <div class="dash-catalog-intro">
               <p>Website order delivery prices by city / area. Editing these rates does <strong>not</strong> change inventory or product stock.</p>
             </div>
-            <div class="dash-inventory-layout">
+            <div class="dash-inventory-layout dash-delivery-layout">
               <article class="dash-panel dash-panel--grow">
                 <header class="dash-panel__header dash-panel__header--row">
                   <div>
@@ -1365,9 +1365,9 @@ export function buildAdminShell() {
                   <p class="dash-empty">Loading delivery rates…</p>
                 </div>
               </article>
-              <article class="dash-panel dash-panel--form">
+              <article class="dash-panel dash-panel--form dash-panel--delivery-form">
                 <header class="dash-panel__header">
-                  <h2 data-delivery-form-title>Add / edit rate</h2>
+                  <h2 data-delivery-form-title>Add new city</h2>
                 </header>
                 <div class="dash-panel__body" data-delivery-form-host></div>
               </article>
