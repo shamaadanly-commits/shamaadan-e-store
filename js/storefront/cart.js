@@ -1,10 +1,9 @@
 /**
  * Shopping bag state with quantity controls.
  * The bag is persisted to localStorage so it survives closing/reopening the site.
+ * Website shipping is set from the delivery city chosen at checkout.
  */
 
-const FREE_SHIPPING_THRESHOLD = 75;
-const SHIPPING_FLAT = 12;
 const STORAGE_KEY = 'shamaadan_cart_v1';
 
 /** @returns {Array<{ product: object, qty: number }>} */
@@ -35,6 +34,8 @@ export function createCart() {
   /** @type {Map<string, { product: object, qty: number }>} */
   const items = new Map();
   const listeners = new Set();
+  /** @type {{ id?: string, city_ar?: string, city_en?: string, zone?: string, price_lyd?: number } | null} */
+  let deliveryCity = null;
 
   // Restore any previously saved bag.
   loadPersisted().forEach(({ product, qty }) => {
@@ -45,6 +46,45 @@ export function createCart() {
     persist(items);
     const snapshot = getSnapshot();
     listeners.forEach((fn) => fn(snapshot));
+  }
+
+  /**
+   * Set website delivery city rate (overrides flat shipping).
+   * Pass null to clear.
+   * @param {{ id?: string, city_ar?: string, city_en?: string, zone?: string, price_lyd?: number } | null} city
+   */
+  function setDeliveryCity(city) {
+    if (!city) {
+      deliveryCity = null;
+      notify();
+      return getSnapshot();
+    }
+    deliveryCity = {
+      id: city.id ? String(city.id) : '',
+      city_ar: String(city.city_ar || '').trim(),
+      city_en: String(city.city_en || '').trim(),
+      zone: String(city.zone || '').trim(),
+      price_lyd: Math.max(0, Number(city.price_lyd) || 0),
+    };
+    notify();
+    return getSnapshot();
+  }
+
+  function getSnapshot() {
+    const list = Array.from(items.values());
+    const count = list.reduce((sum, { qty }) => sum + qty, 0);
+    const subtotal = list.reduce((sum, { product, qty }) => sum + product.price * qty, 0);
+    const shipping = deliveryCity ? Number(deliveryCity.price_lyd) || 0 : 0;
+    const total = subtotal + shipping;
+
+    return {
+      items: list,
+      count,
+      subtotal,
+      shipping,
+      total,
+      deliveryCity: deliveryCity ? { ...deliveryCity } : null,
+    };
   }
 
   /**
@@ -86,16 +126,6 @@ export function createCart() {
     }
 
     if (changed) notify();
-  }
-
-  function getSnapshot() {
-    const list = Array.from(items.values());
-    const count = list.reduce((sum, { qty }) => sum + qty, 0);
-    const subtotal = list.reduce((sum, { product, qty }) => sum + product.price * qty, 0);
-    const shipping = subtotal >= FREE_SHIPPING_THRESHOLD || subtotal === 0 ? 0 : SHIPPING_FLAT;
-    const total = subtotal + shipping;
-
-    return { items: list, count, subtotal, shipping, total };
   }
 
   function add(product) {
@@ -146,6 +176,7 @@ export function createCart() {
 
   function clear() {
     items.clear();
+    deliveryCity = null;
     notify();
   }
 
@@ -155,7 +186,7 @@ export function createCart() {
     return () => listeners.delete(fn);
   }
 
-  return { add, updateQty, remove, clear, subscribe, getSnapshot, reconcile };
+  return { add, updateQty, remove, clear, subscribe, getSnapshot, reconcile, setDeliveryCity };
 }
 
 /**

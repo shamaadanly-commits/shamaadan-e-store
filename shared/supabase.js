@@ -1557,6 +1557,132 @@ export async function getActiveWebsiteOrders(limit = 80) {
   return rows.filter((row) => ['pending', 'paid', 'prepared'].includes(String(row?.status || '').toLowerCase()));
 }
 
+// ── Delivery rates (website checkout only — never touches products/inventory) ──
+
+/**
+ * @param {{ activeOnly?: boolean }} [opts]
+ * @returns {Promise<object[]>}
+ */
+export async function getDeliveryRates(opts = {}) {
+  const activeOnly = opts.activeOnly !== false;
+  let query = getSupabase()
+    .from('delivery_rates')
+    .select('*')
+    .order('zone', { ascending: true })
+    .order('sort_order', { ascending: true })
+    .order('city_ar', { ascending: true });
+
+  if (activeOnly) query = query.eq('is_active', true);
+
+  const { data, error } = await query;
+  if (error) {
+    if (/Could not find the table|schema cache|relation .* does not exist/i.test(error.message)) {
+      throw new Error('Delivery rates table not ready. Run sql/delivery_rates.sql in Supabase (does not change inventory).');
+    }
+    throw mapSupabaseNetworkError(error, 'loading delivery rates');
+  }
+  return data ?? [];
+}
+
+/**
+ * Create or update a delivery rate row.
+ * @param {{
+ *   id?: string,
+ *   city_ar: string,
+ *   city_en?: string,
+ *   zone: 'inside_benghazi' | 'outside_benghazi',
+ *   price_lyd: number,
+ *   is_active?: boolean,
+ *   sort_order?: number,
+ * }} input
+ */
+export async function upsertDeliveryRate(input) {
+  const cityAr = String(input?.city_ar || '').trim();
+  const zone = String(input?.zone || '').trim();
+  const price = Number(input?.price_lyd);
+  if (!cityAr) throw new Error('City name (Arabic) is required.');
+  if (!['inside_benghazi', 'outside_benghazi'].includes(zone)) {
+    throw new Error('Zone must be inside_benghazi or outside_benghazi.');
+  }
+  if (!Number.isFinite(price) || price < 0) throw new Error('Delivery price must be 0 or more.');
+
+  const row = {
+    city_ar: cityAr,
+    city_en: String(input?.city_en || '').trim() || null,
+    zone,
+    price_lyd: price,
+    is_active: input?.is_active !== false,
+    sort_order: Number.isFinite(Number(input?.sort_order)) ? Number(input.sort_order) : 0,
+    updated_at: new Date().toISOString(),
+  };
+
+  const id = String(input?.id || '').trim();
+  if (id) {
+    const { data, error } = await getSupabase()
+      .from('delivery_rates')
+      .update(row)
+      .eq('id', id)
+      .select('*')
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) throw new Error('Delivery rate not found.');
+    return data;
+  }
+
+  const { data, error } = await getSupabase()
+    .from('delivery_rates')
+    .insert(row)
+    .select('*')
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+/**
+ * @param {string} id
+ */
+export async function deleteDeliveryRate(id) {
+  const rateId = String(id || '').trim();
+  if (!rateId) throw new Error('Delivery rate id is required.');
+  const { error } = await getSupabase()
+    .from('delivery_rates')
+    .delete()
+    .eq('id', rateId);
+  if (error) throw new Error(error.message);
+  return true;
+}
+
+/**
+ * Insert missing Libya seed rates only (never overwrites edited prices).
+ * @param {Array<object>} seedRows
+ * @returns {Promise<{ inserted: number, skipped: number }>}
+ */
+export async function seedMissingDeliveryRates(seedRows = []) {
+  const existing = await getDeliveryRates({ activeOnly: false });
+  const have = new Set(existing.map((r) => `${r.zone}::${String(r.city_ar || '').trim()}`));
+  const toInsert = [];
+  for (const row of seedRows) {
+    const cityAr = String(row.city_ar || '').trim();
+    const zone = String(row.zone || '').trim();
+    if (!cityAr || !zone) continue;
+    const key = `${zone}::${cityAr}`;
+    if (have.has(key)) continue;
+    toInsert.push({
+      city_ar: cityAr,
+      city_en: String(row.city_en || '').trim() || null,
+      zone,
+      price_lyd: Number(row.price_lyd) || 0,
+      sort_order: Number(row.sort_order) || 0,
+      is_active: true,
+    });
+  }
+  if (!toInsert.length) return { inserted: 0, skipped: seedRows.length };
+
+  const { error } = await getSupabase().from('delivery_rates').insert(toInsert);
+  if (error) throw new Error(error.message);
+  return { inserted: toInsert.length, skipped: seedRows.length - toInsert.length };
+}
+
 // ── Purchases / landed cost ─────────────────────────────────────────
 
 /**

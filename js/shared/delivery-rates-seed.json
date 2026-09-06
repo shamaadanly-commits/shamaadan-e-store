@@ -1,0 +1,863 @@
+[
+  {
+    "city_ar": "البركة",
+    "city_en": "Al Birkah",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 0
+  },
+  {
+    "city_ar": "أرض بن علي",
+    "city_en": "Ard Bin Ali",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 1
+  },
+  {
+    "city_ar": "أرض بلعون",
+    "city_en": "Ard Baloun",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 2
+  },
+  {
+    "city_ar": "بوزغيبة",
+    "city_en": "Bouzghiba",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 3
+  },
+  {
+    "city_ar": "الحميضة",
+    "city_en": "Al Humaidah",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 4
+  },
+  {
+    "city_ar": "الرويسات",
+    "city_en": "Al Rwisat",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 5
+  },
+  {
+    "city_ar": "الرحبة",
+    "city_en": "Al Rahba",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 6
+  },
+  {
+    "city_ar": "حي لبنان",
+    "city_en": "Hai Lebanon",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 7
+  },
+  {
+    "city_ar": "حي الزيتون",
+    "city_en": "Hai Al Zaytun",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 8
+  },
+  {
+    "city_ar": "طابلينو",
+    "city_en": "Tabalino",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 9
+  },
+  {
+    "city_ar": "جليانة",
+    "city_en": "Jilyanah",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 10
+  },
+  {
+    "city_ar": "راس عبيدة",
+    "city_en": "Ras Obeida",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 11
+  },
+  {
+    "city_ar": "سيدي حسين",
+    "city_en": "Sidi Hussein",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 12
+  },
+  {
+    "city_ar": "حي فاتح",
+    "city_en": "Hai Fateh",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 13
+  },
+  {
+    "city_ar": "الفويهات",
+    "city_en": "Al Fuwayhat",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 14
+  },
+  {
+    "city_ar": "السلماني",
+    "city_en": "Al Salmani",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 15
+  },
+  {
+    "city_ar": "الماجوري",
+    "city_en": "Al Majouri",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 16
+  },
+  {
+    "city_ar": "الحدائق",
+    "city_en": "Al Hadaeq",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 17
+  },
+  {
+    "city_ar": "الكيش",
+    "city_en": "Al Kish",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 18
+  },
+  {
+    "city_ar": "الليثي",
+    "city_en": "Al Laithi",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 19
+  },
+  {
+    "city_ar": "بوهديمة",
+    "city_en": "Buhdima",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 20
+  },
+  {
+    "city_ar": "أرض لملوم",
+    "city_en": "Ard Lamloum",
+    "zone": "inside_benghazi",
+    "price_lyd": 10.0,
+    "sort_order": 21
+  },
+  {
+    "city_ar": "حي السلام",
+    "city_en": "Hai Al Salam",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 22
+  },
+  {
+    "city_ar": "سيدي خريبيش",
+    "city_en": "Sidi Khribish",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 23
+  },
+  {
+    "city_ar": "أرض الحراسة",
+    "city_en": "Ard Al Harasa",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 24
+  },
+  {
+    "city_ar": "أرض التيناز",
+    "city_en": "Ard Al Tinaz",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 25
+  },
+  {
+    "city_ar": "أرض البيجو",
+    "city_en": "Ard Al Bijo",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 26
+  },
+  {
+    "city_ar": "المساكن",
+    "city_en": "Al Masakin",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 27
+  },
+  {
+    "city_ar": "الزريريعية",
+    "city_en": "Al Zririyia",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 28
+  },
+  {
+    "city_ar": "السرتي",
+    "city_en": "Al Sirti",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 29
+  },
+  {
+    "city_ar": "اللثامة",
+    "city_en": "Al Lathama",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 30
+  },
+  {
+    "city_ar": "بوصنيب",
+    "city_en": "Bousnib",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 31
+  },
+  {
+    "city_ar": "قنفودة",
+    "city_en": "Ganfouda",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 32
+  },
+  {
+    "city_ar": "قاريونس",
+    "city_en": "Garyounis",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 33
+  },
+  {
+    "city_ar": "وسط البلاد",
+    "city_en": "City Center (Wast Al Bilad)",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 34
+  },
+  {
+    "city_ar": "الحي الدبلوماسي",
+    "city_en": "Diplomatic Quarter (Hai Al Diplomasi)",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 35
+  },
+  {
+    "city_ar": "السيدة عائشة",
+    "city_en": "Sayeda Aisha",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 36
+  },
+  {
+    "city_ar": "أرض شبنة",
+    "city_en": "Ard Shabna",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 37
+  },
+  {
+    "city_ar": "أرض قريش",
+    "city_en": "Ard Quraish",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 38
+  },
+  {
+    "city_ar": "بوعطني",
+    "city_en": "Buatni",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 39
+  },
+  {
+    "city_ar": "حي الروضة",
+    "city_en": "Hai Al Rawda",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 40
+  },
+  {
+    "city_ar": "حي السراج",
+    "city_en": "Hai Al Sarraj",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 41
+  },
+  {
+    "city_ar": "حي الدولار",
+    "city_en": "Hai Al Dollar",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 42
+  },
+  {
+    "city_ar": "حي المهندسين",
+    "city_en": "Hai Al Muhandiseen",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 43
+  },
+  {
+    "city_ar": "الهواري",
+    "city_en": "Al Hawari",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 44
+  },
+  {
+    "city_ar": "حي قطر",
+    "city_en": "Hai Qatar",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 45
+  },
+  {
+    "city_ar": "الصابري",
+    "city_en": "Al Sabri",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 46
+  },
+  {
+    "city_ar": "سيدي يونس",
+    "city_en": "Sidi Younis",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 47
+  },
+  {
+    "city_ar": "بن يونس",
+    "city_en": "Bin Younis",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 48
+  },
+  {
+    "city_ar": "شبنة",
+    "city_en": "Shabna",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 49
+  },
+  {
+    "city_ar": "القوارشة",
+    "city_en": "Al Qawarishah",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 50
+  },
+  {
+    "city_ar": "الوحيشي",
+    "city_en": "Al Waheishi",
+    "zone": "inside_benghazi",
+    "price_lyd": 15.0,
+    "sort_order": 51
+  },
+  {
+    "city_ar": "تيكا",
+    "city_en": "Tikah",
+    "zone": "inside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 52
+  },
+  {
+    "city_ar": "الكويفية",
+    "city_en": "Al Kuwayfiyah",
+    "zone": "inside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 53
+  },
+  {
+    "city_ar": "بودزيرة",
+    "city_en": "Bou Dzira",
+    "zone": "inside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 54
+  },
+  {
+    "city_ar": "أرض الكواديك",
+    "city_en": "Ard Al Kawadik",
+    "zone": "inside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 55
+  },
+  {
+    "city_ar": "الطلحية",
+    "city_en": "Al Talhiya",
+    "zone": "inside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 56
+  },
+  {
+    "city_ar": "بوهادي",
+    "city_en": "Bouhadi",
+    "zone": "inside_benghazi",
+    "price_lyd": 25.0,
+    "sort_order": 57
+  },
+  {
+    "city_ar": "سيدي فرج",
+    "city_en": "Sidi Faraj",
+    "zone": "inside_benghazi",
+    "price_lyd": 25.0,
+    "sort_order": 58
+  },
+  {
+    "city_ar": "بنينا",
+    "city_en": "Benina",
+    "zone": "inside_benghazi",
+    "price_lyd": 25.0,
+    "sort_order": 59
+  },
+  {
+    "city_ar": "سيدي خليفة",
+    "city_en": "Sidi Khalifa",
+    "zone": "inside_benghazi",
+    "price_lyd": 25.0,
+    "sort_order": 60
+  },
+  {
+    "city_ar": "المقزحة",
+    "city_en": "Al Maqza",
+    "zone": "inside_benghazi",
+    "price_lyd": 35.0,
+    "sort_order": 61
+  },
+  {
+    "city_ar": "قمينس",
+    "city_en": "Qaminis",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 0
+  },
+  {
+    "city_ar": "القيقب",
+    "city_en": "Al Qayqab",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 1
+  },
+  {
+    "city_ar": "الأبرق",
+    "city_en": "Al Abraq",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 2
+  },
+  {
+    "city_ar": "شحات",
+    "city_en": "Shahat",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 3
+  },
+  {
+    "city_ar": "البيضاء",
+    "city_en": "Al Bayda",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 4
+  },
+  {
+    "city_ar": "قصر ليبيا",
+    "city_en": "Qasr Libya",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 5
+  },
+  {
+    "city_ar": "دريانة",
+    "city_en": "Driana",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 6
+  },
+  {
+    "city_ar": "توكرة",
+    "city_en": "Tukrah",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 7
+  },
+  {
+    "city_ar": "تاكنس",
+    "city_en": "Tacnis",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 8
+  },
+  {
+    "city_ar": "المرج",
+    "city_en": "Al Marj",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 9
+  },
+  {
+    "city_ar": "درنة",
+    "city_en": "Derna",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 10
+  },
+  {
+    "city_ar": "إجدابيا",
+    "city_en": "Ajdabiya",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 11
+  },
+  {
+    "city_ar": "المقرون",
+    "city_en": "Al Maqrun",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 12
+  },
+  {
+    "city_ar": "عين مارة",
+    "city_en": "Ain Mara",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 13
+  },
+  {
+    "city_ar": "فرزوقة",
+    "city_en": "Farzugha",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 14
+  },
+  {
+    "city_ar": "برسس",
+    "city_en": "Bersis",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 15
+  },
+  {
+    "city_ar": "مسه",
+    "city_en": "Massa",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 16
+  },
+  {
+    "city_ar": "القبة",
+    "city_en": "Al Qubbah",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 17
+  },
+  {
+    "city_ar": "طبرق",
+    "city_en": "Tobruk",
+    "zone": "outside_benghazi",
+    "price_lyd": 20.0,
+    "sort_order": 18
+  },
+  {
+    "city_ar": "سرت",
+    "city_en": "Sirte",
+    "zone": "outside_benghazi",
+    "price_lyd": 25.0,
+    "sort_order": 19
+  },
+  {
+    "city_ar": "هراوة",
+    "city_en": "Harawa",
+    "zone": "outside_benghazi",
+    "price_lyd": 25.0,
+    "sort_order": 20
+  },
+  {
+    "city_ar": "مصراته",
+    "city_en": "Misrata",
+    "zone": "outside_benghazi",
+    "price_lyd": 25.0,
+    "sort_order": 21
+  },
+  {
+    "city_ar": "العقيلة",
+    "city_en": "Al Uqaylah",
+    "zone": "outside_benghazi",
+    "price_lyd": 25.0,
+    "sort_order": 22
+  },
+  {
+    "city_ar": "العلوص",
+    "city_en": "Al Alous",
+    "zone": "outside_benghazi",
+    "price_lyd": 25.0,
+    "sort_order": 23
+  },
+  {
+    "city_ar": "بشر",
+    "city_en": "Bishr",
+    "zone": "outside_benghazi",
+    "price_lyd": 25.0,
+    "sort_order": 24
+  },
+  {
+    "city_ar": "راس لانوف",
+    "city_en": "Ras Lanuf",
+    "zone": "outside_benghazi",
+    "price_lyd": 25.0,
+    "sort_order": 25
+  },
+  {
+    "city_ar": "بن جواد",
+    "city_en": "Bin Jawad",
+    "zone": "outside_benghazi",
+    "price_lyd": 25.0,
+    "sort_order": 26
+  },
+  {
+    "city_ar": "بوقرين",
+    "city_en": "Abu Qurayn",
+    "zone": "outside_benghazi",
+    "price_lyd": 25.0,
+    "sort_order": 27
+  },
+  {
+    "city_ar": "البريقة",
+    "city_en": "Brega",
+    "zone": "outside_benghazi",
+    "price_lyd": 30.0,
+    "sort_order": 28
+  },
+  {
+    "city_ar": "طرابلس",
+    "city_en": "Tripoli",
+    "zone": "outside_benghazi",
+    "price_lyd": 30.0,
+    "sort_order": 29
+  },
+  {
+    "city_ar": "الخمس",
+    "city_en": "Al Khums",
+    "zone": "outside_benghazi",
+    "price_lyd": 30.0,
+    "sort_order": 30
+  },
+  {
+    "city_ar": "زليتن",
+    "city_en": "Zliten",
+    "zone": "outside_benghazi",
+    "price_lyd": 30.0,
+    "sort_order": 31
+  },
+  {
+    "city_ar": "امساعد",
+    "city_en": "Musaid",
+    "zone": "outside_benghazi",
+    "price_lyd": 30.0,
+    "sort_order": 32
+  },
+  {
+    "city_ar": "الأبيار",
+    "city_en": "Al Abyar",
+    "zone": "outside_benghazi",
+    "price_lyd": 30.0,
+    "sort_order": 33
+  },
+  {
+    "city_ar": "لاثرون",
+    "city_en": "Lathrun",
+    "zone": "outside_benghazi",
+    "price_lyd": 35.0,
+    "sort_order": 34
+  },
+  {
+    "city_ar": "سوسة",
+    "city_en": "Susa",
+    "zone": "outside_benghazi",
+    "price_lyd": 35.0,
+    "sort_order": 35
+  },
+  {
+    "city_ar": "الفتايح",
+    "city_en": "Al Fatayah",
+    "zone": "outside_benghazi",
+    "price_lyd": 35.0,
+    "sort_order": 36
+  },
+  {
+    "city_ar": "أم الرزم",
+    "city_en": "Umm al Rizam",
+    "zone": "outside_benghazi",
+    "price_lyd": 35.0,
+    "sort_order": 37
+  },
+  {
+    "city_ar": "راس الهلال",
+    "city_en": "Ras al Helal",
+    "zone": "outside_benghazi",
+    "price_lyd": 35.0,
+    "sort_order": 38
+  },
+  {
+    "city_ar": "هون",
+    "city_en": "Hun",
+    "zone": "outside_benghazi",
+    "price_lyd": 40.0,
+    "sort_order": 39
+  },
+  {
+    "city_ar": "ودان",
+    "city_en": "Waddan",
+    "zone": "outside_benghazi",
+    "price_lyd": 40.0,
+    "sort_order": 40
+  },
+  {
+    "city_ar": "سبها",
+    "city_en": "Sabha",
+    "zone": "outside_benghazi",
+    "price_lyd": 40.0,
+    "sort_order": 41
+  },
+  {
+    "city_ar": "الكفرة",
+    "city_en": "Kufra",
+    "zone": "outside_benghazi",
+    "price_lyd": 40.0,
+    "sort_order": 42
+  },
+  {
+    "city_ar": "جالو",
+    "city_en": "Jalu",
+    "zone": "outside_benghazi",
+    "price_lyd": 40.0,
+    "sort_order": 43
+  },
+  {
+    "city_ar": "أوجلة",
+    "city_en": "Awjila",
+    "zone": "outside_benghazi",
+    "price_lyd": 40.0,
+    "sort_order": 44
+  },
+  {
+    "city_ar": "الجفرة",
+    "city_en": "Al Jufra",
+    "zone": "outside_benghazi",
+    "price_lyd": 40.0,
+    "sort_order": 45
+  },
+  {
+    "city_ar": "سلوق",
+    "city_en": "Suluq",
+    "zone": "outside_benghazi",
+    "price_lyd": 40.0,
+    "sort_order": 46
+  },
+  {
+    "city_ar": "بن وليد",
+    "city_en": "Bani Walid",
+    "zone": "outside_benghazi",
+    "price_lyd": 40.0,
+    "sort_order": 47
+  },
+  {
+    "city_ar": "أم الأرانب",
+    "city_en": "Umm al Aranib",
+    "zone": "outside_benghazi",
+    "price_lyd": 45.0,
+    "sort_order": 48
+  },
+  {
+    "city_ar": "اجخره",
+    "city_en": "Jikharra",
+    "zone": "outside_benghazi",
+    "price_lyd": 45.0,
+    "sort_order": 49
+  },
+  {
+    "city_ar": "أوباري",
+    "city_en": "Ubari",
+    "zone": "outside_benghazi",
+    "price_lyd": 45.0,
+    "sort_order": 50
+  },
+  {
+    "city_ar": "تازربو",
+    "city_en": "Tazirbu",
+    "zone": "outside_benghazi",
+    "price_lyd": 45.0,
+    "sort_order": 51
+  },
+  {
+    "city_ar": "الجميل",
+    "city_en": "Al Jamil",
+    "zone": "outside_benghazi",
+    "price_lyd": 50.0,
+    "sort_order": 52
+  },
+  {
+    "city_ar": "رقدالين",
+    "city_en": "Rigdalin",
+    "zone": "outside_benghazi",
+    "price_lyd": 50.0,
+    "sort_order": 53
+  },
+  {
+    "city_ar": "العجيلات",
+    "city_en": "Al Ajeelat",
+    "zone": "outside_benghazi",
+    "price_lyd": 50.0,
+    "sort_order": 54
+  },
+  {
+    "city_ar": "زوارة",
+    "city_en": "Zuwara",
+    "zone": "outside_benghazi",
+    "price_lyd": 50.0,
+    "sort_order": 55
+  },
+  {
+    "city_ar": "غريان",
+    "city_en": "Gharyan",
+    "zone": "outside_benghazi",
+    "price_lyd": 50.0,
+    "sort_order": 56
+  },
+  {
+    "city_ar": "براك الشاطي",
+    "city_en": "Brak Al Shati",
+    "zone": "outside_benghazi",
+    "price_lyd": 50.0,
+    "sort_order": 57
+  },
+  {
+    "city_ar": "الزنتان",
+    "city_en": "Zintan",
+    "zone": "outside_benghazi",
+    "price_lyd": 50.0,
+    "sort_order": 58
+  },
+  {
+    "city_ar": "الزاوية",
+    "city_en": "Zawiya",
+    "zone": "outside_benghazi",
+    "price_lyd": 50.0,
+    "sort_order": 59
+  },
+  {
+    "city_ar": "مرزق",
+    "city_en": "Murzuq",
+    "zone": "outside_benghazi",
+    "price_lyd": 50.0,
+    "sort_order": 60
+  }
+]

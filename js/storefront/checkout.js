@@ -1,9 +1,12 @@
 /**
  * Checkout drawer — CAD (cash on delivery) & UPAY (credit card).
  */
-import { createOrder, isSupabaseConfigured } from '../../shared/supabase.js';
+import { createOrder, getDeliveryRates, isSupabaseConfigured } from '../../shared/supabase.js';
 
 const OVERLAY_ID = 'checkout-overlay';
+
+/** @type {object[] | null} */
+let cachedDeliveryRates = null;
 
 /**
  * @param {HTMLElement} shopRoot
@@ -35,6 +38,21 @@ export function initCheckout(shopRoot, cart, i18n) {
   };
 }
 
+async function loadDeliveryRates() {
+  if (cachedDeliveryRates) return cachedDeliveryRates;
+  if (!isSupabaseConfigured()) {
+    cachedDeliveryRates = [];
+    return cachedDeliveryRates;
+  }
+  try {
+    cachedDeliveryRates = await getDeliveryRates({ activeOnly: true });
+  } catch (err) {
+    console.warn('[checkout] delivery rates unavailable:', err?.message || err);
+    cachedDeliveryRates = [];
+  }
+  return cachedDeliveryRates;
+}
+
 function buildShell() {
   return `
     <div class="checkout-overlay__backdrop" data-checkout-close></div>
@@ -49,10 +67,12 @@ function buildShell() {
   `;
 }
 
-function openCheckout(overlay, cart, i18n) {
+async function openCheckout(overlay, cart, i18n) {
   overlay.classList.add('is-open');
   document.body.style.overflow = 'hidden';
   refreshLabels(overlay, i18n);
+  cachedDeliveryRates = null;
+  await loadDeliveryRates();
   renderCheckoutBody(overlay, cart, i18n, { preserveForm: false });
   overlay.querySelector('[data-checkout-drawer]')?.focus();
 }
@@ -83,6 +103,7 @@ function readCheckoutFormState(overlay) {
     email: String(form.email?.value || ''),
     address: String(form.address?.value || ''),
     city: String(form.city?.value || ''),
+    deliveryRateId: String(form.deliveryRateId?.value || form.querySelector('[name="deliveryRateId"]')?.value || ''),
     paymentMethod: payment instanceof HTMLInputElement ? payment.value : 'cad',
     activeName: document.activeElement instanceof HTMLElement
       && form.contains(document.activeElement)
@@ -113,6 +134,12 @@ function restoreCheckoutFormState(overlay, state) {
   if (form.email) form.email.value = state.email;
   if (form.address) form.address.value = state.address;
   if (form.city) form.city.value = state.city;
+  if (form.deliveryRateId && state.deliveryRateId) {
+    form.deliveryRateId.value = state.deliveryRateId;
+  } else if (state.deliveryRateId) {
+    const select = form.querySelector('[name="deliveryRateId"]');
+    if (select) select.value = state.deliveryRateId;
+  }
 
   const radio = form.querySelector(`input[name="paymentMethod"][value="${CSS.escape(state.paymentMethod || 'cad')}"]`);
   if (radio instanceof HTMLInputElement) radio.checked = true;
@@ -142,7 +169,7 @@ function renderCheckoutBody(overlay, cart, i18n, opts = {}) {
   const t = i18n.t.bind(i18n);
   const body = overlay.querySelector('[data-checkout-body]');
   const footer = overlay.querySelector('[data-checkout-footer]');
-  const { items, subtotal, shipping, total, count } = cart.getSnapshot();
+  const { items, subtotal, shipping, total, count, deliveryCity } = cart.getSnapshot();
   const preserveForm = opts.preserveForm === true;
   const savedForm = preserveForm ? readCheckoutFormState(overlay) : null;
   const typingInForm = Boolean(
@@ -172,7 +199,7 @@ function renderCheckoutBody(overlay, cart, i18n, opts = {}) {
     if (linesHost) {
       linesHost.innerHTML = items.map(({ product, qty }) => lineHtml(product, qty, i18n)).join('');
     }
-    renderCheckoutFooter(footer, i18n, subtotal, shipping, total);
+    renderCheckoutFooter(footer, i18n, subtotal, shipping, total, deliveryCity);
     return;
   }
 
@@ -204,7 +231,11 @@ function renderCheckoutBody(overlay, cart, i18n, opts = {}) {
         </div>
         <div class="checkout-field">
           <label for="co-city">${t('checkout.city')}</label>
-          <input type="text" id="co-city" name="city" required autocomplete="address-level2">
+          <select id="co-city" name="deliveryRateId" data-delivery-city required>
+            ${deliveryCityOptionsHtml(cachedDeliveryRates || [], cart.getSnapshot().deliveryCity, i18n)}
+          </select>
+          <input type="hidden" name="city" value="${escapeAttr(cart.getSnapshot().deliveryCity?.city_ar || '')}">
+          <p class="checkout-field__hint">${t('checkout.deliveryHint')}</p>
         </div>
 
         <section class="checkout-section">
@@ -238,7 +269,7 @@ function renderCheckoutBody(overlay, cart, i18n, opts = {}) {
     </section>
   `;
 
-  renderCheckoutFooter(footer, i18n, subtotal, shipping, total);
+  renderCheckoutFooter(footer, i18n, subtotal, shipping, total, deliveryCity);
   bindFormEvents(overlay, cart, i18n);
   if (savedForm) restoreCheckoutFormState(overlay, savedForm);
 }
@@ -250,8 +281,11 @@ function renderCheckoutBody(overlay, cart, i18n, opts = {}) {
  * @param {number} shipping
  * @param {number} total
  */
-function renderCheckoutFooter(footer, i18n, subtotal, shipping, total) {
+function renderCheckoutFooter(footer, i18n, subtotal, shipping, total, deliveryCity = null) {
   const t = i18n.t.bind(i18n);
+  const shippingLabel = !deliveryCity
+    ? t('checkout.shippingCalc')
+    : (shipping === 0 ? t('checkout.shippingFree') : i18n.formatPrice(shipping));
   footer.innerHTML = `
     <div class="checkout-totals">
       <div class="checkout-totals__row">
@@ -260,7 +294,7 @@ function renderCheckoutFooter(footer, i18n, subtotal, shipping, total) {
       </div>
       <div class="checkout-totals__row">
         <span>${t('checkout.shipping')}</span>
-        <span>${shipping === 0 ? t('checkout.shippingFree') : i18n.formatPrice(shipping)}</span>
+        <span>${shippingLabel}</span>
       </div>
       <div class="checkout-totals__row checkout-totals__row--grand">
         <span>${t('checkout.total')}</span>
@@ -334,10 +368,68 @@ function bindFormEvents(overlay, cart, i18n) {
   if (!form || form.dataset.bound === '1') return;
   form.dataset.bound = '1';
 
+  form.addEventListener('change', (event) => {
+    const select = event.target.closest('[data-delivery-city]');
+    if (!(select instanceof HTMLSelectElement)) return;
+    applyDeliveryCityFromSelect(cart, form, select);
+  });
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     await submitOrder(overlay, cart, i18n, form);
   });
+}
+
+/**
+ * @param {ReturnType<import('./cart.js').createCart>} cart
+ * @param {HTMLFormElement} form
+ * @param {HTMLSelectElement} select
+ */
+function applyDeliveryCityFromSelect(cart, form, select) {
+  const id = String(select.value || '').trim();
+  const rate = (cachedDeliveryRates || []).find((r) => String(r.id) === id);
+  if (!rate) {
+    cart.setDeliveryCity(null);
+    if (form.city) form.city.value = '';
+    return;
+  }
+  cart.setDeliveryCity(rate);
+  if (form.city) form.city.value = String(rate.city_ar || rate.city_en || '');
+}
+
+/**
+ * @param {object[]} rates
+ * @param {object | null} selected
+ * @param {ReturnType<import('./i18n.js').createI18n>} i18n
+ */
+function deliveryCityOptionsHtml(rates, selected, i18n) {
+  const t = i18n.t.bind(i18n);
+  const selectedId = selected?.id ? String(selected.id) : '';
+  if (!rates.length) {
+    return `<option value="">${escapeHtml(t('checkout.deliveryUnavailable'))}</option>`;
+  }
+
+  const inside = rates.filter((r) => r.zone === 'inside_benghazi');
+  const outside = rates.filter((r) => r.zone === 'outside_benghazi');
+  const other = rates.filter((r) => r.zone !== 'inside_benghazi' && r.zone !== 'outside_benghazi');
+
+  const option = (r) => {
+    const labelAr = String(r.city_ar || '').trim();
+    const labelEn = String(r.city_en || '').trim();
+    const price = Number(r.price_lyd) || 0;
+    const label = labelEn
+      ? `${labelAr} / ${labelEn} — ${i18n.formatPrice(price)}`
+      : `${labelAr} — ${i18n.formatPrice(price)}`;
+    const sel = String(r.id) === selectedId ? ' selected' : '';
+    return `<option value="${escapeAttr(r.id)}"${sel}>${escapeHtml(label)}</option>`;
+  };
+
+  return [
+    `<option value="">${escapeHtml(t('checkout.chooseCity'))}</option>`,
+    inside.length ? `<optgroup label="${escapeAttr(t('checkout.zoneInside'))}">${inside.map(option).join('')}</optgroup>` : '',
+    outside.length ? `<optgroup label="${escapeAttr(t('checkout.zoneOutside'))}">${outside.map(option).join('')}</optgroup>` : '',
+    other.length ? `<optgroup label="${escapeAttr(t('checkout.city'))}">${other.map(option).join('')}</optgroup>` : '',
+  ].join('');
 }
 
 async function submitOrder(overlay, cart, i18n, form) {
@@ -494,13 +586,25 @@ async function placeOrderClientSide(payload) {
 }
 
 function validateContact(form, errorEl, t) {
-  const required = ['fullName', 'phone', 'email', 'address', 'city'];
+  const required = ['fullName', 'phone', 'email', 'address'];
   for (const name of required) {
     if (!form[name]?.value.trim()) {
       if (errorEl) errorEl.textContent = t('checkout.errorRequired');
       form[name]?.focus();
       return false;
     }
+  }
+  const citySelect = form.querySelector('[data-delivery-city]');
+  if (citySelect instanceof HTMLSelectElement) {
+    if (!citySelect.value) {
+      if (errorEl) errorEl.textContent = t('checkout.errorCity');
+      citySelect.focus();
+      return false;
+    }
+  } else if (!form.city?.value.trim()) {
+    if (errorEl) errorEl.textContent = t('checkout.errorRequired');
+    form.city?.focus();
+    return false;
   }
   return true;
 }

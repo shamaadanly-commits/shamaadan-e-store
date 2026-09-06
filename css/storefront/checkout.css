@@ -254,7 +254,8 @@
 }
 
 .checkout-field input,
-.checkout-field textarea {
+.checkout-field textarea,
+.checkout-field select {
   width: 100%;
   padding: 0.7rem 0.85rem;
   background: var(--co-bg-input);
@@ -266,8 +267,24 @@
   transition: border-color 0.18s var(--co-ease);
 }
 
+.checkout-field select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23a89f92' d='M1.4 0L6 4.6 10.6 0 12 1.4 6 7.4 0 1.4z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  padding-inline-end: 2rem;
+}
+
+.checkout-field__hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: var(--co-text-dim);
+}
+
 .checkout-field input:focus,
-.checkout-field textarea:focus {
+.checkout-field textarea:focus,
+.checkout-field select:focus {
   border-color: var(--co-gold);
 }
 

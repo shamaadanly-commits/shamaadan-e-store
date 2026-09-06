@@ -541,6 +541,118 @@ export function wasteTableHtml(rows = []) {
 }
 
 /**
+ * Delivery rates table (website checkout only — does not touch inventory).
+ * @param {Array<object>} rows
+ * @param {{ filter?: string }} [opts]
+ */
+export function deliveryRatesTableHtml(rows = [], opts = {}) {
+  const filter = String(opts.filter || '').trim().toLowerCase();
+  const filtered = filter
+    ? rows.filter((r) => {
+      const hay = `${r.city_ar || ''} ${r.city_en || ''} ${r.zone || ''}`.toLowerCase();
+      return hay.includes(filter);
+    })
+    : rows;
+
+  const money = (n) => new Intl.NumberFormat('en-LY', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);
+  const zoneLabel = (z) => (z === 'inside_benghazi' ? 'Inside Benghazi' : z === 'outside_benghazi' ? 'Outside Benghazi' : z || '—');
+
+  if (!rows.length) {
+    return `
+      <p class="dash-empty">No delivery rates yet. Click <strong>Load Libya rates</strong> to import the city list (insert-only — never overwrites prices you already edited).</p>`;
+  }
+
+  return `
+    <div class="dash-delivery-toolbar">
+      <label class="dash-field" style="flex:1;margin:0">
+        <span class="visually-hidden">Search cities</span>
+        <input type="search" class="dash-input" data-delivery-filter placeholder="Search city (Arabic or English)…" value="${escapeAttr(opts.filter || '')}">
+      </label>
+      <span class="dash-panel__count">${filtered.length} / ${rows.length} cities</span>
+    </div>
+    ${!filtered.length ? '<p class="dash-empty">No cities match that search.</p>' : `
+    <div class="dash-table-wrap">
+      <table class="dash-table" data-delivery-table>
+        <thead>
+          <tr>
+            <th scope="col">City (AR)</th>
+            <th scope="col">City (EN)</th>
+            <th scope="col">Zone</th>
+            <th scope="col">Price (LYD)</th>
+            <th scope="col">Active</th>
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filtered.map((r) => `
+            <tr data-delivery-row="${escapeAttr(r.id)}">
+              <td class="dash-input--bidi"><strong>${escapeHtml(r.city_ar || '—')}</strong></td>
+              <td>${escapeHtml(r.city_en || '—')}</td>
+              <td>${escapeHtml(zoneLabel(r.zone))}</td>
+              <td class="dash-table__num">${money(r.price_lyd)}</td>
+              <td>${r.is_active === false ? 'Off' : 'On'}</td>
+              <td class="dash-table__actions">
+                <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-edit-delivery="${escapeAttr(r.id)}">Edit</button>
+                <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm " data-delete-delivery="${escapeAttr(r.id)}">Delete</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`}
+  `;
+}
+
+/**
+ * @param {object | null} rate
+ */
+export function deliveryRateFormHtml(rate = null) {
+  const r = rate || {};
+  const isEdit = Boolean(r.id);
+  return `
+    <form class="dash-form" data-delivery-form autocomplete="off">
+      <input type="hidden" name="id" value="${escapeAttr(r.id || '')}">
+      <div class="dash-form__grid">
+        <div class="dash-field">
+          <label for="delivery-city-ar">City (Arabic)</label>
+          <input id="delivery-city-ar" name="city_ar" type="text" class="dash-input--bidi" required value="${escapeAttr(r.city_ar || '')}" placeholder="بنغازي">
+        </div>
+        <div class="dash-field">
+          <label for="delivery-city-en">City (English)</label>
+          <input id="delivery-city-en" name="city_en" type="text" value="${escapeAttr(r.city_en || '')}" placeholder="Benghazi">
+        </div>
+        <div class="dash-field">
+          <label for="delivery-zone">Zone</label>
+          <select id="delivery-zone" name="zone" required>
+            <option value="inside_benghazi"${r.zone === 'inside_benghazi' || !r.zone ? ' selected' : ''}>Inside Benghazi</option>
+            <option value="outside_benghazi"${r.zone === 'outside_benghazi' ? ' selected' : ''}>Outside Benghazi</option>
+          </select>
+        </div>
+        <div class="dash-field">
+          <label for="delivery-price">Price (LYD)</label>
+          <input id="delivery-price" name="price_lyd" type="number" min="0" step="0.5" required value="${escapeAttr(r.price_lyd ?? '')}" placeholder="15">
+        </div>
+        <div class="dash-field">
+          <label for="delivery-sort">Sort order</label>
+          <input id="delivery-sort" name="sort_order" type="number" step="1" value="${escapeAttr(r.sort_order ?? 0)}">
+        </div>
+        <div class="dash-field">
+          <label for="delivery-active">Active on website</label>
+          <select id="delivery-active" name="is_active">
+            <option value="true"${r.is_active !== false ? ' selected' : ''}>Yes</option>
+            <option value="false"${r.is_active === false ? ' selected' : ''}>No</option>
+          </select>
+        </div>
+      </div>
+      <div class="dash-form__actions">
+        <button type="submit" class="dash-btn dash-btn--primary">${isEdit ? 'Save rate' : 'Add rate'}</button>
+        ${isEdit ? '<button type="button" class="dash-btn dash-btn--ghost" data-delivery-cancel>Cancel</button>' : ''}
+      </div>
+      <p class="dash-form__note">These prices apply only to website checkout. Inventory and product stock are never changed here.</p>
+    </form>`;
+}
+
+/**
  * @param {Array<{ id: string, name: string }>} items
  * @param {string} selectedId
  * @param {string} emptyLabel
@@ -983,6 +1095,12 @@ export function buildAdminShell() {
             </span>
             <span class="dash-nav__label">Waste</span>
           </button>
+          <button type="button" class="dash-nav__link" data-nav="delivery" data-view="delivery">
+            <span class="dash-nav__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9 1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+            </span>
+            <span class="dash-nav__label">Delivery rates</span>
+          </button>
           <button type="button" class="dash-nav__link" data-nav="credentials" data-view="credentials">
             <span class="dash-nav__icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" focusable="false"><path fill="currentColor" d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
@@ -1198,6 +1316,35 @@ export function buildAdminShell() {
                   <h2>Record Waste</h2>
                 </header>
                 <div class="dash-panel__body" data-waste-form-host></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="dash-view" data-panel="delivery" aria-label="Delivery rates" hidden>
+            <div class="dash-catalog-intro">
+              <p>Website order delivery prices by city / area. Editing these rates does <strong>not</strong> change inventory or product stock.</p>
+            </div>
+            <div class="dash-inventory-layout">
+              <article class="dash-panel dash-panel--grow">
+                <header class="dash-panel__header dash-panel__header--row">
+                  <div>
+                    <h2>City delivery rates</h2>
+                    <p class="dash-panel__sub">Inside &amp; outside Benghazi</p>
+                  </div>
+                  <div class="dash-panel__header-actions">
+                    <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-seed-delivery>Load Libya rates</button>
+                    <button type="button" class="dash-btn dash-btn--ghost dash-btn--sm" data-refresh-delivery>Refresh</button>
+                  </div>
+                </header>
+                <div class="dash-panel__body" data-delivery-host>
+                  <p class="dash-empty">Loading delivery rates…</p>
+                </div>
+              </article>
+              <article class="dash-panel dash-panel--form">
+                <header class="dash-panel__header">
+                  <h2 data-delivery-form-title>Add / edit rate</h2>
+                </header>
+                <div class="dash-panel__body" data-delivery-form-host></div>
               </article>
             </div>
           </section>

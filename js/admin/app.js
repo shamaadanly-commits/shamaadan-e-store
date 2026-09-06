@@ -37,6 +37,10 @@ import {
   updateWebsiteOrderStatus,
   getSalesOrdersForReport,
   getPosPaymentBreakdown,
+  getDeliveryRates,
+  upsertDeliveryRate,
+  deleteDeliveryRate,
+  seedMissingDeliveryRates,
 } from '../../shared/supabase.js';
 import { downloadAccountingBackupPdf } from './backup.js';
 import {
@@ -80,6 +84,8 @@ import {
   openTicketsPanelHtml,
   wasteFormHtml,
   wasteTableHtml,
+  deliveryRatesTableHtml,
+  deliveryRateFormHtml,
   websiteOrdersTableHtml,
   websiteOrderDetailHtml,
 } from './template.js';
@@ -115,6 +121,11 @@ export async function mount(root) {
   let valuationAsOf = new Date().toISOString().slice(0, 10);
   /** @type {ReturnType<typeof buildInventoryValuation> | null} */
   let valuationSummary = null;
+  /** @type {object[]} */
+  let deliveryRatesCache = [];
+  let deliveryFilter = '';
+  /** @type {string | null} */
+  let editingDeliveryId = null;
   const orderPushState = { knownIds: new Set(), primed: false };
 
   root.className = 'dashboard-app';
@@ -136,6 +147,9 @@ export async function mount(root) {
     paymentsHost: root.querySelector('[data-payments-host]'),
     wasteHost: root.querySelector('[data-waste-host]'),
     wasteFormHost: root.querySelector('[data-waste-form-host]'),
+    deliveryHost: root.querySelector('[data-delivery-host]'),
+    deliveryFormHost: root.querySelector('[data-delivery-form-host]'),
+    deliveryFormTitle: root.querySelector('[data-delivery-form-title]'),
     websiteOrdersHost: root.querySelector('[data-website-orders-host]'),
     reportsHost: root.querySelector('[data-reports-host]'),
     salesByItemHost: root.querySelector('[data-sales-by-item-host]'),
@@ -461,6 +475,10 @@ export async function mount(root) {
     if (event.target.matches('[data-barcode-input]')) {
       updateBarcodePreview(event.target.closest('form'));
     }
+    if (event.target.matches('[data-delivery-filter]')) {
+      deliveryFilter = String(/** @type {HTMLInputElement} */ (event.target).value || '');
+      renderDeliveryTable();
+    }
   });
 
   document.addEventListener('keydown', (event) => {
@@ -543,6 +561,46 @@ export async function mount(root) {
 
     if (target.matches('[data-refresh-waste]')) {
       await refreshWaste();
+      return;
+    }
+
+    if (target.matches('[data-refresh-delivery]')) {
+      await refreshDeliveryRates();
+      return;
+    }
+
+    if (target.matches('[data-seed-delivery]')) {
+      await seedDeliveryRatesFromFile();
+      return;
+    }
+
+    if (target.matches('[data-delivery-cancel]')) {
+      editingDeliveryId = null;
+      renderDeliveryForm();
+      return;
+    }
+
+    const editDelivery = target.closest('[data-edit-delivery]');
+    if (editDelivery) {
+      editingDeliveryId = editDelivery.getAttribute('data-edit-delivery');
+      renderDeliveryForm();
+      return;
+    }
+
+    const deleteDelivery = target.closest('[data-delete-delivery]');
+    if (deleteDelivery) {
+      const id = deleteDelivery.getAttribute('data-delete-delivery');
+      if (!id) return;
+      const row = deliveryRatesCache.find((r) => String(r.id) === String(id));
+      const label = row ? `${row.city_ar || ''} ${row.city_en || ''}`.trim() : id;
+      if (!window.confirm(`Delete delivery rate for “${label}”?\n\nThis does not change inventory.`)) return;
+      try {
+        await deleteDeliveryRate(id);
+        if (editingDeliveryId === id) editingDeliveryId = null;
+        await refreshDeliveryRates();
+      } catch (err) {
+        window.alert(err?.message || 'Failed to delete delivery rate.');
+      }
       return;
     }
 
@@ -1015,6 +1073,13 @@ export async function mount(root) {
       return;
     }
 
+    const deliveryForm = event.target.closest('[data-delivery-form]');
+    if (deliveryForm) {
+      event.preventDefault();
+      await saveDeliveryFromForm(deliveryForm);
+      return;
+    }
+
     const adminPassForm = event.target.closest('[data-cred-admin-password]');
     if (adminPassForm) {
       event.preventDefault();
@@ -1392,9 +1457,11 @@ export async function mount(root) {
     renderCatalogForm();
     renderTaxonomyForms();
     renderWasteForm();
+    renderDeliveryForm();
     refreshOpenTickets();
     refreshPosPayments();
     refreshWaste();
+    refreshDeliveryRates();
     refreshWebsiteOrders();
     updatePushButtons();
     switchView(initialAdminView());
@@ -1589,6 +1656,7 @@ export async function mount(root) {
       taxonomy: 'Collections & Categories',
       valuation: 'Inventory Valuation',
       waste: 'Waste — Damaged & Lost Stock',
+      delivery: 'Delivery rates — Website shipping',
       credentials: 'Passwords & PINs',
     };
     if (els.pageTitle) els.pageTitle.textContent = titles[view] ?? 'Main Dashboard';
@@ -1597,6 +1665,10 @@ export async function mount(root) {
     if (view === 'reports') refreshReports();
     if (view === 'sales-by-item') refreshSalesByItem();
     if (view === 'valuation') renderInventoryValuation();
+    if (view === 'delivery') {
+      renderDeliveryForm();
+      refreshDeliveryRates();
+    }
   }
 
   function setCatalogFormVisible(visible) {
@@ -2028,6 +2100,95 @@ export async function mount(root) {
     } catch (err) {
       console.error('[admin] waste load failed:', err);
       els.wasteHost.innerHTML = `<p class="dash-empty">${escapeHtml(err?.message || 'Failed to load waste records.')}</p>`;
+    }
+  }
+
+  function renderDeliveryForm() {
+    if (!els.deliveryFormHost) return;
+    const rate = editingDeliveryId
+      ? deliveryRatesCache.find((r) => String(r.id) === String(editingDeliveryId)) || null
+      : null;
+    if (els.deliveryFormTitle) {
+      els.deliveryFormTitle.textContent = rate ? 'Edit delivery rate' : 'Add / edit rate';
+    }
+    els.deliveryFormHost.innerHTML = deliveryRateFormHtml(rate);
+  }
+
+  function renderDeliveryTable() {
+    if (!els.deliveryHost) return;
+    const filterEl = els.deliveryHost.querySelector('[data-delivery-filter]');
+    const keepFocus = document.activeElement === filterEl;
+    const selStart = keepFocus && filterEl instanceof HTMLInputElement ? filterEl.selectionStart : null;
+    const selEnd = keepFocus && filterEl instanceof HTMLInputElement ? filterEl.selectionEnd : null;
+    els.deliveryHost.innerHTML = deliveryRatesTableHtml(deliveryRatesCache, { filter: deliveryFilter });
+    if (keepFocus) {
+      const next = els.deliveryHost.querySelector('[data-delivery-filter]');
+      if (next instanceof HTMLInputElement) {
+        next.focus({ preventScroll: true });
+        if (typeof selStart === 'number' && typeof selEnd === 'number') {
+          try { next.setSelectionRange(selStart, selEnd); } catch { /* ignore */ }
+        }
+      }
+    }
+  }
+
+  async function refreshDeliveryRates() {
+    if (!els.deliveryHost) return;
+    if (!isSupabaseReady()) {
+      els.deliveryHost.innerHTML = '<p class="dash-empty">Supabase not configured — delivery rates unavailable.</p>';
+      return;
+    }
+    try {
+      deliveryRatesCache = await getDeliveryRates({ activeOnly: false });
+      renderDeliveryTable();
+      renderDeliveryForm();
+    } catch (err) {
+      console.error('[admin] delivery rates load failed:', err);
+      els.deliveryHost.innerHTML = `<p class="dash-empty">${escapeHtml(err?.message || 'Failed to load delivery rates. Run sql/delivery_rates.sql in Supabase (does not change inventory).')}</p>`;
+    }
+  }
+
+  async function saveDeliveryFromForm(form) {
+    if (!(form instanceof HTMLFormElement)) return;
+    const data = new FormData(form);
+    const id = String(data.get('id') || '').trim();
+    try {
+      await upsertDeliveryRate({
+        id: id || undefined,
+        city_ar: String(data.get('city_ar') || ''),
+        city_en: String(data.get('city_en') || ''),
+        zone: String(data.get('zone') || ''),
+        price_lyd: Number(data.get('price_lyd')),
+        sort_order: Number(data.get('sort_order') || 0),
+        is_active: String(data.get('is_active')) !== 'false',
+      });
+      editingDeliveryId = null;
+      await refreshDeliveryRates();
+    } catch (err) {
+      window.alert(err?.message || 'Failed to save delivery rate.');
+    }
+  }
+
+  async function seedDeliveryRatesFromFile() {
+    if (!isSupabaseReady()) {
+      window.alert('Supabase is not configured.');
+      return;
+    }
+    try {
+      const url = new URL('../shared/delivery-rates-seed.json', import.meta.url);
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Could not load seed file (${res.status}).`);
+      const seedRows = await res.json();
+      if (!Array.isArray(seedRows) || !seedRows.length) {
+        throw new Error('Seed file is empty.');
+      }
+      const result = await seedMissingDeliveryRates(seedRows);
+      window.alert(
+        `Libya rates loaded.\n\nInserted: ${result.inserted}\nAlready present (kept as-is): ${result.skipped}\n\nExisting prices were not overwritten. Inventory was not changed.`,
+      );
+      await refreshDeliveryRates();
+    } catch (err) {
+      window.alert(err?.message || 'Failed to load Libya rates.');
     }
   }
 
