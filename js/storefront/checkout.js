@@ -108,6 +108,7 @@ function readCheckoutFormState(overlay) {
     email: String(form.email?.value || ''),
     address: String(form.address?.value || ''),
     city: String(form.city?.value || ''),
+    citySearch: String(form.citySearch?.value || form.querySelector('[data-city-search]')?.value || ''),
     deliveryRateId: String(form.deliveryRateId?.value || form.querySelector('[name="deliveryRateId"]')?.value || ''),
     paymentMethod: payment instanceof HTMLInputElement ? payment.value : 'cad',
     activeName: document.activeElement instanceof HTMLElement
@@ -142,8 +143,16 @@ function restoreCheckoutFormState(overlay, state) {
   if (form.deliveryRateId && state.deliveryRateId) {
     form.deliveryRateId.value = state.deliveryRateId;
   } else if (state.deliveryRateId) {
-    const select = form.querySelector('[name="deliveryRateId"]');
-    if (select) select.value = state.deliveryRateId;
+    const hidden = form.querySelector('[name="deliveryRateId"]');
+    if (hidden) hidden.value = state.deliveryRateId;
+  }
+  const search = form.querySelector('[data-city-search]');
+  if (search instanceof HTMLInputElement) {
+    search.value = state.citySearch || state.city || '';
+  }
+  const clearBtn = form.querySelector('[data-city-clear]');
+  if (clearBtn instanceof HTMLElement) {
+    clearBtn.hidden = !state.deliveryRateId;
   }
 
   const radio = form.querySelector(`input[name="paymentMethod"][value="${CSS.escape(state.paymentMethod || 'cad')}"]`);
@@ -234,12 +243,31 @@ function renderCheckoutBody(overlay, cart, i18n, opts = {}) {
           <label for="co-address">${t('checkout.address')}</label>
           <input type="text" id="co-address" name="address" required autocomplete="street-address">
         </div>
-        <div class="checkout-field">
-          <label for="co-city">${t('checkout.city')}</label>
-          <select id="co-city" name="deliveryRateId" data-delivery-city required>
-            ${deliveryCityOptionsHtml(cachedDeliveryRates || [], cart.getSnapshot().deliveryCity, i18n)}
-          </select>
+        <div class="checkout-field checkout-city" data-city-picker>
+          <label for="co-city-search">${t('checkout.city')}</label>
+          <input type="hidden" name="deliveryRateId" data-delivery-city-id value="${escapeAttr(cart.getSnapshot().deliveryCity?.id || '')}">
           <input type="hidden" name="city" value="${escapeAttr(cart.getSnapshot().deliveryCity?.city_ar || '')}">
+          <div class="checkout-city__control">
+            <input
+              type="search"
+              id="co-city-search"
+              name="citySearch"
+              class="checkout-city__search"
+              data-city-search
+              placeholder="${escapeAttr((cachedDeliveryRates || []).length ? t('checkout.searchCity') : t('checkout.deliveryUnavailable'))}"
+              value="${escapeAttr(cityDisplayLabel(cart.getSnapshot().deliveryCity, i18n))}"
+              autocomplete="off"
+              inputmode="search"
+              enterkeyhint="search"
+              role="combobox"
+              aria-expanded="false"
+              aria-controls="co-city-list"
+              aria-autocomplete="list"
+              ${(cachedDeliveryRates || []).length ? '' : 'disabled'}
+            >
+            <button type="button" class="checkout-city__clear" data-city-clear ${cart.getSnapshot().deliveryCity ? '' : 'hidden'} aria-label="${escapeAttr(t('checkout.clearCity'))}">✕</button>
+          </div>
+          <ul id="co-city-list" class="checkout-city__list" data-city-list role="listbox" hidden></ul>
           <p class="checkout-field__hint">${t('checkout.deliveryHint')}</p>
         </div>
 
@@ -362,9 +390,14 @@ function bindOverlayEvents(overlay, cart, i18n) {
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && overlay.classList.contains('is-open')) {
-      closeCheckout(overlay);
+    if (event.key !== 'Escape' || !overlay.classList.contains('is-open')) return;
+    const openList = overlay.querySelector('[data-city-list]:not([hidden])');
+    if (openList) {
+      closeCityList(overlay.querySelector('[data-city-picker]'));
+      event.preventDefault();
+      return;
     }
+    closeCheckout(overlay);
   });
 }
 
@@ -373,11 +406,7 @@ function bindFormEvents(overlay, cart, i18n) {
   if (!form || form.dataset.bound === '1') return;
   form.dataset.bound = '1';
 
-  form.addEventListener('change', (event) => {
-    const select = event.target.closest('[data-delivery-city]');
-    if (!(select instanceof HTMLSelectElement)) return;
-    applyDeliveryCityFromSelect(cart, form, select);
-  });
+  bindCityPicker(form, cart, i18n);
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -386,55 +415,228 @@ function bindFormEvents(overlay, cart, i18n) {
 }
 
 /**
- * @param {ReturnType<import('./cart.js').createCart>} cart
  * @param {HTMLFormElement} form
- * @param {HTMLSelectElement} select
+ * @param {ReturnType<import('./cart.js').createCart>} cart
+ * @param {ReturnType<import('./i18n.js').createI18n>} i18n
  */
-function applyDeliveryCityFromSelect(cart, form, select) {
-  const id = String(select.value || '').trim();
-  const rate = (cachedDeliveryRates || []).find((r) => String(r.id) === id);
-  if (!rate) {
+function bindCityPicker(form, cart, i18n) {
+  const picker = form.querySelector('[data-city-picker]');
+  if (!(picker instanceof HTMLElement) || picker.dataset.bound === '1') return;
+  picker.dataset.bound = '1';
+
+  const search = picker.querySelector('[data-city-search]');
+  const list = picker.querySelector('[data-city-list]');
+  const clearBtn = picker.querySelector('[data-city-clear]');
+  const idInput = form.querySelector('[name="deliveryRateId"]');
+  const cityInput = form.querySelector('[name="city"]');
+  if (!(search instanceof HTMLInputElement) || !(list instanceof HTMLElement)) return;
+
+  const openList = (query = search.value) => {
+    const rates = filterDeliveryRates(cachedDeliveryRates || [], query);
+    renderCityList(list, rates, i18n, String(idInput?.value || ''));
+    list.hidden = false;
+    search.setAttribute('aria-expanded', 'true');
+  };
+
+  const pickRate = (rate) => {
+    if (!rate) return;
+    if (idInput) idInput.value = String(rate.id || '');
+    if (cityInput) cityInput.value = String(rate.city_ar || rate.city_en || '');
+    search.value = cityDisplayLabel(rate, i18n);
+    if (clearBtn instanceof HTMLElement) clearBtn.hidden = false;
+    cart.setDeliveryCity(rate);
+    closeCityList(picker);
+  };
+
+  const clearRate = () => {
+    if (idInput) idInput.value = '';
+    if (cityInput) cityInput.value = '';
+    search.value = '';
+    if (clearBtn instanceof HTMLElement) clearBtn.hidden = true;
     cart.setDeliveryCity(null);
-    if (form.city) form.city.value = '';
-    return;
-  }
-  cart.setDeliveryCity(rate);
-  if (form.city) form.city.value = String(rate.city_ar || rate.city_en || '');
+    closeCityList(picker);
+    search.focus();
+  };
+
+  search.addEventListener('focus', () => openList(search.value));
+  search.addEventListener('click', () => openList(search.value));
+
+  search.addEventListener('input', () => {
+    // Typing means the previous selection is no longer valid until they pick again.
+    if (idInput?.value) {
+      idInput.value = '';
+      if (cityInput) cityInput.value = '';
+      cart.setDeliveryCity(null);
+      if (clearBtn instanceof HTMLElement) clearBtn.hidden = true;
+    }
+    openList(search.value);
+  });
+
+  search.addEventListener('keydown', (event) => {
+    const options = [...list.querySelectorAll('[data-city-option]')];
+    const active = list.querySelector('[data-city-option].is-active');
+    let index = options.indexOf(active);
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      if (list.hidden) openList(search.value);
+      index = Math.min(options.length - 1, index + 1);
+      setActiveCityOption(options, index);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      index = Math.max(0, index - 1);
+      setActiveCityOption(options, index);
+      return;
+    }
+    if (event.key === 'Enter') {
+      const chosen = list.querySelector('[data-city-option].is-active')
+        || list.querySelector('[data-city-option]');
+      if (chosen && !list.hidden) {
+        event.preventDefault();
+        const id = chosen.getAttribute('data-city-option');
+        const rate = (cachedDeliveryRates || []).find((r) => String(r.id) === String(id));
+        pickRate(rate);
+      }
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      closeCityList(picker);
+    }
+  });
+
+  list.addEventListener('mousedown', (event) => {
+    // Keep focus on search while selecting.
+    event.preventDefault();
+  });
+
+  list.addEventListener('click', (event) => {
+    const option = event.target.closest('[data-city-option]');
+    if (!option) return;
+    const id = option.getAttribute('data-city-option');
+    const rate = (cachedDeliveryRates || []).find((r) => String(r.id) === String(id));
+    pickRate(rate);
+  });
+
+  clearBtn?.addEventListener('click', (event) => {
+    event.preventDefault();
+    clearRate();
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!picker.contains(event.target)) closeCityList(picker);
+  });
+}
+
+/**
+ * @param {HTMLElement | null} picker
+ */
+function closeCityList(picker) {
+  if (!(picker instanceof HTMLElement)) return;
+  const list = picker.querySelector('[data-city-list]');
+  const search = picker.querySelector('[data-city-search]');
+  if (list instanceof HTMLElement) list.hidden = true;
+  if (search instanceof HTMLInputElement) search.setAttribute('aria-expanded', 'false');
+}
+
+/**
+ * @param {Element[]} options
+ * @param {number} index
+ */
+function setActiveCityOption(options, index) {
+  options.forEach((el, i) => {
+    el.classList.toggle('is-active', i === index);
+    if (i === index && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ block: 'nearest' });
+    }
+  });
+}
+
+/**
+ * @param {object | null | undefined} rate
+ * @param {ReturnType<import('./i18n.js').createI18n>} i18n
+ */
+function cityDisplayLabel(rate, i18n) {
+  if (!rate) return '';
+  const ar = String(rate.city_ar || '').trim();
+  const en = String(rate.city_en || '').trim();
+  const price = Number(rate.price_lyd) || 0;
+  const name = en ? `${ar} / ${en}` : ar;
+  return name ? `${name} — ${i18n.formatPrice(price)}` : '';
 }
 
 /**
  * @param {object[]} rates
- * @param {object | null} selected
- * @param {ReturnType<import('./i18n.js').createI18n>} i18n
+ * @param {string} query
  */
-function deliveryCityOptionsHtml(rates, selected, i18n) {
+function filterDeliveryRates(rates, query) {
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return rates.slice(0, 80);
+  return rates.filter((r) => {
+    const hay = `${r.city_ar || ''} ${r.city_en || ''} ${r.zone || ''}`.toLowerCase();
+    return hay.includes(q);
+  }).slice(0, 80);
+}
+
+/**
+ * @param {HTMLElement} list
+ * @param {object[]} rates
+ * @param {ReturnType<import('./i18n.js').createI18n>} i18n
+ * @param {string} selectedId
+ */
+function renderCityList(list, rates, i18n, selectedId = '') {
   const t = i18n.t.bind(i18n);
-  const selectedId = selected?.id ? String(selected.id) : '';
   if (!rates.length) {
-    return `<option value="">${escapeHtml(t('checkout.deliveryUnavailable'))}</option>`;
+    list.innerHTML = `<li class="checkout-city__empty">${escapeHtml(t('checkout.cityNoResults'))}</li>`;
+    return;
   }
 
-  const inside = rates.filter((r) => r.zone === 'inside_benghazi');
-  const outside = rates.filter((r) => r.zone === 'outside_benghazi');
-  const other = rates.filter((r) => r.zone !== 'inside_benghazi' && r.zone !== 'outside_benghazi');
-
-  const option = (r) => {
-    const labelAr = String(r.city_ar || '').trim();
-    const labelEn = String(r.city_en || '').trim();
-    const price = Number(r.price_lyd) || 0;
-    const label = labelEn
-      ? `${labelAr} / ${labelEn} — ${i18n.formatPrice(price)}`
-      : `${labelAr} — ${i18n.formatPrice(price)}`;
-    const sel = String(r.id) === selectedId ? ' selected' : '';
-    return `<option value="${escapeAttr(r.id)}"${sel}>${escapeHtml(label)}</option>`;
+  const zoneLabel = (zone) => {
+    if (zone === 'inside_benghazi') return t('checkout.zoneInside');
+    if (zone === 'outside_benghazi') return t('checkout.zoneOutside');
+    return t('checkout.city');
   };
 
-  return [
-    `<option value="">${escapeHtml(t('checkout.chooseCity'))}</option>`,
-    inside.length ? `<optgroup label="${escapeAttr(t('checkout.zoneInside'))}">${inside.map(option).join('')}</optgroup>` : '',
-    outside.length ? `<optgroup label="${escapeAttr(t('checkout.zoneOutside'))}">${outside.map(option).join('')}</optgroup>` : '',
-    other.length ? `<optgroup label="${escapeAttr(t('checkout.city'))}">${other.map(option).join('')}</optgroup>` : '',
-  ].join('');
+  let lastZone = '';
+  list.innerHTML = rates.map((r, index) => {
+    const zone = String(r.zone || '');
+    const group = zone !== lastZone
+      ? `<li class="checkout-city__group" aria-hidden="true">${escapeHtml(zoneLabel(zone))}</li>`
+      : '';
+    lastZone = zone;
+    const selected = String(r.id) === String(selectedId);
+    return `${group}
+      <li
+        class="checkout-city__option${selected || index === 0 ? ' is-active' : ''}"
+        role="option"
+        data-city-option="${escapeAttr(r.id)}"
+        aria-selected="${selected ? 'true' : 'false'}"
+      >
+        <span class="checkout-city__option-name">${escapeHtml(String(r.city_ar || '').trim())}${r.city_en ? ` <span class="checkout-city__option-en">/ ${escapeHtml(String(r.city_en).trim())}</span>` : ''}</span>
+        <span class="checkout-city__option-price">${escapeHtml(i18n.formatPrice(Number(r.price_lyd) || 0))}</span>
+      </li>`;
+  }).join('');
+}
+
+function validateContact(form, errorEl, t) {
+  const required = ['fullName', 'phone', 'email', 'address'];
+  for (const name of required) {
+    if (!form[name]?.value.trim()) {
+      if (errorEl) errorEl.textContent = t('checkout.errorRequired');
+      form[name]?.focus();
+      return false;
+    }
+  }
+  const rateId = String(form.deliveryRateId?.value || form.querySelector('[name="deliveryRateId"]')?.value || '').trim();
+  if (!rateId) {
+    if (errorEl) errorEl.textContent = t('checkout.errorCity');
+    form.querySelector('[data-city-search]')?.focus();
+    return false;
+  }
+  return true;
 }
 
 async function submitOrder(overlay, cart, i18n, form) {
@@ -588,30 +790,6 @@ async function placeOrderClientSide(payload) {
   }
 
   return invoiceNumber;
-}
-
-function validateContact(form, errorEl, t) {
-  const required = ['fullName', 'phone', 'email', 'address'];
-  for (const name of required) {
-    if (!form[name]?.value.trim()) {
-      if (errorEl) errorEl.textContent = t('checkout.errorRequired');
-      form[name]?.focus();
-      return false;
-    }
-  }
-  const citySelect = form.querySelector('[data-delivery-city]');
-  if (citySelect instanceof HTMLSelectElement) {
-    if (!citySelect.value) {
-      if (errorEl) errorEl.textContent = t('checkout.errorCity');
-      citySelect.focus();
-      return false;
-    }
-  } else if (!form.city?.value.trim()) {
-    if (errorEl) errorEl.textContent = t('checkout.errorRequired');
-    form.city?.focus();
-    return false;
-  }
-  return true;
 }
 
 function validateCard(form, errorEl, t) {

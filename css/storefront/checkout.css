@@ -282,9 +282,110 @@
   color: var(--co-text-dim);
 }
 
+.checkout-city {
+  position: relative;
+}
+
+.checkout-city__control {
+  position: relative;
+}
+
+.checkout-city__search {
+  width: 100%;
+  padding-inline-end: 2.4rem !important;
+}
+
+.checkout-city__clear {
+  position: absolute;
+  inset-inline-end: 0.45rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.75rem;
+  height: 1.75rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--co-text-dim);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.checkout-city__clear:hover {
+  color: var(--co-text);
+  background: rgb(255 255 255 / 6%);
+}
+
+.checkout-city__list {
+  position: absolute;
+  z-index: 20;
+  inset-inline: 0;
+  top: calc(100% - 0.15rem);
+  margin: 0;
+  padding: 0.35rem 0;
+  list-style: none;
+  max-height: min(16rem, 42vh);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--co-bg-card);
+  border: 1px solid var(--co-border);
+  border-radius: var(--co-radius-sm);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 45%);
+}
+
+.checkout-city__group {
+  padding: 0.45rem 0.85rem 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--co-text-dim);
+}
+
+.checkout-city__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  cursor: pointer;
+  color: var(--co-text);
+}
+
+.checkout-city__option-name {
+  min-width: 0;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.checkout-city__option-en {
+  color: var(--co-text-muted);
+  font-size: 0.82rem;
+}
+
+.checkout-city__option-price {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--co-gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.checkout-city__option.is-active,
+.checkout-city__option:hover {
+  background: rgb(125 101 26 / 18%);
+}
+
+.checkout-city__empty {
+  padding: 0.85rem;
+  color: var(--co-text-dim);
+  font-size: 0.85rem;
+}
+
 .checkout-field input:focus,
 .checkout-field textarea:focus,
-.checkout-field select:focus {
+.checkout-field select:focus,
+.checkout-city__search:focus {
   border-color: var(--co-gold);
 }
 
