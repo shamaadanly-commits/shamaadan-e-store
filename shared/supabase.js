@@ -866,6 +866,69 @@ async function insertInventoryRestoreRows(rows) {
 }
 
 /**
+ * Current stock_quantity for a set of products.
+ * @param {string[]} productIds
+ * @returns {Promise<Map<string, number>>}
+ */
+export async function getProductStockLevels(productIds) {
+  const ids = [...new Set((productIds || []).map((id) => String(id || '').trim()).filter(Boolean))];
+  const levels = new Map();
+  if (!ids.length) return levels;
+
+  const { data, error } = await getSupabase()
+    .from('products')
+    .select('id, stock_quantity')
+    .in('id', ids);
+
+  if (error) throw mapSupabaseNetworkError(error, 'checking stock');
+  for (const row of data ?? []) {
+    levels.set(String(row.id), Number(row.stock_quantity ?? 0));
+  }
+  return levels;
+}
+
+/**
+ * Reserve / release stock for items sitting on the live POS register ticket,
+ * so the website and other devices see them as taken right away.
+ * Positive delta reserves (type `park`), negative delta releases (type `park_void`).
+ * @param {Array<{ product_id: string, delta: number }>} changes
+ * @param {string} holdId
+ */
+export async function applyRegisterHoldChanges(changes, holdId) {
+  const list = (changes || []).filter(
+    (c) => c?.product_id && Number.isFinite(Number(c.delta)) && Number(c.delta) !== 0,
+  );
+  if (!list.length) return;
+
+  const note = `Register hold ${holdId || ''}`.trim();
+  const reserveRows = list
+    .filter((c) => Number(c.delta) > 0)
+    .map((c) => ({
+      product_id: c.product_id,
+      quantity_changed: -Math.abs(Math.trunc(Number(c.delta))),
+      type: 'park',
+      source: 'pos',
+      notes: note,
+    }));
+  const releaseRows = list
+    .filter((c) => Number(c.delta) < 0)
+    .map((c) => ({
+      product_id: c.product_id,
+      quantity_changed: Math.abs(Math.trunc(Number(c.delta))),
+      type: 'park_void',
+      source: 'pos',
+      notes: `${note} released`,
+    }));
+
+  if (releaseRows.length) await insertInventoryRestoreRows(releaseRows);
+
+  if (reserveRows.length) {
+    const { error } = await getSupabase().from('inventory_transactions').insert(reserveRows);
+    if (error) throw new Error(`Could not reserve stock: ${error.message}`);
+  }
+}
+
+/**
  * Create a sale: orders → order_items → inventory_transactions (stock via trigger).
  * Pass status: 'open' | 'parked' to park a ticket (still reserves stock).
  * @param {{

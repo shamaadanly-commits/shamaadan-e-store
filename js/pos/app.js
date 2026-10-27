@@ -36,6 +36,7 @@ import {
   saveOfflineCatalog,
 } from '../shared/offline.js';
 import { createCartState } from './cart-state.js';
+import { createRegisterHolds } from './register-holds.js';
 import { createDashboard, renderDashboard } from './dashboard.js';
 import { createBarcodeScanner } from './scanner.js';
 import { printReceipt, printRefundReceipt } from './receipt.js';
@@ -269,6 +270,25 @@ async function mountRegister(root, staff) {
     if (rows.length) cart.syncCatalogStock(rows);
   }
 
+  const registerHolds = createRegisterHolds({
+    isEnabled: () => isSupabaseConfigured() && isOnline(),
+    onShortage: (items) => {
+      const snapshot = cart.getSnapshot();
+      const names = [];
+      for (const { productId, short, available } of items) {
+        const line = snapshot.items.find((l) => l.productId === productId);
+        if (!line) continue;
+        cart.adjustQuantity(productId, -Math.min(short, line.quantity));
+        names.push(available > 0 ? `${line.name} (only ${available} left)` : `${line.name} (sold out)`);
+      }
+      syncCartStockFromServer().catch(() => undefined);
+      if (names.length) showToast(els.toast, `Ticket updated · ${names.join(', ')}`);
+    },
+    onError: (err) => {
+      console.warn('[pos] register stock hold sync failed:', err?.message || err);
+    },
+  });
+
   const scanner = createBarcodeScanner({
     root,
     onScan: (code) => handleBarcode(code),
@@ -282,11 +302,17 @@ async function mountRegister(root, staff) {
   bindConnectivity(root, {
     onOnline: async () => {
       await flushOfflinePosSales();
+      await registerHolds.releaseStaleSessions();
+      await registerHolds.retry();
       await syncCartStockFromServer();
       refreshCatalog();
     },
   });
   flushOfflinePosSales().catch(() => undefined);
+  registerHolds.releaseStaleSessions()
+    .then(() => syncCartStockFromServer())
+    .then(() => refreshCatalog())
+    .catch(() => undefined);
 
   function handleBarcode(code) {
     const result = cart.addByBarcode(code);
@@ -511,6 +537,8 @@ async function mountRegister(root, staff) {
       try {
         els.park && (els.park.disabled = true);
         const snapshot = cart.getSnapshot();
+        // Parking reserves the whole ticket itself — release the live holds first.
+        await registerHolds.releaseAll();
         const parked = await saveOpenTicket({
           staff_user_id: staff.id,
           staff_name: staff.displayName || staff.username,
@@ -528,6 +556,7 @@ async function mountRegister(root, staff) {
         modal.remove();
         cart.clear({ restoreStock: false });
         activeOpenTicketId = null;
+        await registerHolds.resume([]);
         await syncCartStockFromServer();
         const ticketNo = parked?.order?.invoice_number || '';
         showToast(els.toast, ticketNo
@@ -537,6 +566,7 @@ async function mountRegister(root, staff) {
         await showTicketsPage();
       } catch (err) {
         console.error('[pos] park ticket failed:', err);
+        registerHolds.resume(cart.getSnapshot().items);
         if (errorEl) {
           errorEl.hidden = false;
           errorEl.textContent = err?.message || 'Failed to park ticket.';
@@ -789,6 +819,7 @@ async function mountRegister(root, staff) {
   }
 
   cart.subscribe((snapshot) => {
+    registerHolds.schedule(snapshot.items);
     refreshCatalog();
     renderLineItems(els.lines, snapshot.items);
     if (els.itemCount) {
@@ -842,6 +873,7 @@ async function mountRegister(root, staff) {
   async function autoRefreshPos() {
     if (document.hidden) return;
     try {
+      await registerHolds.releaseStaleSessions();
       await refreshOpenTicketBadge();
       await refreshOnlineOrdersBadge();
 
@@ -897,6 +929,12 @@ async function mountRegister(root, staff) {
     }
 
     if (target.closest('[data-pos-lock]')) {
+      if (cart.getSnapshot().items.length) {
+        const ok = window.confirm('Lock the register? Items on the current ticket will be removed and their stock returned.');
+        if (!ok) return;
+      }
+      await registerHolds.releaseAll();
+      cart.clear();
       await logout('pos');
       scanner.stop?.();
       await mountPinGate(root);
@@ -1200,6 +1238,9 @@ async function mountRegister(root, staff) {
           return;
         }
 
+        // The sale below deducts stock itself — give back the live register holds first.
+        await registerHolds.releaseAll();
+
         let invoiceNo = '';
         let offlineQueued = false;
         if (isSupabaseConfigured() && isOnline()) {
@@ -1255,6 +1296,7 @@ async function mountRegister(root, staff) {
 
         const sale = cart.checkout();
         activeOpenTicketId = null;
+        registerHolds.resume([]);
         if (sale.units > 0) {
           const receiptSale = {
             ...sale,
@@ -1285,6 +1327,7 @@ async function mountRegister(root, staff) {
         }
       } catch (err) {
         console.error('[pos] charge failed:', err);
+        registerHolds.resume(cart.getSnapshot().items);
         window.alert(err?.message || 'Charge failed.');
         els.checkout.disabled = cart.getSnapshot().items.length === 0;
       }
